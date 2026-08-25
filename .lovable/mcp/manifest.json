@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://dycjzlwqppiwwebteeky.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "astrowake",
+      "version": "0.1.0",
+      "title": "Astrowake"
+    },
+    "tools": [
+      {
+        "name": "list_leads",
+        "title": "Listar leads",
+        "description": "Lista os leads captados na landing page do Astrowake (nome, e-mail, WhatsApp, origem, cidade e data), do mais recente para o mais antigo. Requer conta de administrador.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Quantidade máxima de leads.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "search": {
+              "description": "Filtro por nome ou e-mail.",
+              "type": "string",
+              "minLength": 1
+            },
+            "since": {
+              "description": "Data ISO 8601: retorna apenas leads criados a partir dela.",
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+            }
+          }
+        },
+        "outputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "leads": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "count": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "leads",
+            "count"
+          ]
+        }
+      },
+      {
+        "name": "lead_stats",
+        "title": "Estatísticas de leads",
+        "description": "Resumo dos leads do Astrowake: total, últimas 24h e 7 dias, horário de pico, cidades e origens mais frequentes. Requer conta de administrador.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "days": {
+              "default": 30,
+              "description": "Janela de análise em dias.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365
+            }
+          }
+        },
+        "outputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "janela_dias": {
+              "type": "number"
+            },
+            "total_na_janela": {
+              "type": "number"
+            },
+            "ultimas_24h": {
+              "type": "number"
+            },
+            "ultimos_7_dias": {
+              "type": "number"
+            },
+            "horario_pico_utc": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cidades": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "label",
+                  "total"
+                ]
+              }
+            },
+            "origens": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "label",
+                  "total"
+                ]
+              }
+            }
+          },
+          "required": [
+            "janela_dias",
+            "total_na_janela",
+            "ultimas_24h",
+            "ultimos_7_dias",
+            "horario_pico_utc",
+            "cidades",
+            "origens"
+          ]
+        }
+      }
+    ]
+  }
+}
