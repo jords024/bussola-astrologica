@@ -1,0 +1,62 @@
+services:
+  # ============================================================================
+  # Serviço da Aplicação Web (Landing Page & Painel Astrowake / Bússola)
+  # ============================================================================
+  landing_crassus:
+    image: aryalvesfernandes/landing-crassus:1.0.10
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    
+    networks:
+      - network_swarm_public
+
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      
+      ##########################################
+      # Configurações do Banco de Dados Postgres
+      ##########################################
+      # Exemplo de conexão direta com o Postgres do Swarm ou externo:
+      - DATABASE_URL=postgres://postgres:35cb19b8-13cd-4f02-af3e-abdcdd373ae5@postgres:5432/bussola_astrologica
+      
+      ##########################################
+      # Chave de Segurança JWT
+      ##########################################
+      - JWT_SECRET=bussola_astrologica_jwt_secret_producao_super_segura_2026
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1024M
+      labels:
+        # Habilita o Traefik
+        - traefik.enable=true
+        
+        # Configura o Domínio / Roteamento HTTP(S)
+        - traefik.http.routers.landing_crassus.rule=Host(`crassusastrologo.com.br`)
+        
+        # Define o ponto de entrada HTTPS e Certificado SSL Let's Encrypt
+        - traefik.http.routers.landing_crassus.entrypoints=websecure
+        - traefik.http.routers.landing_crassus.tls.certresolver=letsencryptresolver
+        
+        # Define o serviço do Traefik e Porta interna
+        - traefik.http.routers.landing_crassus.service=landing_crassus
+        - traefik.http.services.landing_crassus.loadbalancer.server.port=3000
+        - traefik.http.services.landing_crassus.loadbalancer.passhostheader=true
+        
+        # Configura o Middleware para Headers SSL / HTTPS e Compressão Gzip/Brotli
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.middlewares.landing_compress.compress=true
+        - traefik.http.routers.landing_crassus.middlewares=sslheader@docker,landing_compress@docker
+
+networks:
+  network_swarm_public:
+    external: true
+    name: network_swarm_public
