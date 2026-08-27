@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import retrato from "../../assets/crassus-retrato.png.asset.json";
+import retratoImg from "../../assets/crassus-retrato.webp";
 
 const PARAGRAFOS = [
   "Minha mãe é astróloga há quase 50 anos, então eu cresci ouvindo esses nomes na mesa de jantar do mesmo jeito que outras famílias falam de futebol. E olha só a ironia: eu passei metade da vida fugindo disso…",
@@ -97,7 +97,7 @@ export default function BlocoHistoriaCrassus() {
               className="relative overflow-hidden rounded-[22px] border border-gold/25 will-change-transform"
             >
               <img
-                src={retrato.url}
+                src={retratoImg}
                 alt="Crassus Gobbi, astrólogo, com as mãos apoiadas sob o queixo"
                 loading="eager"
                 decoding="async"

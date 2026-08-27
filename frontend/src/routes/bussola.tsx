@@ -6,7 +6,7 @@ import heroMobileAsset from "../assets/bussola-hero-mobile.png.asset.json";
 import fluiAsset from "../assets/bussola-tudo-flui.png.asset.json";
 import fluiMobileAsset from "../assets/bussola-tudo-flui-mobile.png.asset.json";
 import semanaAsset from "../assets/bussola-semana-seguinte.png.asset.json";
-import retratoAsset from "../assets/crassus-retrato.png.asset.json";
+import retratoAsset from "../assets/crassus-retrato.webp";
 import erroAsset from "../assets/bussola-erro-nunca-foi-voce.png.asset.json";
 
 import portasSeAbrindoAsset from "../assets/bussola-portas-se-abrindo.webp";
@@ -71,7 +71,7 @@ const PREFETCH_IMAGES = [
   fluiAsset.url,
   fluiMobileAsset.url,
   semanaAsset.url,
-  retratoAsset.url,
+  retratoAsset,
   erroAsset.url,
   portasSeAbrindoAsset,
   esforcouODobroAsset,
