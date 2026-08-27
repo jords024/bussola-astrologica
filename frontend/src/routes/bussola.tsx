@@ -133,7 +133,7 @@ export const Route = createFileRoute("/bussola")({
   component: BussolaPage,
 });
 
-const CHECKOUT_URL = "https://pay.hotmart.com/Q107238351O";
+const CHECKOUT_URL = "https://pay.hotmart.com/Q107238351O?checkoutMode=10";
 
 function BussolaPage() {
   const pixelFired = useRef(false);

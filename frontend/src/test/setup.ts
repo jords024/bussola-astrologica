@@ -15,4 +15,36 @@ if (typeof window !== 'undefined') {
       dispatchEvent: () => false,
     }),
   });
+
+  class MockIntersectionObserver {
+    observe = () => {};
+    unobserve = () => {};
+    disconnect = () => {};
+  }
+  Object.defineProperty(window, 'IntersectionObserver', {
+    writable: true,
+    configurable: true,
+    value: MockIntersectionObserver,
+  });
+  Object.defineProperty(global, 'IntersectionObserver', {
+    writable: true,
+    configurable: true,
+    value: MockIntersectionObserver,
+  });
+
+  class MockResizeObserver {
+    observe = () => {};
+    unobserve = () => {};
+    disconnect = () => {};
+  }
+  Object.defineProperty(window, 'ResizeObserver', {
+    writable: true,
+    configurable: true,
+    value: MockResizeObserver,
+  });
+  Object.defineProperty(global, 'ResizeObserver', {
+    writable: true,
+    configurable: true,
+    value: MockResizeObserver,
+  });
 }

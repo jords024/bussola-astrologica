@@ -6,19 +6,43 @@ import BlocoTudoFlui from '@/components/bussola/bloco-tudo-flui';
 import BlocoSemanaSeguinte from '@/components/bussola/bloco-semana-seguinte';
 import Bloco12Portas from '@/components/bussola/bloco-12-portas';
 import BlocoHistoriaCrassus from '@/components/bussola/bloco-historia-crassus';
+import BlocoOfertaFinal from '@/components/bussola/bloco-oferta-final';
+import CtaFixo from '@/components/bussola/cta-fixo';
 import BlocoFAQ from '@/components/bussola/bloco-faq';
 import WhatsappButton from '@/components/bussola/whatsapp-button';
 import RodapeBussola from '@/components/bussola/rodape-bussola';
+import { fireEvent } from '@testing-library/react';
+import { vi } from 'vitest';
 
 describe('Bussola Sales Page Components', () => {
-  it('should render HeroBussola with CTA button and eager loading', () => {
-    const onCheckout = () => {};
+  it('should render HeroBussola with CTA button and trigger onCheckout', () => {
+    const onCheckout = vi.fn();
     render(<HeroBussola onCheckout={onCheckout} />);
     const ctaButtons = screen.getAllByRole('button');
     expect(ctaButtons.length).toBeGreaterThan(0);
+    fireEvent.click(ctaButtons[0]);
+    expect(onCheckout).toHaveBeenCalled();
     const heroImg = screen.getByAltText(/Roda zodiacal dourada/i);
     expect(heroImg).toHaveAttribute('loading', 'eager');
     expect(heroImg).toHaveAttribute('fetchpriority', 'high');
+  });
+
+  it('should render BlocoOfertaFinal with CTA button and trigger onCheckout', () => {
+    const onCheckout = vi.fn();
+    render(<BlocoOfertaFinal onCheckout={onCheckout} />);
+    const ctaButton = screen.getByRole('button', { name: /Quero abrir minhas portas/i });
+    expect(ctaButton).toBeInTheDocument();
+    fireEvent.click(ctaButton);
+    expect(onCheckout).toHaveBeenCalled();
+  });
+
+  it('should render CtaFixo and trigger onCheckout', () => {
+    const onCheckout = vi.fn();
+    render(<CtaFixo onCheckout={onCheckout} />);
+    const ctaButton = screen.getByRole('button', { name: /Quero abrir minhas portas/i, hidden: true });
+    expect(ctaButton).toBeInTheDocument();
+    fireEvent.click(ctaButton);
+    expect(onCheckout).toHaveBeenCalled();
   });
 
   it('should render BlocoTudoFlui with eager loading for fast above-the-fold display', () => {

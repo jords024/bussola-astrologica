@@ -47,7 +47,7 @@ function Vendas() {
   const handleCheckout = (origem = "hero_vendas") => {
     fbqTrack("InitiateCheckout", { content_name: "Formacao Astrowake" });
     fbqTrackCustom("ClicouCheckout", { origem });
-    window.location.href = "https://pay.hotmart.com/SEU_LINK_DE_CHECKOUT";
+    window.location.href = "https://pay.hotmart.com/Q107238351O?checkoutMode=10";
   };
 
   return (
