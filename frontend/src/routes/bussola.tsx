@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
 import { fbqTrack, fbqTrackCustom, trackPageView } from "../lib/fbq";
+import { submitLead } from "../lib/leads.functions";
+import CheckoutModal, { type CheckoutFormData } from "../components/bussola/checkout-modal";
 import heroAsset from "../assets/bussola-hero.png.asset.json";
 import heroMobileAsset from "../assets/bussola-hero-mobile.png.asset.json";
 import fluiAsset from "../assets/bussola-tudo-flui.png.asset.json";
@@ -133,10 +136,14 @@ export const Route = createFileRoute("/bussola")({
   component: BussolaPage,
 });
 
-const CHECKOUT_URL = "https://pay.hotmart.com/Q107238351O?checkoutMode=10";
+const HOTMART_BASE_URL = "https://pay.hotmart.com/Q107238351O";
 
 function BussolaPage() {
   const pixelFired = useRef(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutOrigem, setCheckoutOrigem] = useState("hero_bussola");
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const sendLead = useServerFn(submitLead);
 
   useEffect(() => {
     if (pixelFired.current) return;
@@ -169,9 +176,7 @@ function BussolaPage() {
     }
   }, []);
 
-  // Dificulta o "salvar imagem" / copiar conteúdo da página (não é segurança
-  // real — view-source e devtools ainda acessam tudo — apenas dissuade o
-  // visitante casual de baixar as artes ou colar o texto em outro lugar.
+  // Dificulta o "salvar imagem" / copiar conteúdo da página
   useEffect(() => {
     const preventContextMenu = (e: MouseEvent) => e.preventDefault();
     const preventDragStart = (e: DragEvent) => e.preventDefault();
@@ -183,15 +188,74 @@ function BussolaPage() {
     };
   }, []);
 
-  const handleCheckout = (origem = "hero_bussola") => {
-    fbqTrack("InitiateCheckout", { content_name: "Bussola Astrologica" });
-    fbqTrackCustom("ClicouCheckout", { origem });
-    window.location.href = CHECKOUT_URL;
+  const handleOpenCheckout = (origem = "hero_bussola") => {
+    setCheckoutOrigem(origem);
+    setIsCheckoutOpen(true);
+  };
+
+  const handleProcessCheckout = async (data: CheckoutFormData) => {
+    setIsRedirecting(true);
+    try {
+      // Captura parâmetros UTM e origem da navegação
+      const currentParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+      const utm_source = currentParams.get("utm_source") || undefined;
+      const utm_medium = currentParams.get("utm_medium") || undefined;
+      const utm_campaign = currentParams.get("utm_campaign") || undefined;
+      const referrer = typeof document !== "undefined" ? document.referrer : undefined;
+      const ddi = data.ddi || "55";
+      const fullPhone = `+${ddi}${data.whatsapp}`;
+
+      // 1. Salva o lead no banco de dados e dispara webhook ZapVoice
+      try {
+        await sendLead({
+          data: {
+            nome: data.nome,
+            whatsapp: fullPhone,
+            origem: `bussola_modal_${checkoutOrigem}`,
+            referrer,
+            utm_source,
+            utm_medium,
+            utm_campaign,
+          },
+        });
+      } catch (leadError) {
+        console.error("Aviso: falha ao salvar lead pré-checkout:", leadError);
+      }
+
+      // 2. Dispara eventos de Pixel Meta
+      fbqTrack("Lead", { content_name: "Bussola Astrologica" });
+      fbqTrack("InitiateCheckout", { content_name: "Bussola Astrologica" });
+      fbqTrackCustom("ClicouCheckout", { origem: checkoutOrigem });
+
+      // 3. Constrói a URL pré-populada da Hotmart
+      const hotmartUrl = new URL(HOTMART_BASE_URL);
+      hotmartUrl.searchParams.set("checkoutMode", "10");
+      hotmartUrl.searchParams.set("name", data.nome);
+      if (data.whatsapp) {
+        hotmartUrl.searchParams.set("phonenumber", data.whatsapp);
+        hotmartUrl.searchParams.set("phoneac", ddi);
+      }
+
+      // Repassa parâmetros UTM existentes na URL atual para a Hotmart
+      if (typeof window !== "undefined") {
+        const searchParams = new URLSearchParams(window.location.search);
+        ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "src", "sck"].forEach((param) => {
+          const val = searchParams.get(param);
+          if (val) hotmartUrl.searchParams.set(param, val);
+        });
+        window.location.href = hotmartUrl.toString();
+      }
+    } catch (err) {
+      console.error("Erro no processamento do checkout:", err);
+      // Fallback: redireciona mesmo em caso de erro
+      const ddi = data.ddi || "55";
+      window.location.href = `${HOTMART_BASE_URL}?checkoutMode=10&name=${encodeURIComponent(data.nome)}&phonenumber=${encodeURIComponent(data.whatsapp)}&phoneac=${ddi}`;
+    }
   };
 
   return (
     <main className="relative w-full select-none bg-background font-body text-foreground selection:bg-gold selection:text-background">
-      <HeroBussola onCheckout={() => handleCheckout("hero_bussola")} />
+      <HeroBussola onCheckout={() => handleOpenCheckout("hero_bussola")} />
       <BlocoTudoFlui />
       <BlocoSemanaSeguinte />
       <BlocoRelogioCosmico />
@@ -221,12 +285,20 @@ function BussolaPage() {
       <BlocoNemTodaFasePedeEsforco />
       <BlocoOfertaHeadline />
       <BlocoOfertaConteudo />
-      <BlocoOfertaFinal onCheckout={() => handleCheckout("oferta_final")} />
+      <BlocoOfertaFinal onCheckout={() => handleOpenCheckout("oferta_final")} />
       <BlocoFAQ />
       <RodapeBussola />
 
       <WhatsappButton />
-      <CtaFixo onCheckout={() => handleCheckout("cta_fixo")} />
+      <CtaFixo onCheckout={() => handleOpenCheckout("cta_fixo")} />
+
+      {/* Modal de Pré-Checkout Pré-Populado */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => !isRedirecting && setIsCheckoutOpen(false)}
+        onSubmit={handleProcessCheckout}
+        isLoading={isRedirecting}
+      />
     </main>
   );
 }

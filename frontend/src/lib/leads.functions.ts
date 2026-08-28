@@ -14,7 +14,7 @@ import {
 
 export type LeadInput = {
   nome: string;
-  email: string;
+  email?: string | undefined;
   whatsapp: string;
   origem?: string | undefined;
   referrer?: string | undefined;
@@ -52,13 +52,23 @@ export function clean(value: unknown, max = 300): string | null {
 export const submitLead = createServerFn({ method: "POST" })
   .validator((data: LeadInput) => {
     const nome = clean(data?.nome, 120);
-    const email = clean(data?.email, 160);
+    const rawEmail = clean(data?.email, 160);
     const whatsapp = clean(data?.whatsapp, 40);
-    if (!nome || !email || !whatsapp) throw new Error("Dados incompletos");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("E-mail inválido");
+    if (!nome || !whatsapp) throw new Error("Dados incompletos");
+    
+    let email = rawEmail ? rawEmail.toLowerCase() : null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("E-mail inválido");
+    }
+    
+    if (!email) {
+      const cleanPhone = whatsapp.replace(/\D/g, "");
+      email = `checkout-${cleanPhone || "lead"}@bussola.cliente`;
+    }
+
     return {
       nome,
-      email: email.toLowerCase(),
+      email,
       whatsapp,
       origem: clean(data?.origem, 80),
       referrer: clean(data?.referrer, 300),
@@ -123,6 +133,77 @@ export const submitLead = createServerFn({ method: "POST" })
         data.utm_campaign,
       ]
     );
+
+    // Disparo do webhook para o ZapVoice no formato oficial de evento da Hotmart
+    try {
+      const cleanDigits = data.whatsapp.replace(/\D/g, "");
+      const ddd = cleanDigits.length >= 10 ? cleanDigits.slice(-11, -9) : "";
+      const phoneNum = cleanDigits.length >= 10 ? cleanDigits.slice(-9) : cleanDigits;
+
+      const hotmartPayload = {
+        id: `lead_${Date.now()}`,
+        event: "PURCHASE_OUT_OF_SHOPPING_CART",
+        version: "2.0.0",
+        creation_date: Date.now(),
+        data: {
+          product: {
+            id: "Q107238351O",
+            ucode: "Q107238351O",
+            name: "Bússola Astrológica",
+          },
+          buyer: {
+            name: data.nome,
+            email: data.email,
+            checkout_phone: cleanDigits,
+            phone: data.whatsapp,
+            phone_local_code: ddd,
+            phone_number: phoneNum,
+            phone_checkout_number: cleanDigits,
+            address: {
+              city: cidade || "",
+              state: regiao || "",
+              country: pais || "BR",
+            },
+          },
+          purchase: {
+            order_date: Date.now(),
+            status: "STARTED",
+            price: {
+              value: 67.0,
+              currency_code: "BRL",
+            },
+            tracking: {
+              source: data.utm_source || "",
+              medium: data.utm_medium || "",
+              campaign: data.utm_campaign || "",
+              source_sck: data.origem || "",
+            },
+          },
+        },
+        nome: data.nome,
+        name: data.nome,
+        phone: data.whatsapp,
+        whatsapp: data.whatsapp,
+        email: data.email,
+        origem: data.origem,
+        ip,
+        cidade,
+        regiao,
+        pais,
+        utm_source: data.utm_source,
+        utm_medium: data.utm_medium,
+        utm_campaign: data.utm_campaign,
+      };
+
+      await fetch("https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hotmartPayload),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (webhookError) {
+      console.error("Aviso: erro ao enviar webhook para ZapVoice:", webhookError);
+    }
 
     return { ok: true };
   });

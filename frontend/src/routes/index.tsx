@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -11,11 +12,13 @@ import {
   Lock,
   X,
   ShieldCheck,
+  ChevronDown,
+  Check,
 } from "lucide-react";
-
 
 import { fbqTrack, fbqTrackCustom, trackPageView } from "../lib/fbq";
 import { submitLead } from "../lib/leads.functions";
+import { COUNTRIES, formatPhoneByCountry, type CountryInfo } from "../components/bussola/checkout-modal";
 import crassusAsset from "../assets/crassus-cosmico.png.asset.json";
 import crassusMobileAsset from "../assets/crassus-mobile.png.asset.json";
 
@@ -46,16 +49,22 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const parallaxRef = useRef<HTMLDivElement>(null);
+  const lenisRef = useRef<Lenis | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ nome: "", email: "", whatsapp: "" });
+  const [formData, setFormData] = useState({ nome: "", whatsapp: "" });
+  const [selectedCountry, setSelectedCountry] = useState<CountryInfo>(COUNTRIES[0]);
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittedRef = useRef(false);
   const origemRef = useRef<string>("hero");
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
+  const sendLead = useServerFn(submitLead);
 
   const openModal = (origem: string) => {
     submittedRef.current = false;
     origemRef.current = origem;
     setModalOpen(true);
+    setIsCountryDropdownOpen(false);
     // Lead abriu o formulário (chegou até esse ponto)
     fbqTrack("InitiateCheckout", { content_name: "Formulario Astrowake", origem });
     fbqTrackCustom("AbriuFormulario", { origem });
@@ -63,15 +72,29 @@ function Index() {
 
   const closeModal = () => {
     setModalOpen(false);
+    setIsCountryDropdownOpen(false);
     if (!submittedRef.current) {
       // Abriu o formulário e desistiu sem enviar
       fbqTrackCustom("AbandonouFormulario", {
         preencheu_nome: Boolean(formData.nome),
-        preencheu_email: Boolean(formData.email),
         preencheu_whatsapp: Boolean(formData.whatsapp),
       });
     }
   };
+
+  useEffect(() => {
+    const handleClickOutsideDropdown = (event: MouseEvent) => {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
+        setIsCountryDropdownOpen(false);
+      }
+    };
+    if (isCountryDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutsideDropdown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideDropdown);
+    };
+  }, [isCountryDropdownOpen]);
 
   useEffect(() => {
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -102,6 +125,7 @@ function Index() {
     }
 
     const lenis = new Lenis({ autoRaf: false });
+    lenisRef.current = lenis;
     lenis.on("scroll", ScrollTrigger.update);
     const raf = (time: number) => {
       lenis.raf(time * 1000);
@@ -120,6 +144,7 @@ function Index() {
       ScrollTrigger.getAll().forEach((st) => st.kill());
       gsap.ticker.remove(raf);
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
 
@@ -130,12 +155,24 @@ function Index() {
     trackPageView();
   }, []);
 
-
   useEffect(() => {
-    document.body.style.overflow = modalOpen ? "hidden" : "";
+    if (modalOpen) {
+      lenisRef.current?.stop();
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      lenisRef.current?.start();
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
 
     return () => {
+      lenisRef.current?.start();
+      document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
+      document.body.style.touchAction = "";
     };
   }, [modalOpen]);
 
@@ -145,12 +182,13 @@ function Index() {
     setIsSubmitting(true);
     fbqTrackCustom("EnviouFormulario");
     try {
+      const cleanDigits = formData.whatsapp.replace(/\D/g, "");
+      const fullPhone = `+${selectedCountry.ddi}${cleanDigits}`;
       const params = new URLSearchParams(window.location.search);
-      await submitLead({
+      await sendLead({
         data: {
           nome: formData.nome,
-          email: formData.email,
-          whatsapp: formData.whatsapp,
+          whatsapp: fullPhone,
           origem: origemRef.current,
           referrer: document.referrer,
           utm_source: params.get("utm_source") ?? undefined,
@@ -164,11 +202,21 @@ function Index() {
     window.location.href = "/obrigado";
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneByCountry(e.target.value, selectedCountry.code);
+    setFormData((prev) => ({ ...prev, whatsapp: formatted }));
+  };
+
+  const handleCountrySelect = (country: CountryInfo) => {
+    setSelectedCountry(country);
+    setIsCountryDropdownOpen(false);
+    setFormData((prev) => ({ ...prev, whatsapp: formatPhoneByCountry(prev.whatsapp, country.code) }));
+  };
 
   const setField =
-    (key: keyof typeof formData) =>
+    (key: "nome") =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
-      setFormData({ ...formData, [key]: e.target.value });
+      setFormData((prev) => ({ ...prev, [key]: e.target.value }));
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
@@ -373,12 +421,12 @@ function Index() {
       {/* ==================== MODAL / POPUP ==================== */}
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          onClick={() => closeModal()}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm overscroll-none touch-none select-none"
+          onWheel={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
         >
           <div
-            className="relative w-full max-w-md overflow-hidden rounded-[1.5rem] border border-gold/25 bg-card shadow-[var(--shadow-gold)]"
-            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md overflow-hidden rounded-[1.5rem] border border-gold/25 bg-card shadow-[var(--shadow-gold)] select-auto"
           >
             <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(ellipse_at_top,oklch(0.8_0.14_82/0.28),transparent_70%)]" />
 
@@ -406,7 +454,7 @@ function Index() {
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div>
                   <label htmlFor="nome" className="mb-1.5 block text-xs font-semibold text-foreground/80">
-                    Seu Nome Completo
+                    Seu Nome Completo *
                   </label>
                   <input
                     id="nome"
@@ -418,39 +466,76 @@ function Index() {
                     className="w-full rounded-xl border border-input bg-background/70 px-4 py-3.5 text-sm text-white placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all"
                   />
                 </div>
-                <div>
-                  <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-foreground/80">
-                    Seu Melhor E-mail
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    placeholder="voce@email.com"
-                    value={formData.email}
-                    onChange={setField("email")}
-                    className="w-full rounded-xl border border-input bg-background/70 px-4 py-3.5 text-sm text-white placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all"
-                  />
-                </div>
+
                 <div>
                   <label htmlFor="whatsapp" className="mb-1.5 block text-xs font-semibold text-foreground/80">
-                    Seu WhatsApp com DDD
+                    Seu WhatsApp com DDD *
                   </label>
-                  <input
-                    id="whatsapp"
-                    type="tel"
-                    required
-                    placeholder="(11) 99999-9999"
-                    value={formData.whatsapp}
-                    onChange={setField("whatsapp")}
-                    className="w-full rounded-xl border border-input bg-background/70 px-4 py-3.5 text-sm text-white placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold transition-all"
-                  />
+                  <div className="relative flex rounded-xl border border-input bg-background/70 focus-within:border-gold focus-within:ring-1 focus-within:ring-gold transition-all">
+                    {/* Botão Dropdown País */}
+                    <div className="relative" ref={countryDropdownRef}>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => setIsCountryDropdownOpen((prev) => !prev)}
+                        className="flex h-full items-center gap-1.5 rounded-l-xl border-r border-gold/20 bg-background/50 px-3 py-3 text-sm font-medium text-foreground transition-colors hover:bg-gold/10 active:scale-95"
+                        aria-label={`País selecionado: ${selectedCountry.name} (+${selectedCountry.ddi})`}
+                        aria-expanded={isCountryDropdownOpen}
+                      >
+                        <span className="text-lg leading-none" role="img" aria-label={selectedCountry.name}>
+                          {selectedCountry.flag}
+                        </span>
+                        <span className="text-xs font-bold text-gold-soft">+{selectedCountry.ddi}</span>
+                        <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform duration-200" />
+                      </button>
+
+                      {/* Lista Dropdown com Bandeiras */}
+                      {isCountryDropdownOpen && (
+                        <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-60 overflow-y-auto rounded-xl border border-gold/35 bg-card/98 p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                          {COUNTRIES.map((c) => {
+                            const isSelected = c.code === selectedCountry.code;
+                            return (
+                              <button
+                                key={c.code}
+                                type="button"
+                                onClick={() => handleCountrySelect(c)}
+                                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
+                                  isSelected
+                                    ? "bg-gold/20 font-bold text-gold"
+                                    : "text-foreground/90 hover:bg-gold/10 hover:text-foreground"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base leading-none">{c.flag}</span>
+                                  <span className="truncate">{c.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-muted-foreground font-mono">+{c.ddi}</span>
+                                  {isSelected && <Check className="h-3 w-3 text-gold shrink-0" />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      id="whatsapp"
+                      type="tel"
+                      required
+                      placeholder={selectedCountry.code === "BR" ? "(11) 99999-9999" : "Número com DDD"}
+                      value={formData.whatsapp}
+                      onChange={handlePhoneChange}
+                      className="w-full flex-1 bg-transparent px-3.5 py-3.5 text-sm text-white placeholder:text-muted-foreground/60 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold-deep via-gold to-gold-soft px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-primary-foreground shadow-[var(--shadow-gold)] transition-transform duration-300 hover:scale-[1.02] disabled:opacity-80"
+                  className="group mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gold-deep via-gold to-gold-soft px-6 py-4 text-sm font-bold uppercase tracking-[0.14em] text-primary-foreground shadow-[var(--shadow-gold)] transition-transform duration-300 hover:scale-[1.02] disabled:opacity-80"
                 >
                   {isSubmitting ? (
                     <>
