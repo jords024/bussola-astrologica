@@ -120,6 +120,24 @@ export const Route = createFileRoute("/bussola")({
     ],
     links: [
       {
+        rel: "preconnect",
+        href: "https://pay.hotmart.com",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "dns-prefetch",
+        href: "https://pay.hotmart.com",
+      },
+      {
+        rel: "preconnect",
+        href: "https://zapvoicecrassos.aryaraj.shop",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "dns-prefetch",
+        href: "https://zapvoicecrassos.aryaraj.shop",
+      },
+      {
         rel: "preload",
         as: "image",
         href: heroMobileAsset.url,
@@ -205,9 +223,9 @@ function BussolaPage() {
       const ddi = data.ddi || "55";
       const fullPhone = `+${ddi}${data.whatsapp}`;
 
-      // 1. Salva o lead no banco de dados e dispara webhook ZapVoice
+      // 1. Salva o lead no banco de dados e dispara webhook ZapVoice (com timeout resiliente de 3.5s no cliente)
       try {
-        await sendLead({
+        const sendLeadPromise = sendLead({
           data: {
             nome: data.nome,
             whatsapp: fullPhone,
@@ -218,8 +236,13 @@ function BussolaPage() {
             utm_campaign,
           },
         });
+        const clientTimeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Lead submission client timeout")), 3500)
+        );
+
+        await Promise.race([sendLeadPromise, clientTimeoutPromise]);
       } catch (leadError) {
-        console.error("Aviso: falha ao salvar lead pré-checkout:", leadError);
+        console.warn("Aviso: falha ou timeout ao salvar lead pré-checkout, prosseguindo com Hotmart:", leadError);
       }
 
       // 2. Dispara eventos de Pixel Meta

@@ -85,6 +85,24 @@ describe('CheckoutModal Component with Country Selector', () => {
     });
   });
 
+  it('should apply mobile safe area and 100dvh classes', () => {
+    render(
+      <CheckoutModal isOpen={true} onClose={vi.fn()} onSubmit={vi.fn()} />
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('min-h-[100dvh]');
+    expect(dialog.className).toContain('safe-area-inset-bottom');
+  });
+
+  it('should display loading state when isLoading is true', () => {
+    render(
+      <CheckoutModal isOpen={true} onClose={vi.fn()} onSubmit={vi.fn()} isLoading={true} />
+    );
+    expect(screen.getByText(/Carregando checkout seguro/i)).toBeInTheDocument();
+    const submitBtn = screen.getByRole('button', { name: /Carregando checkout seguro/i });
+    expect(submitBtn).toBeDisabled();
+  });
+
   it('should call onClose when close button is clicked', () => {
     const handleClose = vi.fn();
     render(

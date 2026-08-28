@@ -91,6 +91,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       {
+        rel: "preconnect",
+        href: "https://pay.hotmart.com",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "dns-prefetch",
+        href: "https://pay.hotmart.com",
+      },
+      {
+        rel: "preconnect",
+        href: "https://zapvoicecrassos.aryaraj.shop",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "dns-prefetch",
+        href: "https://zapvoicecrassos.aryaraj.shop",
+      },
+      {
+        rel: "preconnect",
+        href: "https://connect.facebook.net",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "dns-prefetch",
+        href: "https://connect.facebook.net",
+      },
+      {
         rel: "preload",
         as: "font",
         type: "font/woff2",

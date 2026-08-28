@@ -168,9 +168,7 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
       role="dialog"
       aria-modal="true"
       aria-labelledby="checkout-modal-title"
-      onWheel={(e) => e.stopPropagation()}
-      onTouchMove={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overscroll-none touch-none select-none"
+      className="fixed inset-0 z-50 flex min-h-[100dvh] items-center justify-center p-3 pb-[env(safe-area-inset-bottom,12px)] sm:p-6"
     >
       {/* Backdrop — Não fecha ao clicar fora */}
       <div
@@ -178,9 +176,9 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
         aria-hidden="true"
       />
 
-      {/* Caixa do Modal */}
+      {/* Caixa do Modal — Suporta rolagem interna se o teclado do celular abrir */}
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-[26px] border border-gold/35 bg-card/95 p-6 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_-10px_color-mix(in_oklab,var(--gold)_30%,transparent)] backdrop-blur-xl sm:p-8 animate-in zoom-in-95 duration-300"
+        className="relative w-full max-w-lg max-h-[min(92dvh,640px)] overflow-y-auto rounded-[22px] border border-gold/35 bg-card/95 p-5 sm:rounded-[26px] sm:p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_-10px_color-mix(in_oklab,var(--gold)_30%,transparent)] backdrop-blur-xl animate-in zoom-in-95 duration-300"
       >
         {/* Glow de fundo */}
         <div

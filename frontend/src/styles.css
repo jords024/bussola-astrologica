@@ -190,3 +190,23 @@
   -webkit-background-clip: text;
   color: transparent;
 }
+
+/* Mobile & Low-End Device Optimizations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Garante renderização fluida no Safari iOS e Chrome Mobile */
+html,
+body {
+  touch-action: pan-y;
+  -webkit-text-size-adjust: 100%;
+}
+

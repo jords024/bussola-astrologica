@@ -53,7 +53,7 @@ export default function CtaFixo({ onCheckout }: Props) {
       className={`fixed inset-x-0 bottom-0 z-40 transition-all duration-500 ease-out ${
         visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-full opacity-0"
       }`}
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))" }}
     >
       <div className="border-t border-gold/25 bg-background/92 backdrop-blur-lg">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:gap-5 sm:px-6">

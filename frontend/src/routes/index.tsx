@@ -124,14 +124,26 @@ function Index() {
       );
     }
 
-    const lenis = new Lenis({ autoRaf: false });
-    lenisRef.current = lenis;
-    lenis.on("scroll", ScrollTrigger.update);
-    const raf = (time: number) => {
-      lenis.raf(time * 1000);
-    };
-    gsap.ticker.add(raf);
-    gsap.ticker.lagSmoothing(0);
+    // Instancia Lenis apenas em desktops / ponteiros finos para preservar o scroll nativo de 120Hz/60Hz no mobile
+    const isTouchOrMobile =
+      typeof window !== "undefined" &&
+      (window.matchMedia("(pointer: coarse)").matches ||
+        window.innerWidth < 768 ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+    let lenis: Lenis | null = null;
+    let raf: ((time: number) => void) | null = null;
+
+    if (!isTouchOrMobile) {
+      lenis = new Lenis({ autoRaf: false, smoothWheel: true });
+      lenisRef.current = lenis;
+      lenis.on("scroll", ScrollTrigger.update);
+      raf = (time: number) => {
+        lenis?.raf(time * 1000);
+      };
+      gsap.ticker.add(raf);
+      gsap.ticker.lagSmoothing(0);
+    }
 
     // Gentle reveal
     gsap.fromTo(
@@ -142,8 +154,8 @@ function Index() {
 
     return () => {
       ScrollTrigger.getAll().forEach((st) => st.kill());
-      gsap.ticker.remove(raf);
-      lenis.destroy();
+      if (raf) gsap.ticker.remove(raf);
+      lenis?.destroy();
       lenisRef.current = null;
     };
   }, []);
@@ -185,7 +197,8 @@ function Index() {
       const cleanDigits = formData.whatsapp.replace(/\D/g, "");
       const fullPhone = `+${selectedCountry.ddi}${cleanDigits}`;
       const params = new URLSearchParams(window.location.search);
-      await sendLead({
+      
+      const sendLeadPromise = sendLead({
         data: {
           nome: formData.nome,
           whatsapp: fullPhone,
@@ -196,6 +209,12 @@ function Index() {
           utm_campaign: params.get("utm_campaign") ?? undefined,
         },
       });
+
+      const clientTimeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout envio lead")), 3500)
+      );
+
+      await Promise.race([sendLeadPromise, clientTimeoutPromise]);
     } catch {
       // não bloqueia o lead: segue para a página de obrigado
     }

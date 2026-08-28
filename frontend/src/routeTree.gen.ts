@@ -15,6 +15,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BussolaRouteImport } from './routes/bussola'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ObrigadoRouteImport } from './routes/obrigado'
+import { Route as PoliticasDePrivacidadeRouteImport } from './routes/politicas-de-privacidade'
+import { Route as TermosDeUsoRouteImport } from './routes/termos-de-uso'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
@@ -50,6 +52,16 @@ const McpRoute = McpRouteImport.update({
 const ObrigadoRoute = ObrigadoRouteImport.update({
   id: '/obrigado',
   path: '/obrigado',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PoliticasDePrivacidadeRoute = PoliticasDePrivacidadeRouteImport.update({
+  id: '/politicas-de-privacidade',
+  path: '/politicas-de-privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosDeUsoRoute = TermosDeUsoRouteImport.update({
+  id: '/termos-de-uso',
+  path: '/termos-de-uso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VendasRoute = VendasRouteImport.update({
@@ -97,6 +109,8 @@ export interface FileRoutesByFullPath {
   '/bussola': typeof BussolaRoute
   '/mcp': typeof McpRoute
   '/obrigado': typeof ObrigadoRoute
+  '/politicas-de-privacidade': typeof PoliticasDePrivacidadeRoute
+  '/termos-de-uso': typeof TermosDeUsoRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -111,6 +125,8 @@ export interface FileRoutesByTo {
   '/bussola': typeof BussolaRoute
   '/mcp': typeof McpRoute
   '/obrigado': typeof ObrigadoRoute
+  '/politicas-de-privacidade': typeof PoliticasDePrivacidadeRoute
+  '/termos-de-uso': typeof TermosDeUsoRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -127,6 +143,8 @@ export interface FileRoutesById {
   '/bussola': typeof BussolaRoute
   '/mcp': typeof McpRoute
   '/obrigado': typeof ObrigadoRoute
+  '/politicas-de-privacidade': typeof PoliticasDePrivacidadeRoute
+  '/termos-de-uso': typeof TermosDeUsoRoute
   '/vendas': typeof VendasRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -143,6 +161,8 @@ export interface FileRouteTypes {
     | '/bussola'
     | '/mcp'
     | '/obrigado'
+    | '/politicas-de-privacidade'
+    | '/termos-de-uso'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -157,6 +177,8 @@ export interface FileRouteTypes {
     | '/bussola'
     | '/mcp'
     | '/obrigado'
+    | '/politicas-de-privacidade'
+    | '/termos-de-uso'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -172,6 +194,8 @@ export interface FileRouteTypes {
     | '/bussola'
     | '/mcp'
     | '/obrigado'
+    | '/politicas-de-privacidade'
+    | '/termos-de-uso'
     | '/vendas'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
@@ -188,6 +212,8 @@ export interface RootRouteChildren {
   BussolaRoute: typeof BussolaRoute
   McpRoute: typeof McpRoute
   ObrigadoRoute: typeof ObrigadoRoute
+  PoliticasDePrivacidadeRoute: typeof PoliticasDePrivacidadeRoute
+  TermosDeUsoRoute: typeof TermosDeUsoRoute
   VendasRoute: typeof VendasRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
@@ -238,6 +264,20 @@ declare module '@tanstack/react-router' {
       path: '/obrigado'
       fullPath: '/obrigado'
       preLoaderRoute: typeof ObrigadoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/politicas-de-privacidade': {
+      id: '/politicas-de-privacidade'
+      path: '/politicas-de-privacidade'
+      fullPath: '/politicas-de-privacidade'
+      preLoaderRoute: typeof PoliticasDePrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos-de-uso': {
+      id: '/termos-de-uso'
+      path: '/termos-de-uso'
+      fullPath: '/termos-de-uso'
+      preLoaderRoute: typeof TermosDeUsoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/vendas': {
@@ -310,6 +350,8 @@ const rootRouteChildren: RootRouteChildren = {
   BussolaRoute: BussolaRoute,
   McpRoute: McpRoute,
   ObrigadoRoute: ObrigadoRoute,
+  PoliticasDePrivacidadeRoute: PoliticasDePrivacidadeRoute,
+  TermosDeUsoRoute: TermosDeUsoRoute,
   VendasRoute: VendasRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
