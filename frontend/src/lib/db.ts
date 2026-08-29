@@ -41,6 +41,11 @@ if (process.env.NODE_ENV !== "production") {
   globalThis.__pg_pool = pool;
 }
 
+// Auto-migração leve para garantir que leads.email aceite NULL
+pool
+  .query("ALTER TABLE leads ALTER COLUMN email DROP NOT NULL")
+  .catch(() => {});
+
 export async function query<R extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,
   params?: unknown[],

@@ -129,29 +129,7 @@ export const submitLead = createServerFn({ method: "POST" })
       `\n🚀 [NOVO LEAD CAPTADO - ${dataHoraBrasilia} (Horário de Brasília)] Nome: "${data.nome}" | WhatsApp: "${data.whatsapp}" | Origem: "${data.origem || "checkout_pre_populado"}"`,
     );
 
-    await query(
-      `INSERT INTO leads (
-        nome, email, whatsapp, origem, ip, cidade, regiao, pais, timezone, user_agent, referrer, utm_source, utm_medium, utm_campaign
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-      [
-        data.nome,
-        data.email,
-        data.whatsapp,
-        data.origem,
-        ip,
-        cidade,
-        regiao,
-        pais,
-        timezone,
-        userAgent,
-        data.referrer,
-        data.utm_source,
-        data.utm_medium,
-        data.utm_campaign,
-      ],
-    );
-
-    // Disparo do webhook para o ZapVoice com os dados essenciais do checkout pré-populado
+    // 1. Disparo PRIORITÁRIO do webhook para o ZapVoice com os dados do checkout pré-populado
     try {
       const cleanDigits = data.whatsapp.replace(/\D/g, "");
 
@@ -210,6 +188,36 @@ export const submitLead = createServerFn({ method: "POST" })
       }
     } catch (webhookError) {
       console.error("❌ [WEBHOOK FALHA]: Erro ao enviar webhook para ZapVoice:", webhookError);
+    }
+
+    // 2. Persistência no banco de dados PostgreSQL (resiliente com fallback para compatibilidade)
+    try {
+      const dbEmail = data.email ?? "";
+
+      await query(
+        `INSERT INTO leads (
+          nome, email, whatsapp, origem, ip, cidade, regiao, pais, timezone, user_agent, referrer, utm_source, utm_medium, utm_campaign
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [
+          data.nome,
+          dbEmail,
+          data.whatsapp,
+          data.origem,
+          ip,
+          cidade,
+          regiao,
+          pais,
+          timezone,
+          userAgent,
+          data.referrer,
+          data.utm_source,
+          data.utm_medium,
+          data.utm_campaign,
+        ],
+      );
+      console.log(`💾 [BANCO DE DADOS] Lead gravado com sucesso no PostgreSQL.`);
+    } catch (dbError) {
+      console.error("⚠️ [BANCO DE DADOS]: Aviso ao persistir lead no Postgres (não bloqueou o webhook):", dbError);
     }
 
     return { ok: true };
