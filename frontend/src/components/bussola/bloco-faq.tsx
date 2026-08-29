@@ -19,8 +19,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     pergunta: "Por quanto tempo terei acesso?",
-    resposta:
-      "O acesso é vitalício. Você poderá acessar o conteúdo e os bônus quando quiser.",
+    resposta: "O acesso é vitalício. Você poderá acessar o conteúdo e os bônus quando quiser.",
   },
   {
     pergunta: "Isso funciona mesmo para quem nunca conseguiu entender astrologia?",

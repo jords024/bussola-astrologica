@@ -76,10 +76,8 @@ export default function BlocoTudoFlui() {
               decoding="async"
               sizes="100vw"
               style={{
-                maskImage:
-                  "radial-gradient(115% 110% at 50% 50%, #000 40%, transparent 82%)",
-                WebkitMaskImage:
-                  "radial-gradient(115% 110% at 50% 50%, #000 40%, transparent 82%)",
+                maskImage: "radial-gradient(115% 110% at 50% 50%, #000 40%, transparent 82%)",
+                WebkitMaskImage: "radial-gradient(115% 110% at 50% 50%, #000 40%, transparent 82%)",
               }}
             />
           </picture>

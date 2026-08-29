@@ -1,8 +1,8 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import sharp from 'sharp';
+import fs from "node:fs";
+import path from "node:path";
+import sharp from "sharp";
 
-const PUBLIC_DIR = path.resolve('public/__l5e/assets-v1');
+const PUBLIC_DIR = path.resolve("public/__l5e/assets-v1");
 
 function getFiles(dir) {
   let files = [];
@@ -12,7 +12,7 @@ function getFiles(dir) {
     const stat = fs.statSync(full);
     if (stat.isDirectory()) {
       files = files.concat(getFiles(full));
-    } else if (item.endsWith('.png') || item.endsWith('.jpg') || item.endsWith('.jpeg')) {
+    } else if (item.endsWith(".png") || item.endsWith(".jpg") || item.endsWith(".jpeg")) {
       files.push(full);
     }
   }
@@ -30,7 +30,7 @@ async function optimize() {
     const beforeSize = fs.statSync(file).size;
     totalBefore += beforeSize;
     const base = path.basename(file).toLowerCase();
-    const isMobile = base.includes('mobile') || base.includes('pa') || base.includes('logo');
+    const isMobile = base.includes("mobile") || base.includes("pa") || base.includes("logo");
     const maxWidth = isMobile ? 800 : 1200;
 
     try {
@@ -56,7 +56,9 @@ async function optimize() {
       if (outputBuffer.length < beforeSize) {
         fs.writeFileSync(file, outputBuffer);
         totalAfter += outputBuffer.length;
-        console.log(`✓ ${path.basename(file)}: ${(beforeSize / 1024).toFixed(0)}KB -> ${(outputBuffer.length / 1024).toFixed(0)}KB (-${Math.round((1 - outputBuffer.length / beforeSize) * 100)}%)`);
+        console.log(
+          `✓ ${path.basename(file)}: ${(beforeSize / 1024).toFixed(0)}KB -> ${(outputBuffer.length / 1024).toFixed(0)}KB (-${Math.round((1 - outputBuffer.length / beforeSize) * 100)}%)`,
+        );
       } else {
         totalAfter += beforeSize;
         console.log(`- ${path.basename(file)}: mantido (${(beforeSize / 1024).toFixed(0)}KB)`);

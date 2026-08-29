@@ -2,7 +2,12 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
 
-type Row = { created_at: string; cidade: string | null; regiao: string | null; origem: string | null };
+type Row = {
+  created_at: string;
+  cidade: string | null;
+  regiao: string | null;
+  origem: string | null;
+};
 
 function rank(values: Array<string | null>, top = 8) {
   const counts = new Map<string, number>();
@@ -68,7 +73,9 @@ export default defineTool({
       ultimas_24h: last24h,
       ultimos_7_dias: last7d,
       horario_pico_utc: peak ? `${String(peak[0]).padStart(2, "0")}:00` : null,
-      cidades: rank(rows.map((r) => (r.cidade ? `${r.cidade}${r.regiao ? ` / ${r.regiao}` : ""}` : null))),
+      cidades: rank(
+        rows.map((r) => (r.cidade ? `${r.cidade}${r.regiao ? ` / ${r.regiao}` : ""}` : null)),
+      ),
       origens: rank(rows.map((r) => r.origem)),
     };
 

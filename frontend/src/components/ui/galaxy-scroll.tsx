@@ -28,7 +28,8 @@ export default function GalaxyScroll({ opacity = 1 }: { opacity?: number }) {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    const cores = (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency ?? 4;
+    const cores =
+      (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency ?? 4;
     const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 4;
     const lowEnd = isMobile && (cores <= 4 || mem <= 4);
 
@@ -63,7 +64,14 @@ export default function GalaxyScroll({ opacity = 1 }: { opacity?: number }) {
       const c = document.createElement("canvas");
       c.width = c.height = SPRITE;
       const sc = c.getContext("2d")!;
-      const grd = sc.createRadialGradient(SPRITE / 2, SPRITE / 2, 0, SPRITE / 2, SPRITE / 2, SPRITE / 2);
+      const grd = sc.createRadialGradient(
+        SPRITE / 2,
+        SPRITE / 2,
+        0,
+        SPRITE / 2,
+        SPRITE / 2,
+        SPRITE / 2,
+      );
       grd.addColorStop(0, `rgba(255,255,255,1)`);
       grd.addColorStop(0.18, `rgba(${r},${g},${b},0.95)`);
       grd.addColorStop(0.42, `rgba(${r},${g},${b},0.28)`);
@@ -178,7 +186,12 @@ export default function GalaxyScroll({ opacity = 1 }: { opacity?: number }) {
             shooting.splice(i, 1);
             continue;
           }
-          const g = ctx.createLinearGradient(sh.x, sh.y, sh.x - sh.vx * sh.len, sh.y - sh.vy * sh.len);
+          const g = ctx.createLinearGradient(
+            sh.x,
+            sh.y,
+            sh.x - sh.vx * sh.len,
+            sh.y - sh.vy * sh.len,
+          );
           g.addColorStop(0, `rgba(255,246,225,${0.75 * sh.life})`);
           g.addColorStop(1, "rgba(255,246,225,0)");
           ctx.strokeStyle = g;

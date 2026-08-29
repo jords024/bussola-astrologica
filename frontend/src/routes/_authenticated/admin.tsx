@@ -20,10 +20,16 @@ export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
       { title: "Painel de Leads — Astrowake" },
-      { name: "description", content: "Acompanhe os leads captados, horários, origem e localidade." },
+      {
+        name: "description",
+        content: "Acompanhe os leads captados, horários, origem e localidade.",
+      },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Painel de Leads — Astrowake" },
-      { property: "og:description", content: "Acompanhe os leads captados, horários, origem e localidade." },
+      {
+        property: "og:description",
+        content: "Acompanhe os leads captados, horários, origem e localidade.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -55,7 +61,7 @@ function AdminPage() {
     return leads.filter((l) =>
       [l.nome, l.email, l.whatsapp, l.cidade, l.regiao, l.pais, l.origem]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
+        .some((v) => String(v).toLowerCase().includes(q)),
     );
   }, [leads, search]);
 
@@ -70,9 +76,13 @@ function AdminPage() {
       const city = [l.cidade, l.regiao].filter(Boolean).join(" / ") || "Desconhecida";
       cities.set(city, (cities.get(city) ?? 0) + 1);
       const hour = Number(
-        new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" })
+        new Intl.DateTimeFormat("pt-BR", {
+          hour: "2-digit",
+          hour12: false,
+          timeZone: "America/Sao_Paulo",
+        })
           .format(new Date(l.created_at))
-          .replace(/\D/g, "")
+          .replace(/\D/g, ""),
       );
       hours.set(hour, (hours.get(hour) ?? 0) + 1);
     }
@@ -136,7 +146,9 @@ function AdminPage() {
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">Administração</p>
-            <h1 className="mt-2 font-display text-3xl text-white sm:text-4xl">Leads do Astrowake</h1>
+            <h1 className="mt-2 font-display text-3xl text-white sm:text-4xl">
+              Leads do Astrowake
+            </h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -176,9 +188,21 @@ function AdminPage() {
         ) : (
           <>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard icon={<Users className="h-5 w-5 text-gold" />} label="Total de leads" value={leads.length} />
-              <StatCard icon={<CalendarDays className="h-5 w-5 text-gold" />} label="Últimas 24h" value={stats.today} />
-              <StatCard icon={<CalendarDays className="h-5 w-5 text-gold" />} label="Últimos 7 dias" value={stats.week} />
+              <StatCard
+                icon={<Users className="h-5 w-5 text-gold" />}
+                label="Total de leads"
+                value={leads.length}
+              />
+              <StatCard
+                icon={<CalendarDays className="h-5 w-5 text-gold" />}
+                label="Últimas 24h"
+                value={stats.today}
+              />
+              <StatCard
+                icon={<CalendarDays className="h-5 w-5 text-gold" />}
+                label="Últimos 7 dias"
+                value={stats.week}
+              />
               <StatCard
                 icon={<Clock className="h-5 w-5 text-gold" />}
                 label="Horário de pico"
@@ -197,7 +221,9 @@ function AdminPage() {
                 <div className="mt-4 space-y-3">
                   {stats.topCities.map(([city, count]) => (
                     <div key={city} className="flex items-center gap-3">
-                      <span className="w-48 shrink-0 truncate text-sm text-foreground/90">{city}</span>
+                      <span className="w-48 shrink-0 truncate text-sm text-foreground/90">
+                        {city}
+                      </span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
                         <div
                           className="h-full rounded-full bg-gold"
@@ -254,8 +280,10 @@ function AdminPage() {
                         {dateFmt.format(new Date(lead.created_at))}
                       </td>
                       <td className="px-4 py-3 text-white">{lead.nome}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{lead.email}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{lead.whatsapp}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{lead.email || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                        {lead.whatsapp}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {[lead.cidade, lead.regiao, lead.pais].filter(Boolean).join(" / ") || "—"}
                       </td>

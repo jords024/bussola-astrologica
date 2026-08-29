@@ -55,15 +55,14 @@ export const submitLead = createServerFn({ method: "POST" })
     const rawEmail = clean(data?.email, 160);
     const whatsapp = clean(data?.whatsapp, 40);
     if (!nome || !whatsapp) throw new Error("Dados incompletos");
-    
-    let email = rawEmail ? rawEmail.toLowerCase() : null;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error("E-mail inválido");
-    }
-    
-    if (!email) {
-      const cleanPhone = whatsapp.replace(/\D/g, "");
-      email = `checkout-${cleanPhone || "lead"}@bussola.cliente`;
+
+    let email: string | null = null;
+    if (rawEmail) {
+      const normalized = rawEmail.toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+        throw new Error("E-mail inválido");
+      }
+      email = normalized;
     }
 
     return {
@@ -131,76 +130,53 @@ export const submitLead = createServerFn({ method: "POST" })
         data.utm_source,
         data.utm_medium,
         data.utm_campaign,
-      ]
+      ],
     );
 
-    // Disparo do webhook para o ZapVoice no formato oficial de evento da Hotmart
+    // Disparo do webhook para o ZapVoice com os dados essenciais do checkout pré-populado
     try {
       const cleanDigits = data.whatsapp.replace(/\D/g, "");
-      const ddd = cleanDigits.length >= 10 ? cleanDigits.slice(-11, -9) : "";
-      const phoneNum = cleanDigits.length >= 10 ? cleanDigits.slice(-9) : cleanDigits;
 
       const hotmartPayload = {
-        id: `lead_${Date.now()}`,
         event: "PURCHASE_OUT_OF_SHOPPING_CART",
-        version: "2.0.0",
-        creation_date: Date.now(),
+        checkout_pre_populado: true,
+        is_checkout_pre_populado: true,
+        tipo: "checkout_pre_populado",
+        origem: data.origem || "checkout_pre_populado",
+        nome: data.nome,
+        name: data.nome,
+        whatsapp: data.whatsapp,
+        phone: data.whatsapp,
         data: {
           product: {
-            id: "Q107238351O",
-            ucode: "Q107238351O",
             name: "Bússola Astrológica",
           },
           buyer: {
             name: data.nome,
-            email: data.email,
-            checkout_phone: cleanDigits,
             phone: data.whatsapp,
-            phone_local_code: ddd,
-            phone_number: phoneNum,
-            phone_checkout_number: cleanDigits,
-            address: {
-              city: cidade || "",
-              state: regiao || "",
-              country: pais || "BR",
-            },
-          },
-          purchase: {
-            order_date: Date.now(),
-            status: "STARTED",
-            price: {
-              value: 67.0,
-              currency_code: "BRL",
-            },
-            tracking: {
-              source: data.utm_source || "",
-              medium: data.utm_medium || "",
-              campaign: data.utm_campaign || "",
-              source_sck: data.origem || "",
-            },
+            checkout_phone: cleanDigits,
           },
         },
-        nome: data.nome,
-        name: data.nome,
-        phone: data.whatsapp,
-        whatsapp: data.whatsapp,
-        email: data.email,
-        origem: data.origem,
-        ip,
-        cidade,
-        regiao,
-        pais,
-        utm_source: data.utm_source,
-        utm_medium: data.utm_medium,
-        utm_campaign: data.utm_campaign,
       };
 
-      await fetch("https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(hotmartPayload),
-        signal: AbortSignal.timeout(5000),
-      });
+      const webhookRes = await fetch(
+        "https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(hotmartPayload),
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+
+      if (!webhookRes.ok) {
+        console.warn(
+          `[ZapVoice Webhook] Resposta com erro: status ${webhookRes.status} ${webhookRes.statusText}`,
+        );
+      } else {
+        const resJson = await webhookRes.json().catch(() => null);
+        console.info(`[ZapVoice Webhook] Sucesso no disparo para ZapVoice:`, resJson);
+      }
     } catch (webhookError) {
       console.error("Aviso: erro ao enviar webhook para ZapVoice:", webhookError);
     }
@@ -214,9 +190,7 @@ export const listLeads = createServerFn({ method: "GET" })
     const isAdmin = await hasRole(context.userId, "admin");
     if (!isAdmin) throw new Error("Forbidden");
 
-    const result = await query<LeadRow>(
-      "SELECT * FROM leads ORDER BY created_at DESC LIMIT 1000"
-    );
+    const result = await query<LeadRow>("SELECT * FROM leads ORDER BY created_at DESC LIMIT 1000");
 
     return { leads: result.rows };
   });
@@ -249,10 +223,9 @@ export const registerUser = createServerFn({ method: "POST" })
     return { email: email.toLowerCase(), password };
   })
   .handler(async ({ data }) => {
-    const existing = await query<{ id: string }>(
-      "SELECT id FROM users WHERE email = $1",
-      [data.email]
-    );
+    const existing = await query<{ id: string }>("SELECT id FROM users WHERE email = $1", [
+      data.email,
+    ]);
     if (existing.rows.length > 0) {
       throw new Error("Este e-mail já está cadastrado.");
     }
@@ -260,7 +233,7 @@ export const registerUser = createServerFn({ method: "POST" })
     const passwordHash = await hashPassword(data.password);
     const userRes = await query<{ id: string; email: string }>(
       "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email",
-      [data.email, passwordHash]
+      [data.email, passwordHash],
     );
     const newUser = userRes.rows[0];
 
@@ -299,7 +272,7 @@ export const loginUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const result = await query<{ id: string; email: string; password_hash: string }>(
       "SELECT id, email, password_hash FROM users WHERE email = $1",
-      [data.email]
+      [data.email],
     );
 
     if (result.rows.length === 0) {

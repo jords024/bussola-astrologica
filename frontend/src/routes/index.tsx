@@ -18,10 +18,13 @@ import {
 
 import { fbqTrack, fbqTrackCustom, trackPageView } from "../lib/fbq";
 import { submitLead } from "../lib/leads.functions";
-import { COUNTRIES, formatPhoneByCountry, type CountryInfo } from "../components/bussola/checkout-modal";
+import {
+  COUNTRIES,
+  formatPhoneByCountry,
+  type CountryInfo,
+} from "../components/bussola/checkout-modal";
 import crassusAsset from "../assets/crassus-cosmico.png.asset.json";
 import crassusMobileAsset from "../assets/crassus-mobile.png.asset.json";
-
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -84,7 +87,10 @@ function Index() {
 
   useEffect(() => {
     const handleClickOutsideDropdown = (event: MouseEvent) => {
-      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
+      if (
+        countryDropdownRef.current &&
+        !countryDropdownRef.current.contains(event.target as Node)
+      ) {
         setIsCountryDropdownOpen(false);
       }
     };
@@ -115,12 +121,12 @@ function Index() {
       tl.to(
         heroEl.querySelectorAll('[data-parallax-layer="1"]'),
         { yPercent: 40, ease: "none" },
-        0
+        0,
       );
       tl.to(
         heroEl.querySelectorAll('[data-parallax-layer="2"]'),
         { yPercent: 18, ease: "none" },
-        0
+        0,
       );
     }
 
@@ -149,7 +155,7 @@ function Index() {
     gsap.fromTo(
       "[data-reveal]",
       { opacity: 0, y: 24 },
-      { opacity: 1, y: 0, duration: 0.9, ease: "power2.out", stagger: 0.12 }
+      { opacity: 1, y: 0, duration: 0.9, ease: "power2.out", stagger: 0.12 },
     );
 
     return () => {
@@ -197,7 +203,7 @@ function Index() {
       const cleanDigits = formData.whatsapp.replace(/\D/g, "");
       const fullPhone = `+${selectedCountry.ddi}${cleanDigits}`;
       const params = new URLSearchParams(window.location.search);
-      
+
       const sendLeadPromise = sendLead({
         data: {
           nome: formData.nome,
@@ -211,7 +217,7 @@ function Index() {
       });
 
       const clientTimeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout envio lead")), 3500)
+        setTimeout(() => reject(new Error("Timeout envio lead")), 3500),
       );
 
       await Promise.race([sendLeadPromise, clientTimeoutPromise]);
@@ -229,13 +235,14 @@ function Index() {
   const handleCountrySelect = (country: CountryInfo) => {
     setSelectedCountry(country);
     setIsCountryDropdownOpen(false);
-    setFormData((prev) => ({ ...prev, whatsapp: formatPhoneByCountry(prev.whatsapp, country.code) }));
+    setFormData((prev) => ({
+      ...prev,
+      whatsapp: formatPhoneByCountry(prev.whatsapp, country.code),
+    }));
   };
 
-  const setField =
-    (key: "nome") =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setFormData((prev) => ({ ...prev, [key]: e.target.value }));
+  const setField = (key: "nome") => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFormData((prev) => ({ ...prev, [key]: e.target.value }));
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
@@ -243,7 +250,10 @@ function Index() {
       <section ref={parallaxRef} className="relative min-h-screen overflow-hidden">
         {/* Parallax background */}
         <div data-parallax-layers className="absolute inset-0">
-          <div data-parallax-layer="1" className="absolute inset-x-0 top-0 h-[72vh] lg:inset-y-0 lg:left-auto lg:right-0 lg:h-auto lg:w-[68%]">
+          <div
+            data-parallax-layer="1"
+            className="absolute inset-x-0 top-0 h-[72vh] lg:inset-y-0 lg:left-auto lg:right-0 lg:h-auto lg:w-[68%]"
+          >
             <picture>
               <source media="(min-width: 1024px)" srcSet={crassusAsset.url} />
               <img
@@ -260,9 +270,6 @@ function Index() {
             <div className="absolute inset-0 hidden lg:block bg-[linear-gradient(90deg,oklch(0.09_0_0)_0%,oklch(0.09_0_0)_26%,oklch(0.09_0_0/0.7)_38%,transparent_52%)]" />
             <div className="absolute inset-x-0 bottom-0 h-32 hidden lg:block bg-gradient-to-t from-background to-transparent" />
           </div>
-
-
-
         </div>
 
         <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col items-start justify-start px-5 pb-16 pt-[7vh] sm:justify-center sm:px-6 sm:pb-24 sm:pt-24">
@@ -277,16 +284,21 @@ function Index() {
           {/* Espaço para o rosto do Crassus aparecer no mobile */}
           <div aria-hidden className="h-[34vh] sm:hidden" />
 
-
-
-          <p data-reveal className="mt-6 max-w-xl whitespace-pre-line text-[17px] leading-relaxed text-muted-foreground">
-            Um encontro ao vivo para você acessar as instruções da sua alma através de uma tecnologia milenar e nunca mais jogar a
-            vida no{"\u00A0"}{"\n"}<strong className="font-semibold text-gold">Modo Difícil...</strong>
+          <p
+            data-reveal
+            className="mt-6 max-w-xl whitespace-pre-line text-[17px] leading-relaxed text-muted-foreground"
+          >
+            Um encontro ao vivo para você acessar as instruções da sua alma através de uma
+            tecnologia milenar e nunca mais jogar a vida no{"\u00A0"}
+            {"\n"}
+            <strong className="font-semibold text-gold">Modo Difícil...</strong>
           </p>
 
-
           {/* Date & time bar */}
-          <div data-reveal className="mt-7 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-foreground/90">
+          <div
+            data-reveal
+            className="mt-7 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-foreground/90"
+          >
             <span className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gold" />
               Nesta quinta-feira
@@ -301,11 +313,17 @@ function Index() {
           {/* Checklist */}
           <ul data-reveal className="mt-7 max-w-xl space-y-2.5">
             {[
-              { title: "Carreira & Escolhas", text: "clareza para onde colocar sua energia para\nprosperar de verdade" },
+              {
+                title: "Carreira & Escolhas",
+                text: "clareza para onde colocar sua energia para\nprosperar de verdade",
+              },
               { title: "Relações Pessoais", text: "limites claros, sem se anular" },
               { title: "Direção de Vida", text: "seus\u00A0próximos passos com menos ansiedade" },
             ].map((item) => (
-              <li key={item.title} className="flex items-start gap-3 text-[15px] text-foreground/90">
+              <li
+                key={item.title}
+                className="flex items-start gap-3 text-[15px] text-foreground/90"
+              >
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
                 <span>
                   <strong className="font-semibold text-foreground">{item.title}</strong>
@@ -314,7 +332,6 @@ function Index() {
               </li>
             ))}
           </ul>
-
 
           {/* CTA opens modal */}
           <button
@@ -376,11 +393,13 @@ function Index() {
 
           {/* Narrative */}
           <div className="space-y-6">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">Quem vai te guiar</p>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
+              Quem vai te guiar
+            </p>
 
             <p className="font-display text-2xl leading-snug font-medium text-white sm:text-3xl">
-              Astrologia de verdade não é sobre prever o futuro. É sobre tomar as rédeas da sua
-              vida e da sua prosperidade.
+              Astrologia de verdade não é sobre prever o futuro. É sobre tomar as rédeas da sua vida
+              e da sua prosperidade.
             </p>
 
             <div className="space-y-5 text-[16px] leading-relaxed text-foreground/85">
@@ -391,25 +410,27 @@ function Index() {
               </p>
               <p>
                 Aos 28 anos, eu era empresário, dono de 5 empresas em Porto Alegre, usava blazer e
-                vivia no ritmo acelerado do mercado. Por fora, parecia sucesso. Por dentro, eu estava
-                exausto, rasgando dinheiro na tentativa e erro e pilotando a minha vida no escuro.
+                vivia no ritmo acelerado do mercado. Por fora, parecia sucesso. Por dentro, eu
+                estava exausto, rasgando dinheiro na tentativa e erro e pilotando a minha vida no
+                escuro.
               </p>
               <p>
-                A grande virada aconteceu quando eu parei de tratar a astrologia como teoria e passei
-                a aplicar o mapa como uma ferramenta de estratégia financeira e direção da minha vida.
+                A grande virada aconteceu quando eu parei de tratar a astrologia como teoria e
+                passei a aplicar o mapa como uma ferramenta de estratégia financeira e direção da
+                minha vida.
               </p>
               <p>
-                Eu alinhei a minha carreira e o meu trabalho ao meu momento da época e comecei a viver
-                a astrologia real. O resultado? Conquistei a minha independência financeira, fechei
-                meus antigos negócios e hoje vivo com liberdade total, viajando o mundo e trabalhando
-                no meu estilo, atendendo pessoas online pelo mundo.
+                Eu alinhei a minha carreira e o meu trabalho ao meu momento da época e comecei a
+                viver a astrologia real. O resultado? Conquistei a minha independência financeira,
+                fechei meus antigos negócios e hoje vivo com liberdade total, viajando o mundo e
+                trabalhando no meu estilo, atendendo pessoas online pelo mundo.
               </p>
               <p className="rounded-xl border border-gold/20 bg-gold/[0.06] p-5">
                 Após mais de 5.000 atendimentos individuais, eu criei o evento{" "}
-                <span className="font-semibold text-gold-soft">Astrowake</span> para te entregar esse
-                mesmo manual. Eu não vou te ensinar a virar astrólogo nem te passar decoreba teórica.
-                Eu vou te mostrar como usar essa tecnologia milenar pra você tomar decisões inteligentes
-                na sua carreira, no seu dinheiro e nos seus relacionamentos.
+                <span className="font-semibold text-gold-soft">Astrowake</span> para te entregar
+                esse mesmo manual. Eu não vou te ensinar a virar astrólogo nem te passar decoreba
+                teórica. Eu vou te mostrar como usar essa tecnologia milenar pra você tomar decisões
+                inteligentes na sua carreira, no seu dinheiro e nos seus relacionamentos.
               </p>
             </div>
 
@@ -444,9 +465,7 @@ function Index() {
           onWheel={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}
         >
-          <div
-            className="relative w-full max-w-md overflow-hidden rounded-[1.5rem] border border-gold/25 bg-card shadow-[var(--shadow-gold)] select-auto"
-          >
+          <div className="relative w-full max-w-md overflow-hidden rounded-[1.5rem] border border-gold/25 bg-card shadow-[var(--shadow-gold)] select-auto">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(ellipse_at_top,oklch(0.8_0.14_82/0.28),transparent_70%)]" />
 
             <button
@@ -472,7 +491,10 @@ function Index() {
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div>
-                  <label htmlFor="nome" className="mb-1.5 block text-xs font-semibold text-foreground/80">
+                  <label
+                    htmlFor="nome"
+                    className="mb-1.5 block text-xs font-semibold text-foreground/80"
+                  >
                     Seu Nome Completo *
                   </label>
                   <input
@@ -487,7 +509,10 @@ function Index() {
                 </div>
 
                 <div>
-                  <label htmlFor="whatsapp" className="mb-1.5 block text-xs font-semibold text-foreground/80">
+                  <label
+                    htmlFor="whatsapp"
+                    className="mb-1.5 block text-xs font-semibold text-foreground/80"
+                  >
                     Seu WhatsApp com DDD *
                   </label>
                   <div className="relative flex rounded-xl border border-input bg-background/70 focus-within:border-gold focus-within:ring-1 focus-within:ring-gold transition-all">
@@ -501,10 +526,16 @@ function Index() {
                         aria-label={`País selecionado: ${selectedCountry.name} (+${selectedCountry.ddi})`}
                         aria-expanded={isCountryDropdownOpen}
                       >
-                        <span className="text-lg leading-none" role="img" aria-label={selectedCountry.name}>
+                        <span
+                          className="text-lg leading-none"
+                          role="img"
+                          aria-label={selectedCountry.name}
+                        >
                           {selectedCountry.flag}
                         </span>
-                        <span className="text-xs font-bold text-gold-soft">+{selectedCountry.ddi}</span>
+                        <span className="text-xs font-bold text-gold-soft">
+                          +{selectedCountry.ddi}
+                        </span>
                         <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform duration-200" />
                       </button>
 
@@ -543,7 +574,9 @@ function Index() {
                       id="whatsapp"
                       type="tel"
                       required
-                      placeholder={selectedCountry.code === "BR" ? "(11) 99999-9999" : "Número com DDD"}
+                      placeholder={
+                        selectedCountry.code === "BR" ? "(11) 99999-9999" : "Número com DDD"
+                      }
                       value={formData.whatsapp}
                       onChange={handlePhoneChange}
                       className="w-full flex-1 bg-transparent px-3.5 py-3.5 text-sm text-white placeholder:text-muted-foreground/60 focus:outline-none"

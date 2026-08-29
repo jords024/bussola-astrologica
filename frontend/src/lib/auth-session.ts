@@ -9,17 +9,17 @@ export interface AuthSession {
   user: AuthUser;
 }
 
-const STORAGE_KEY = 'astrowake_auth_session';
+const STORAGE_KEY = "astrowake_auth_session";
 
 export const authSession = {
   getToken(): string | null {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === "undefined") return null;
     const session = this.getSession();
     return session?.token ?? null;
   },
 
   getSession(): AuthSession | null {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
@@ -35,14 +35,14 @@ export const authSession = {
   },
 
   setSession(token: string, user: AuthUser): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
-    window.dispatchEvent(new CustomEvent('auth:change', { detail: { token, user } }));
+    window.dispatchEvent(new CustomEvent("auth:change", { detail: { token, user } }));
   },
 
   signOut(): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     localStorage.removeItem(STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent('auth:change', { detail: null }));
+    window.dispatchEvent(new CustomEvent("auth:change", { detail: null }));
   },
 };

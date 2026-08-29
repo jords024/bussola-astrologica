@@ -1,8 +1,8 @@
-import '@testing-library/jest-dom';
+import "@testing-library/jest-dom";
 
 // Mock matchMedia for jsdom when window is available
-if (typeof window !== 'undefined') {
-  Object.defineProperty(window, 'matchMedia', {
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (query: string) => ({
       matches: false,
@@ -21,12 +21,12 @@ if (typeof window !== 'undefined') {
     unobserve = () => {};
     disconnect = () => {};
   }
-  Object.defineProperty(window, 'IntersectionObserver', {
+  Object.defineProperty(window, "IntersectionObserver", {
     writable: true,
     configurable: true,
     value: MockIntersectionObserver,
   });
-  Object.defineProperty(global, 'IntersectionObserver', {
+  Object.defineProperty(global, "IntersectionObserver", {
     writable: true,
     configurable: true,
     value: MockIntersectionObserver,
@@ -37,12 +37,12 @@ if (typeof window !== 'undefined') {
     unobserve = () => {};
     disconnect = () => {};
   }
-  Object.defineProperty(window, 'ResizeObserver', {
+  Object.defineProperty(window, "ResizeObserver", {
     writable: true,
     configurable: true,
     value: MockResizeObserver,
   });
-  Object.defineProperty(global, 'ResizeObserver', {
+  Object.defineProperty(global, "ResizeObserver", {
     writable: true,
     configurable: true,
     value: MockResizeObserver,

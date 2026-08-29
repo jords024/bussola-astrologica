@@ -125,7 +125,9 @@ export default function BlocoCustoInvisivel({ onCheckout }: { onCheckout: () => 
         >
           <p className="font-display text-xl leading-snug text-foreground sm:text-2xl">
             Só que ninguém te avisou que se você estiver caminhando na direção errada,{" "}
-            <span className="text-gold">correr mais rápido só vai te levar mais depressa para o abismo.</span>
+            <span className="text-gold">
+              correr mais rápido só vai te levar mais depressa para o abismo.
+            </span>
           </p>
         </motion.blockquote>
 
@@ -186,7 +188,10 @@ export default function BlocoCustoInvisivel({ onCheckout }: { onCheckout: () => 
 
               <div className="relative mt-5 space-y-4">
                 {p.body.map((t) => (
-                  <p key={t.slice(0, 24)} className="text-base leading-relaxed text-muted-foreground">
+                  <p
+                    key={t.slice(0, 24)}
+                    className="text-base leading-relaxed text-muted-foreground"
+                  >
                     {t}
                   </p>
                 ))}

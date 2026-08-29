@@ -1,12 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  BookOpen,
-  Sparkles,
-  Gift,
-  MonitorPlay,
-  Clock,
-  DoorOpen,
-} from "lucide-react";
+import { BookOpen, Sparkles, Gift, MonitorPlay, Clock, DoorOpen } from "lucide-react";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -76,8 +69,8 @@ export default function BlocoOfertaConteudo() {
 
           <p className="relative mt-6 text-[15.5px] leading-relaxed text-muted-foreground sm:text-base">
             O guia que te ensina a abrir o seu mapa e enxergar, com os seus próprios olhos, quais
-            portas da sua vida estão abertas neste momento — e quais não vão abrir por mais que
-            você empurre.
+            portas da sua vida estão abertas neste momento — e quais não vão abrir por mais que você
+            empurre.
           </p>
 
           {/* 60 interpretações */}
@@ -124,8 +117,8 @@ export default function BlocoOfertaConteudo() {
                 Aulas práticas e objetivas
               </h4>
               <p className="mt-2 text-[14.5px] leading-relaxed text-muted-foreground">
-                Eu te mostro na tela onde clicar, onde olhar e como ler. Passo a passo, do começo
-                ao fim, sem decorar nada.
+                Eu te mostro na tela onde clicar, onde olhar e como ler. Passo a passo, do começo ao
+                fim, sem decorar nada.
               </p>
             </div>
           </div>

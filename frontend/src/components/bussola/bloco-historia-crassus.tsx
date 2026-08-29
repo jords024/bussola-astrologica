@@ -129,7 +129,11 @@ export default function BlocoHistoriaCrassus() {
             >
               Meu nome é <em className="italic text-gold">Crassus Gobbi</em>.
             </h2>
-            <div aria-hidden data-reveal className="mt-6 h-px w-24 bg-gradient-to-r from-gold/70 to-transparent" />
+            <div
+              aria-hidden
+              data-reveal
+              className="mt-6 h-px w-24 bg-gradient-to-r from-gold/70 to-transparent"
+            />
             {PARAGRAFOS.map((p) => (
               <p
                 key={p.slice(0, 24)}
@@ -153,8 +157,8 @@ export default function BlocoHistoriaCrassus() {
             }}
           >
             <p className="text-[15.5px] leading-[1.85] text-muted-foreground md:text-base">
-              Um dia eu tava me arrumando pra mais um desses dias. Verão em Porto Alegre, uns quarenta
-              graus lá fora, e eu de blazer, camisa, calça e sapato.
+              Um dia eu tava me arrumando pra mais um desses dias. Verão em Porto Alegre, uns
+              quarenta graus lá fora, e eu de blazer, camisa, calça e sapato.
             </p>
             <blockquote className="mt-7 border-l border-gold/40 pl-5 md:pl-7">
               <p className="font-display text-[1.6rem] leading-[1.35] text-foreground md:text-[2.1rem]">

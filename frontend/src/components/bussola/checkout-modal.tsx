@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Lock, ShieldCheck, Zap, User, ChevronDown, Check, ArrowRight, Loader2 } from "lucide-react";
+import {
+  X,
+  Lock,
+  ShieldCheck,
+  Zap,
+  User,
+  ChevronDown,
+  Check,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
 
 export type CountryInfo = {
   code: string;
@@ -51,7 +61,8 @@ export function formatPhoneByCountry(val: string, countryCode: string): string {
     const sliced = digits.slice(0, 11);
     if (sliced.length <= 2) return sliced.length ? `(${sliced}` : "";
     if (sliced.length <= 6) return `(${sliced.slice(0, 2)}) ${sliced.slice(2)}`;
-    if (sliced.length <= 10) return `(${sliced.slice(0, 2)}) ${sliced.slice(2, 6)}-${sliced.slice(6)}`;
+    if (sliced.length <= 10)
+      return `(${sliced.slice(0, 2)}) ${sliced.slice(2, 6)}-${sliced.slice(6)}`;
     return `(${sliced.slice(0, 2)}) ${sliced.slice(2, 7)}-${sliced.slice(7)}`;
   }
   return digits.slice(0, 15);
@@ -177,9 +188,7 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
       />
 
       {/* Caixa do Modal — Suporta rolagem interna se o teclado do celular abrir */}
-      <div
-        className="relative w-full max-w-lg max-h-[min(92dvh,640px)] overflow-y-auto rounded-[22px] border border-gold/35 bg-card/95 p-5 sm:rounded-[26px] sm:p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_-10px_color-mix(in_oklab,var(--gold)_30%,transparent)] backdrop-blur-xl animate-in zoom-in-95 duration-300"
-      >
+      <div className="relative w-full max-w-lg max-h-[min(92dvh,640px)] overflow-y-auto rounded-[22px] border border-gold/35 bg-card/95 p-5 sm:rounded-[26px] sm:p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_-10px_color-mix(in_oklab,var(--gold)_30%,transparent)] backdrop-blur-xl animate-in zoom-in-95 duration-300">
         {/* Glow de fundo */}
         <div
           aria-hidden="true"
@@ -215,7 +224,8 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
             Para onde enviamos <em className="italic text-gold">seu acesso?</em>
           </h3>
           <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground sm:text-sm">
-            Preencha seus dados para abrir a página de pagamento 100% seguro da Hotmart com desconto.
+            Preencha seus dados para abrir a página de pagamento 100% seguro da Hotmart com
+            desconto.
           </p>
         </div>
 
@@ -234,7 +244,10 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* Campo Nome */}
           <div>
-            <label htmlFor="modal-nome" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="modal-nome"
+              className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Seu nome completo *
             </label>
             <div className="relative mt-1.5">
@@ -261,7 +274,10 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
 
           {/* Campo WhatsApp com Seletor de Bandeira / País */}
           <div>
-            <label htmlFor="modal-whatsapp" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="modal-whatsapp"
+              className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Seu WhatsApp com DDD *
             </label>
             <div className="relative mt-1.5 flex rounded-xl border border-gold/25 bg-background/80 focus-within:border-gold focus-within:ring-2 focus-within:ring-gold/25">
@@ -275,7 +291,11 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
                   aria-label={`País selecionado: ${selectedCountry.name} (+${selectedCountry.ddi})`}
                   aria-expanded={isCountryDropdownOpen}
                 >
-                  <span className="text-lg leading-none" role="img" aria-label={selectedCountry.name}>
+                  <span
+                    className="text-lg leading-none"
+                    role="img"
+                    aria-label={selectedCountry.name}
+                  >
                     {selectedCountry.flag}
                   </span>
                   <span className="text-xs font-bold text-gold-soft">+{selectedCountry.ddi}</span>
@@ -355,8 +375,7 @@ export default function CheckoutModal({ isOpen, onClose, onSubmit, isLoading = f
             Ambiente 100% Seguro
           </span>
           <span className="flex items-center gap-1">
-            <ShieldCheck className="h-3 w-3 text-gold" />
-            7 dias de garantia
+            <ShieldCheck className="h-3 w-3 text-gold" />7 dias de garantia
           </span>
         </div>
       </div>

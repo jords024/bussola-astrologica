@@ -1,9 +1,9 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 
-const LOVABLE_BASE = 'https://b26bc652-be79-46f9-8e21-7a7ecf8492c5.lovableproject.com';
-const ASSETS_DIR = path.resolve('src/assets');
-const PUBLIC_DIR = path.resolve('public');
+const LOVABLE_BASE = "https://b26bc652-be79-46f9-8e21-7a7ecf8492c5.lovableproject.com";
+const ASSETS_DIR = path.resolve("src/assets");
+const PUBLIC_DIR = path.resolve("public");
 
 function findAssetJsonFiles(dir) {
   let results = [];
@@ -13,7 +13,7 @@ function findAssetJsonFiles(dir) {
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
       results = results.concat(findAssetJsonFiles(fullPath));
-    } else if (file.endsWith('.asset.json')) {
+    } else if (file.endsWith(".asset.json")) {
       results.push(fullPath);
     }
   }
@@ -25,7 +25,7 @@ async function downloadAll() {
   console.log(`Encontrados ${files.length} arquivos de asset para baixar...`);
 
   for (const file of files) {
-    const content = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    const content = JSON.parse(fs.readFileSync(file, "utf-8"));
     const urlPath = content.url;
     if (!urlPath) continue;
 
@@ -53,7 +53,7 @@ async function downloadAll() {
     }
   }
 
-  console.log('Todos os assets foram baixados com sucesso para public/');
+  console.log("Todos os assets foram baixados com sucesso para public/");
 }
 
 downloadAll();

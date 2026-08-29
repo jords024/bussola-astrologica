@@ -78,16 +78,36 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Astrowake — Hackeando a Realidade" },
-      { name: "description", content: "Aprenda a fazer a sua limpeza energética e alinhar o seu campo. Evento ao vivo, gratuito, nesta quinta-feira às 20h com Crassus Gobbi." },
+      {
+        name: "description",
+        content:
+          "Aprenda a fazer a sua limpeza energética e alinhar o seu campo. Evento ao vivo, gratuito, nesta quinta-feira às 20h com Crassus Gobbi.",
+      },
       { name: "author", content: "Crassus Gobbi" },
       { property: "og:title", content: "Astrowake — Hackeando a Realidade" },
-      { property: "og:description", content: "Aprenda a fazer a sua limpeza energética e alinhar o seu campo. Evento ao vivo, gratuito, nesta quinta-feira às 20h com Crassus Gobbi." },
+      {
+        property: "og:description",
+        content:
+          "Aprenda a fazer a sua limpeza energética e alinhar o seu campo. Evento ao vivo, gratuito, nesta quinta-feira às 20h com Crassus Gobbi.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Astrowake — Hackeando a Realidade" },
-      { name: "twitter:description", content: "Aprenda a fazer a sua limpeza energética e alinhar o seu campo. Evento ao vivo, gratuito, nesta quinta-feira às 20h com Crassus Gobbi." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/1b081ba0-290e-4685-a668-917343223699" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/1b081ba0-290e-4685-a668-917343223699" },
+      {
+        name: "twitter:description",
+        content:
+          "Aprenda a fazer a sua limpeza energética e alinhar o seu campo. Evento ao vivo, gratuito, nesta quinta-feira às 20h com Crassus Gobbi.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/1b081ba0-290e-4685-a668-917343223699",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/1b081ba0-290e-4685-a668-917343223699",
+      },
     ],
     links: [
       {
@@ -178,7 +198,6 @@ function RootShell({ children }: { children: ReactNode }) {
         {children}
         <Scripts />
       </body>
-
     </html>
   );
 }

@@ -40,12 +40,17 @@ export default function RodapeBussola() {
           <div className="mt-2 flex flex-col items-center gap-1.5 leading-relaxed text-muted-foreground/80">
             <p className="font-semibold text-foreground/90">{DADOS_EMPRESA.razaoSocial}</p>
             <p>CNPJ: {DADOS_EMPRESA.cnpj}</p>
-            <p>{DADOS_EMPRESA.autor} — Todos os direitos reservados © {DADOS_EMPRESA.ano}</p>
+            <p>
+              {DADOS_EMPRESA.autor} — Todos os direitos reservados © {DADOS_EMPRESA.ano}
+            </p>
           </div>
 
           {/* Aviso legal e de segurança */}
           <p className="mt-2 max-w-2xl text-[11px] leading-relaxed text-muted-foreground/60">
-            Este produto não garante a obtenção de resultados financeiros ou pessoais milagrosos. Qualquer referência ao desempenho passado ou potencial de decisões com base em astrologia não é garantia de resultados futuros. Seus dados estão 100% seguros e protegidos.
+            Este produto não garante a obtenção de resultados financeiros ou pessoais milagrosos.
+            Qualquer referência ao desempenho passado ou potencial de decisões com base em
+            astrologia não é garantia de resultados futuros. Seus dados estão 100% seguros e
+            protegidos.
           </p>
         </div>
       </div>

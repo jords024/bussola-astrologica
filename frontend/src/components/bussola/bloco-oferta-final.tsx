@@ -88,10 +88,9 @@ export default function BlocoOfertaFinal({ onCheckout }: Props) {
           className="mx-auto mt-6 max-w-xl rounded-2xl border border-gold/15 bg-background/40 p-5 text-center sm:p-6"
         >
           <p className="text-[15px] leading-relaxed text-muted-foreground sm:text-base">
-            Uma consulta comigo custa{" "}
-            <span className="font-semibold text-foreground">R$600</span>. Aqui você adquire uma
-            ferramenta e ela responde a pergunta que você tiver, quantas vezes você quiser, pelo
-            resto da vida.
+            Uma consulta comigo custa <span className="font-semibold text-foreground">R$600</span>.
+            Aqui você adquire uma ferramenta e ela responde a pergunta que você tiver, quantas vezes
+            você quiser, pelo resto da vida.
           </p>
           <p className="mt-3 text-[15px] leading-relaxed text-gold-soft sm:text-base">
             Se eu acredito mesmo que astrologia de verdade tem que chegar no maior número de gente

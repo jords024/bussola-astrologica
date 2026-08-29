@@ -3,19 +3,19 @@
 @import "tw-animate-css";
 
 @font-face {
-  font-family: 'Manrope';
+  font-family: "Manrope";
   font-style: normal;
   font-weight: 300 800;
   font-display: optional;
-  src: url('/fonts/manrope.woff2') format('woff2');
+  src: url("/fonts/manrope.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: 'Cormorant Garamond';
+  font-family: "Cormorant Garamond";
   font-style: normal;
   font-weight: 400 700;
   font-display: optional;
-  src: url('/fonts/cormorant-garamond.woff2') format('woff2');
+  src: url("/fonts/cormorant-garamond.woff2") format("woff2");
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -209,4 +209,3 @@ body {
   touch-action: pan-y;
   -webkit-text-size-adjust: 100%;
 }
-

@@ -99,7 +99,6 @@ const PREFETCH_IMAGES = [
   nemTodaFasePedeEsforcoAsset,
 ];
 
-
 const DESCRICAO =
   "Aprenda a identificar quais portas estão abertas para você agora — no dinheiro, no amor, na carreira e em outras 9 áreas da vida. Acesso imediato, 7 dias de garantia.";
 
@@ -181,10 +180,14 @@ function BussolaPage() {
 
     if (typeof window !== "undefined") {
       if ("requestIdleCallback" in window) {
-        const handle = (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(prefetch);
+        const handle = (
+          window as unknown as { requestIdleCallback: (cb: () => void) => number }
+        ).requestIdleCallback(prefetch);
         return () => {
           if ("cancelIdleCallback" in window) {
-            (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(handle);
+            (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(
+              handle,
+            );
           }
         };
       } else {
@@ -206,6 +209,14 @@ function BussolaPage() {
     };
   }, []);
 
+  const handleScrollToOferta = () => {
+    fbqTrackCustom("ClicouHeroCta", { destino: "oferta" });
+    const el = document.getElementById("oferta");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   const handleOpenCheckout = (origem = "hero_bussola") => {
     setCheckoutOrigem(origem);
     setIsCheckoutOpen(true);
@@ -215,7 +226,10 @@ function BussolaPage() {
     setIsRedirecting(true);
     try {
       // Captura parâmetros UTM e origem da navegação
-      const currentParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+      const currentParams =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : new URLSearchParams();
       const utm_source = currentParams.get("utm_source") || undefined;
       const utm_medium = currentParams.get("utm_medium") || undefined;
       const utm_campaign = currentParams.get("utm_campaign") || undefined;
@@ -229,7 +243,7 @@ function BussolaPage() {
           data: {
             nome: data.nome,
             whatsapp: fullPhone,
-            origem: `bussola_modal_${checkoutOrigem}`,
+            origem: `checkout_pre_populado_${checkoutOrigem}`,
             referrer,
             utm_source,
             utm_medium,
@@ -237,12 +251,15 @@ function BussolaPage() {
           },
         });
         const clientTimeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Lead submission client timeout")), 3500)
+          setTimeout(() => reject(new Error("Lead submission client timeout")), 3500),
         );
 
         await Promise.race([sendLeadPromise, clientTimeoutPromise]);
       } catch (leadError) {
-        console.warn("Aviso: falha ou timeout ao salvar lead pré-checkout, prosseguindo com Hotmart:", leadError);
+        console.warn(
+          "Aviso: falha ou timeout ao salvar lead pré-checkout, prosseguindo com Hotmart:",
+          leadError,
+        );
       }
 
       // 2. Dispara eventos de Pixel Meta
@@ -262,7 +279,15 @@ function BussolaPage() {
       // Repassa parâmetros UTM existentes na URL atual para a Hotmart
       if (typeof window !== "undefined") {
         const searchParams = new URLSearchParams(window.location.search);
-        ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "src", "sck"].forEach((param) => {
+        [
+          "utm_source",
+          "utm_medium",
+          "utm_campaign",
+          "utm_content",
+          "utm_term",
+          "src",
+          "sck",
+        ].forEach((param) => {
           const val = searchParams.get(param);
           if (val) hotmartUrl.searchParams.set(param, val);
         });
@@ -278,7 +303,7 @@ function BussolaPage() {
 
   return (
     <main className="relative w-full select-none bg-background font-body text-foreground selection:bg-gold selection:text-background">
-      <HeroBussola onCheckout={() => handleOpenCheckout("hero_bussola")} />
+      <HeroBussola onCtaClick={handleScrollToOferta} />
       <BlocoTudoFlui />
       <BlocoSemanaSeguinte />
       <BlocoRelogioCosmico />

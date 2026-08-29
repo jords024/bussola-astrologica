@@ -1,11 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { CheckCircle2, Calendar, Clock, MessagesSquare, CalendarPlus, Download } from "lucide-react";
+import {
+  CheckCircle2,
+  Calendar,
+  Clock,
+  MessagesSquare,
+  CalendarPlus,
+  Download,
+} from "lucide-react";
 import { fbqTrack, fbqTrackCustom, trackPageView } from "../lib/fbq";
 import { googleCalendarUrl, outlookCalendarUrl } from "../lib/event";
 
 const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/Bidw8pFNLtJ6COqH97EOQ7";
-
 
 export const Route = createFileRoute("/obrigado")({
   head: () => ({
@@ -39,7 +45,6 @@ function Obrigado() {
   }, []);
 
   return (
-
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-6 py-20">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,oklch(0.8_0.14_82/0.12),transparent_55%)]" />
 
@@ -57,8 +62,8 @@ function Obrigado() {
         </h1>
 
         <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-          Tudo acontece no grupo do WhatsApp. Clique no botão abaixo e entre no
-          grupo VIP para não perder nada.
+          Tudo acontece no grupo do WhatsApp. Clique no botão abaixo e entre no grupo VIP para não
+          perder nada.
         </p>
 
         <a

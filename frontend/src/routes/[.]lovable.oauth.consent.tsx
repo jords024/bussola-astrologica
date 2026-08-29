@@ -10,7 +10,9 @@ type OAuthDetails = {
 };
 
 type OAuthApi = {
-  getAuthorizationDetails: (id: string) => Promise<{ data: OAuthDetails | null; error: Error | null }>;
+  getAuthorizationDetails: (
+    id: string,
+  ) => Promise<{ data: OAuthDetails | null; error: Error | null }>;
   approveAuthorization: (id: string) => Promise<{ data: OAuthDetails | null; error: Error | null }>;
   denyAuthorization: (id: string) => Promise<{ data: OAuthDetails | null; error: Error | null }>;
 };
@@ -79,7 +81,8 @@ function Consent() {
         </div>
         <h1 className="mt-6 text-center font-display text-3xl text-white">Conectar {clientName}</h1>
         <p className="mt-3 text-center text-sm text-muted-foreground">
-          {clientName} poderá acessar os dados do Astrowake como você, incluindo os leads que a sua conta pode ver.
+          {clientName} poderá acessar os dados do Astrowake como você, incluindo os leads que a sua
+          conta pode ver.
         </p>
 
         {error && <p className="mt-4 text-center text-sm text-gold-soft">{error}</p>}

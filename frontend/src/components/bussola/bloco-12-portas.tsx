@@ -20,23 +20,22 @@ export default function Bloco12Portas() {
     let ctx: gsap.Context | undefined;
     const timer = setTimeout(() => {
       ctx = gsap.context(() => {
-      gsap
-        .timeline({
-          scrollTrigger: { trigger: section, start: "top bottom", end: "bottom top", scrub: 0.6 },
-        })
-        .fromTo(
-          imageRef.current,
-          { yPercent: isMobile ? 3 : 7, scale: 1.03 },
-          { yPercent: isMobile ? -3 : -7, scale: 1, ease: "none" },
-          0,
-        )
-        .fromTo(
-          glowRef.current,
-          { yPercent: isMobile ? -6 : -12, opacity: 0.3 },
-          { yPercent: isMobile ? 6 : 12, opacity: 0.65, ease: "none" },
-          0,
-        );
-
+        gsap
+          .timeline({
+            scrollTrigger: { trigger: section, start: "top bottom", end: "bottom top", scrub: 0.6 },
+          })
+          .fromTo(
+            imageRef.current,
+            { yPercent: isMobile ? 3 : 7, scale: 1.03 },
+            { yPercent: isMobile ? -3 : -7, scale: 1, ease: "none" },
+            0,
+          )
+          .fromTo(
+            glowRef.current,
+            { yPercent: isMobile ? -6 : -12, opacity: 0.3 },
+            { yPercent: isMobile ? 6 : 12, opacity: 0.65, ease: "none" },
+            0,
+          );
       }, section);
     }, 120);
 

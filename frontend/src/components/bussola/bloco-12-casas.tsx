@@ -28,18 +28,114 @@ type House = {
 };
 
 const HOUSES: House[] = [
-  { n: 1, r: "I", name: "Você", Icon: User, teaser: "Quem você é e como você começa as coisas.", body: "É a porta da sua identidade. Fala do corpo, da aparência, da autoestima e, principalmente, da forma como você se lança nas coisas. Quando essa área se move, mexe em recomeço, em vontade de mudar o visual, em iniciativa.", tags: ["Identidade", "Corpo", "Autoestima", "Iniciativa", "Recomeços"] },
-  { n: 2, r: "II", name: "Dinheiro", Icon: Coins, teaser: "O que entra, o que fica e o que você considera valioso.", body: "Renda, recursos, segurança material e gastos. Também fala dos seus talentos — aquilo que você sabe fazer e pode transformar em dinheiro — e do que você considera valioso o suficiente para guardar.", tags: ["Renda", "Recursos", "Segurança", "Gastos", "Talentos"] },
-  { n: 3, r: "III", name: "Comunicação", Icon: MessageCircle, teaser: "Conversas, decisões do dia e o que você assina.", body: "Tudo o que passa pela palavra: conversas, estudos, documentos, contratos rápidos. Também governa os deslocamentos do dia a dia e a relação com quem está perto — irmãos, vizinhos, colegas.", tags: ["Conversas", "Estudos", "Documentos", "Deslocamentos", "Pessoas próximas"] },
-  { n: 4, r: "IV", name: "Casa e família", Icon: Home, teaser: "Raízes, lar e o lugar onde você descansa.", body: "O chão de onde você veio e o lugar onde você se recolhe. Família, pertencimento, vida íntima. Quando essa área se move, costuma aparecer mudança de casa, reforma, ou assunto de família batendo à porta.", tags: ["Lar", "Família", "Raízes", "Pertencimento", "Mudanças"] },
-  { n: 5, r: "V", name: "Amor e criação", Icon: Heart, teaser: "Romance, prazer e aquilo que só você poderia criar.", body: "A porta do prazer. Romance, paquera, hobbies, filhos e projetos autorais. É onde a sua expressão pessoal aparece sem filtro — o que você faz porque quer, não porque precisa.", tags: ["Romance", "Prazer", "Criatividade", "Filhos", "Expressão"] },
-  { n: 6, r: "VI", name: "Rotina e corpo", Icon: Activity, teaser: "Hábitos, disciplina e o corpo que te carrega.", body: "O trabalho de todo dia, a organização, a agenda. E o corpo: saúde, alimentação, autocuidado. É a área que mostra se a sua rotina está te sustentando ou te consumindo.", tags: ["Hábitos", "Organização", "Trabalho", "Disciplina", "Autocuidado"] },
-  { n: 7, r: "VII", name: "Relacionamentos", Icon: Users, teaser: "O outro: namoro, sociedade, acordo.", body: "Toda relação de um pra um. Namoro, casamento, sócio, contrato. É a porta que fala de acordo — o que você combina com alguém e o quanto isso está equilibrado.", tags: ["Namoro", "Casamento", "Sociedades", "Contratos", "Acordos"] },
-  { n: 8, r: "VIII", name: "Transformação", Icon: Flame, teaser: "Intimidade, crise e o que renasce depois.", body: "A área mais profunda do mapa. Intimidade, sexualidade, crises, perdas e renascimentos. Também governa dinheiro que não é só seu: recursos compartilhados, dívidas, heranças, o dinheiro do casal.", tags: ["Intimidade", "Crises", "Renascimento", "Dívidas", "Heranças"] },
-  { n: 9, r: "IX", name: "Expansão", Icon: Plane, teaser: "Viagem, estudo e novas formas de enxergar.", body: "Onde a sua vida fica maior. Viagens longas, estudo superior, espiritualidade, filosofia. É a porta que abre quando você começa a acreditar em coisas que não cabiam na sua visão antiga.", tags: ["Viagens", "Estudos", "Espiritualidade", "Filosofia", "Crenças"] },
-  { n: 10, r: "X", name: "Carreira", Icon: Mountain, teaser: "Profissão, autoridade e o que te torna reconhecida.", body: "O topo do mapa e o topo da sua vida pública. Profissão, vocação, reputação, visibilidade. É a porta dos grandes objetivos — e de ser vista pelo que você faz.", tags: ["Profissão", "Vocação", "Autoridade", "Reputação", "Visibilidade"] },
-  { n: 11, r: "XI", name: "Futuro e conexões", Icon: UsersRound, teaser: "Amizade, comunidade e o que você planeja.", body: "As pessoas que caminham do seu lado: amizades, grupos, comunidade, audiência. E o futuro que você desenha com elas — projetos coletivos, sonhos, planos de longo prazo.", tags: ["Amizades", "Grupos", "Comunidade", "Audiência", "Planos"] },
-  { n: 12, r: "XII", name: "Recolhimento", Icon: Moon, teaser: "Descanso, bastidor e fim de ciclo.", body: "A porta do silêncio. Descanso, solidão escolhida, inconsciente, padrões que agem sem você perceber. É onde os ciclos se encerram — e onde o próximo começa a ser preparado nos bastidores.", tags: ["Descanso", "Solitude", "Inconsciente", "Bastidores", "Encerramentos"] },
+  {
+    n: 1,
+    r: "I",
+    name: "Você",
+    Icon: User,
+    teaser: "Quem você é e como você começa as coisas.",
+    body: "É a porta da sua identidade. Fala do corpo, da aparência, da autoestima e, principalmente, da forma como você se lança nas coisas. Quando essa área se move, mexe em recomeço, em vontade de mudar o visual, em iniciativa.",
+    tags: ["Identidade", "Corpo", "Autoestima", "Iniciativa", "Recomeços"],
+  },
+  {
+    n: 2,
+    r: "II",
+    name: "Dinheiro",
+    Icon: Coins,
+    teaser: "O que entra, o que fica e o que você considera valioso.",
+    body: "Renda, recursos, segurança material e gastos. Também fala dos seus talentos — aquilo que você sabe fazer e pode transformar em dinheiro — e do que você considera valioso o suficiente para guardar.",
+    tags: ["Renda", "Recursos", "Segurança", "Gastos", "Talentos"],
+  },
+  {
+    n: 3,
+    r: "III",
+    name: "Comunicação",
+    Icon: MessageCircle,
+    teaser: "Conversas, decisões do dia e o que você assina.",
+    body: "Tudo o que passa pela palavra: conversas, estudos, documentos, contratos rápidos. Também governa os deslocamentos do dia a dia e a relação com quem está perto — irmãos, vizinhos, colegas.",
+    tags: ["Conversas", "Estudos", "Documentos", "Deslocamentos", "Pessoas próximas"],
+  },
+  {
+    n: 4,
+    r: "IV",
+    name: "Casa e família",
+    Icon: Home,
+    teaser: "Raízes, lar e o lugar onde você descansa.",
+    body: "O chão de onde você veio e o lugar onde você se recolhe. Família, pertencimento, vida íntima. Quando essa área se move, costuma aparecer mudança de casa, reforma, ou assunto de família batendo à porta.",
+    tags: ["Lar", "Família", "Raízes", "Pertencimento", "Mudanças"],
+  },
+  {
+    n: 5,
+    r: "V",
+    name: "Amor e criação",
+    Icon: Heart,
+    teaser: "Romance, prazer e aquilo que só você poderia criar.",
+    body: "A porta do prazer. Romance, paquera, hobbies, filhos e projetos autorais. É onde a sua expressão pessoal aparece sem filtro — o que você faz porque quer, não porque precisa.",
+    tags: ["Romance", "Prazer", "Criatividade", "Filhos", "Expressão"],
+  },
+  {
+    n: 6,
+    r: "VI",
+    name: "Rotina e corpo",
+    Icon: Activity,
+    teaser: "Hábitos, disciplina e o corpo que te carrega.",
+    body: "O trabalho de todo dia, a organização, a agenda. E o corpo: saúde, alimentação, autocuidado. É a área que mostra se a sua rotina está te sustentando ou te consumindo.",
+    tags: ["Hábitos", "Organização", "Trabalho", "Disciplina", "Autocuidado"],
+  },
+  {
+    n: 7,
+    r: "VII",
+    name: "Relacionamentos",
+    Icon: Users,
+    teaser: "O outro: namoro, sociedade, acordo.",
+    body: "Toda relação de um pra um. Namoro, casamento, sócio, contrato. É a porta que fala de acordo — o que você combina com alguém e o quanto isso está equilibrado.",
+    tags: ["Namoro", "Casamento", "Sociedades", "Contratos", "Acordos"],
+  },
+  {
+    n: 8,
+    r: "VIII",
+    name: "Transformação",
+    Icon: Flame,
+    teaser: "Intimidade, crise e o que renasce depois.",
+    body: "A área mais profunda do mapa. Intimidade, sexualidade, crises, perdas e renascimentos. Também governa dinheiro que não é só seu: recursos compartilhados, dívidas, heranças, o dinheiro do casal.",
+    tags: ["Intimidade", "Crises", "Renascimento", "Dívidas", "Heranças"],
+  },
+  {
+    n: 9,
+    r: "IX",
+    name: "Expansão",
+    Icon: Plane,
+    teaser: "Viagem, estudo e novas formas de enxergar.",
+    body: "Onde a sua vida fica maior. Viagens longas, estudo superior, espiritualidade, filosofia. É a porta que abre quando você começa a acreditar em coisas que não cabiam na sua visão antiga.",
+    tags: ["Viagens", "Estudos", "Espiritualidade", "Filosofia", "Crenças"],
+  },
+  {
+    n: 10,
+    r: "X",
+    name: "Carreira",
+    Icon: Mountain,
+    teaser: "Profissão, autoridade e o que te torna reconhecida.",
+    body: "O topo do mapa e o topo da sua vida pública. Profissão, vocação, reputação, visibilidade. É a porta dos grandes objetivos — e de ser vista pelo que você faz.",
+    tags: ["Profissão", "Vocação", "Autoridade", "Reputação", "Visibilidade"],
+  },
+  {
+    n: 11,
+    r: "XI",
+    name: "Futuro e conexões",
+    Icon: UsersRound,
+    teaser: "Amizade, comunidade e o que você planeja.",
+    body: "As pessoas que caminham do seu lado: amizades, grupos, comunidade, audiência. E o futuro que você desenha com elas — projetos coletivos, sonhos, planos de longo prazo.",
+    tags: ["Amizades", "Grupos", "Comunidade", "Audiência", "Planos"],
+  },
+  {
+    n: 12,
+    r: "XII",
+    name: "Recolhimento",
+    Icon: Moon,
+    teaser: "Descanso, bastidor e fim de ciclo.",
+    body: "A porta do silêncio. Descanso, solidão escolhida, inconsciente, padrões que agem sem você perceber. É onde os ciclos se encerram — e onde o próximo começa a ser preparado nos bastidores.",
+    tags: ["Descanso", "Solitude", "Inconsciente", "Bastidores", "Encerramentos"],
+  },
 ];
 
 const pos = (i: number, radius: number) => {
@@ -139,15 +235,37 @@ export default function Bloco12Casas() {
       {/* Roda das casas */}
       <div className="relative mt-8 grid h-[186px] place-items-center">
         <svg viewBox="0 0 200 200" aria-hidden className="h-[186px] w-[186px] overflow-visible">
-          <circle cx="100" cy="100" r="84" fill="none" stroke="color-mix(in oklab, var(--gold) 22%, transparent)" strokeWidth="0.75" />
-          <circle cx="100" cy="100" r="70" fill="none" stroke="color-mix(in oklab, var(--gold) 22%, transparent)" strokeWidth="0.75" strokeDasharray="1 5" />
+          <circle
+            cx="100"
+            cy="100"
+            r="84"
+            fill="none"
+            stroke="color-mix(in oklab, var(--gold) 22%, transparent)"
+            strokeWidth="0.75"
+          />
+          <circle
+            cx="100"
+            cy="100"
+            r="70"
+            fill="none"
+            stroke="color-mix(in oklab, var(--gold) 22%, transparent)"
+            strokeWidth="0.75"
+            strokeDasharray="1 5"
+          />
           {HOUSES.map((h, i) => {
             const outer = pos(i, 84);
             const inner = pos(i, 77);
             const on = i === live;
             return (
               <g key={h.n}>
-                <line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke="color-mix(in oklab, var(--gold) 30%, transparent)" strokeWidth="0.75" />
+                <line
+                  x1={inner.x}
+                  y1={inner.y}
+                  x2={outer.x}
+                  y2={outer.y}
+                  stroke="color-mix(in oklab, var(--gold) 30%, transparent)"
+                  strokeWidth="0.75"
+                />
                 <circle
                   cx={outer.x}
                   cy={outer.y}
@@ -166,14 +284,15 @@ export default function Bloco12Casas() {
             stroke="var(--gold)"
             strokeWidth="1"
             opacity="0.55"
-            style={{ transition: "cx .5s cubic-bezier(.2,.8,.2,1), cy .5s cubic-bezier(.2,.8,.2,1)" }}
+            style={{
+              transition: "cx .5s cubic-bezier(.2,.8,.2,1), cy .5s cubic-bezier(.2,.8,.2,1)",
+            }}
           />
         </svg>
         <div className="absolute text-center">
           <div className="font-display text-[46px] leading-none text-gold">{HOUSES[live]?.n}</div>
           <div className="mt-1.5 text-[9.5px] uppercase tracking-[0.3em] text-gold/60">
             Casa {HOUSES[live]?.n}
-
           </div>
         </div>
       </div>
@@ -259,11 +378,12 @@ export default function Bloco12Casas() {
             O que você aprende na prática
           </p>
           <p className="mt-6 text-center font-display text-[1.35rem] leading-[1.45] text-foreground md:text-[1.75rem]">
-            Você aprende a reconhecer os sinais desses ciclos e transformar essa leitura em algo simples e prático:
+            Você aprende a reconhecer os sinais desses ciclos e transformar essa leitura em algo
+            simples e prático:
           </p>
           <p className="mt-5 text-center font-display text-[1.15rem] leading-[1.55] text-muted-foreground md:text-[1.35rem]">
-            onde colocar sua energia, o que observar e quais portas podem estar abertas para você com base no seu{" "}
-            <em className="not-italic text-gold">MOMENTO ATUAL</em>
+            onde colocar sua energia, o que observar e quais portas podem estar abertas para você
+            com base no seu <em className="not-italic text-gold">MOMENTO ATUAL</em>
           </p>
           <div className="my-7 flex items-center justify-center gap-3">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold" />
@@ -271,7 +391,8 @@ export default function Bloco12Casas() {
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold/30" />
           </div>
           <p className="text-center text-[15px] leading-[1.8] text-muted-foreground md:text-base">
-            Tudo isso sem precisar virar especialista em astrologia, apenas entender os conceitos arquetípicos dos planetas e das casas do seu mapa astral.
+            Tudo isso sem precisar virar especialista em astrologia, apenas entender os conceitos
+            arquetípicos dos planetas e das casas do seu mapa astral.
           </p>
         </div>
       </div>
@@ -302,7 +423,9 @@ export default function Bloco12Casas() {
                 Casa {detail.n}
               </span>
             </div>
-            <h3 className="font-display text-[34px] leading-[1.12] text-foreground">{detail.name}</h3>
+            <h3 className="font-display text-[34px] leading-[1.12] text-foreground">
+              {detail.name}
+            </h3>
             <p className="mb-5 mt-1 font-display text-[15px] italic text-gold">{detail.r}</p>
             <p className="mb-6 text-[15px] leading-[1.8] text-muted-foreground">{detail.body}</p>
             <div className="mb-7 flex flex-wrap gap-2">

@@ -62,8 +62,7 @@ export default function CtaFixo({ onCheckout }: Props) {
               Bússola Astrológica
             </p>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground/80">
-              <Lock className="h-3 w-3 text-gold" />
-              7 dias de garantia
+              <Lock className="h-3 w-3 text-gold" />7 dias de garantia
             </p>
           </div>
 

@@ -35,4 +35,3 @@ export function trackPageView() {
   }
   fbqTrack("PageView");
 }
-

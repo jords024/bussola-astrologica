@@ -73,10 +73,8 @@ export default function BlocoSemanaSeguinte() {
             decoding="async"
             sizes="100vw"
             style={{
-              maskImage:
-                "radial-gradient(120% 115% at 50% 50%, #000 35%, transparent 78%)",
-              WebkitMaskImage:
-                "radial-gradient(120% 115% at 50% 50%, #000 35%, transparent 78%)",
+              maskImage: "radial-gradient(120% 115% at 50% 50%, #000 35%, transparent 78%)",
+              WebkitMaskImage: "radial-gradient(120% 115% at 50% 50%, #000 35%, transparent 78%)",
             }}
           />
         </div>

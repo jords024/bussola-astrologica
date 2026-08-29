@@ -6,7 +6,9 @@ import { loginUser, registerUser } from "@/lib/leads.functions";
 import { useServerFn } from "@tanstack/react-start";
 
 function safeNext(value: unknown): string | undefined {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : undefined;
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : undefined;
 }
 
 export const Route = createFileRoute("/auth")({
@@ -17,10 +19,16 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Acesso Administrativo — Astrowake" },
-      { name: "description", content: "Área restrita de administração dos leads do evento Astrowake." },
+      {
+        name: "description",
+        content: "Área restrita de administração dos leads do evento Astrowake.",
+      },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Acesso Administrativo — Astrowake" },
-      { property: "og:description", content: "Área restrita de administração dos leads do evento Astrowake." },
+      {
+        property: "og:description",
+        content: "Área restrita de administração dos leads do evento Astrowake.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -81,12 +89,17 @@ function AuthPage() {
         </div>
         <h1 className="mt-6 text-center font-display text-3xl text-white">Painel Astrowake</h1>
         <p className="mt-2 text-center text-sm text-muted-foreground">
-          {mode === "login" ? "Entre para ver os leads captados." : "Crie o acesso de administrador."}
+          {mode === "login"
+            ? "Entre para ver os leads captados."
+            : "Crie o acesso de administrador."}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
-            <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-foreground/80">
+            <label
+              htmlFor="email"
+              className="mb-1.5 block text-xs font-semibold text-foreground/80"
+            >
               E-mail
             </label>
             <input
@@ -99,7 +112,10 @@ function AuthPage() {
             />
           </div>
           <div>
-            <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-foreground/80">
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-xs font-semibold text-foreground/80"
+            >
               Senha
             </label>
             <input
@@ -130,7 +146,9 @@ function AuthPage() {
           onClick={() => setMode(mode === "login" ? "signup" : "login")}
           className="mt-6 w-full text-center text-xs text-muted-foreground underline underline-offset-4 hover:text-gold-soft"
         >
-          {mode === "login" ? "Primeiro acesso? Criar conta de administrador" : "Já tenho acesso — entrar"}
+          {mode === "login"
+            ? "Primeiro acesso? Criar conta de administrador"
+            : "Já tenho acesso — entrar"}
         </button>
       </div>
     </div>

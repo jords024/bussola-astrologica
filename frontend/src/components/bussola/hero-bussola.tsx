@@ -6,10 +6,12 @@ import heroMobileAsset from "../../assets/bussola-hero-mobile.png.asset.json";
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 type Props = {
-  onCheckout: () => void;
+  onCtaClick?: () => void;
+  onCheckout?: () => void;
 };
 
-export default function HeroBussola({ onCheckout }: Props) {
+export default function HeroBussola({ onCtaClick, onCheckout }: Props) {
+  const handleCta = onCtaClick || onCheckout;
   return (
     <header className="relative isolate flex min-h-[100svh] w-full items-end justify-start overflow-hidden bg-[oklch(0.09_0.03_265)] md:items-center">
       {/* Fundo cósmico — mobile: bússola no topo, texto na parte escura inferior; desktop: mandala à direita */}
@@ -61,7 +63,7 @@ export default function HeroBussola({ onCheckout }: Props) {
           <div className="mt-7 max-w-md md:mt-9">
             <button
               type="button"
-              onClick={onCheckout}
+              onClick={handleCta}
               className="group flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-gold-deep via-gold-soft to-gold px-6 py-4 text-xs font-black uppercase tracking-[0.16em] text-background shadow-[0_18px_50px_-12px_color-mix(in_oklab,var(--gold)_45%,transparent)] transition-all hover:brightness-110 active:scale-[0.99] sm:px-8 sm:py-5 sm:text-sm md:text-base"
             >
               <span>Quero abrir minhas portas</span>

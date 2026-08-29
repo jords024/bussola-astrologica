@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS leads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   nome TEXT NOT NULL,
-  email TEXT NOT NULL,
+  email TEXT,
   whatsapp TEXT NOT NULL,
   origem TEXT,
   ip TEXT,

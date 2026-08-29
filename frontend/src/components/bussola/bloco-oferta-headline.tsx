@@ -15,9 +15,10 @@ export default function BlocoOfertaHeadline() {
 
   return (
     <section
+      id="oferta"
       ref={sectionRef}
       aria-label="Você não precisa decorar o céu"
-      className="relative isolate w-full overflow-hidden bg-background py-20 md:py-28"
+      className="relative isolate w-full scroll-mt-6 overflow-hidden bg-background py-20 md:py-28"
     >
       <div
         aria-hidden
@@ -63,8 +64,7 @@ export default function BlocoOfertaHeadline() {
           className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
         >
           E é exatamente isso que a{" "}
-          <span className="font-semibold text-foreground">Bússola Astrológica</span> vai te
-          ensinar.
+          <span className="font-semibold text-foreground">Bússola Astrológica</span> vai te ensinar.
         </motion.p>
 
         <motion.div
