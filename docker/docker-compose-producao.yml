@@ -3,7 +3,7 @@ services:
   # Serviço da Aplicação Web (Landing Page & Painel Astrowake / Bússola)
   # ============================================================================
   landing_crassus:
-    image: aryalvesfernandes/landing-crassus:1.1.4
+    image: aryalvesfernandes/landing-crassus:1.1.5
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     
     networks:

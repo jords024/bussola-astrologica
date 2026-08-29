@@ -42,6 +42,19 @@ export type LeadRow = {
   utm_campaign: string | null;
 };
 
+export function getBrasiliaDateTime(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export function clean(value: unknown, max = 300): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -110,9 +123,10 @@ export const submitLead = createServerFn({ method: "POST" })
     }
 
     const userAgent = clean(getRequestHeader("user-agent"), 400);
+    const dataHoraBrasilia = getBrasiliaDateTime();
 
     console.log(
-      `\n🚀 [NOVO LEAD CAPTADO] Nome: "${data.nome}" | WhatsApp: "${data.whatsapp}" | Origem: "${data.origem || "checkout_pre_populado"}"`,
+      `\n🚀 [NOVO LEAD CAPTADO - ${dataHoraBrasilia} (Horário de Brasília)] Nome: "${data.nome}" | WhatsApp: "${data.whatsapp}" | Origem: "${data.origem || "checkout_pre_populado"}"`,
     );
 
     await query(
@@ -147,6 +161,8 @@ export const submitLead = createServerFn({ method: "POST" })
         is_checkout_pre_populado: true,
         tipo: "checkout_pre_populado",
         origem: data.origem || "checkout_pre_populado",
+        data_hora_brasilia: dataHoraBrasilia,
+        data_preenchimento: dataHoraBrasilia,
         nome: data.nome,
         name: data.nome,
         whatsapp: data.whatsapp,
@@ -160,11 +176,15 @@ export const submitLead = createServerFn({ method: "POST" })
             phone: data.whatsapp,
             checkout_phone: cleanDigits,
           },
+          purchase: {
+            order_date: Date.now(),
+            order_date_brasilia: dataHoraBrasilia,
+          },
         },
       };
 
       console.log(
-        `📡 [WEBHOOK DISPARADO] Enviando para ZapVoice (https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart)`,
+        `📡 [WEBHOOK DISPARADO - ${dataHoraBrasilia} (Horário de Brasília)] Enviando para ZapVoice (https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart)`,
       );
       console.log(`📦 [WEBHOOK JSON PAYLOAD]:\n${JSON.stringify(hotmartPayload, null, 2)}`);
 

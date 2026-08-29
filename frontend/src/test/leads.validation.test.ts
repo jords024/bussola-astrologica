@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clean } from "@/lib/leads.functions";
+import { clean, getBrasiliaDateTime } from "@/lib/leads.functions";
 
 describe("Lead Validation & Cleaning", () => {
   it("should clean and trim string values", () => {
@@ -23,5 +23,12 @@ describe("Lead Validation & Cleaning", () => {
     expect(emailRegex.test("contato.teste@dominio.com.br")).toBe(true);
     expect(emailRegex.test("invalido-sem-arroba")).toBe(false);
     expect(emailRegex.test("invalido@semdominio")).toBe(false);
+  });
+
+  it("should format date and time in America/Sao_Paulo timezone correctly", () => {
+    // 2026-08-29T20:30:00.000Z is 17:30:00 in Brasilia (UTC-3)
+    const fixedUtcDate = new Date("2026-08-29T20:30:00.000Z");
+    const formatted = getBrasiliaDateTime(fixedUtcDate);
+    expect(formatted).toBe("29/08/2026, 17:30:00");
   });
 });
