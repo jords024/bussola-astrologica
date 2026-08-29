@@ -111,6 +111,10 @@ export const submitLead = createServerFn({ method: "POST" })
 
     const userAgent = clean(getRequestHeader("user-agent"), 400);
 
+    console.log(
+      `\n🚀 [NOVO LEAD CAPTADO] Nome: "${data.nome}" | WhatsApp: "${data.whatsapp}" | Origem: "${data.origem || "checkout_pre_populado"}"`,
+    );
+
     await query(
       `INSERT INTO leads (
         nome, email, whatsapp, origem, ip, cidade, regiao, pais, timezone, user_agent, referrer, utm_source, utm_medium, utm_campaign
@@ -159,6 +163,11 @@ export const submitLead = createServerFn({ method: "POST" })
         },
       };
 
+      console.log(
+        `📡 [WEBHOOK DISPARADO] Enviando para ZapVoice (https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart)`,
+      );
+      console.log(`📦 [WEBHOOK JSON PAYLOAD]:\n${JSON.stringify(hotmartPayload, null, 2)}`);
+
       const webhookRes = await fetch(
         "https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart",
         {
@@ -169,16 +178,18 @@ export const submitLead = createServerFn({ method: "POST" })
         },
       );
 
+      const resJson = await webhookRes.json().catch(() => null);
+
       if (!webhookRes.ok) {
         console.warn(
-          `[ZapVoice Webhook] Resposta com erro: status ${webhookRes.status} ${webhookRes.statusText}`,
+          `⚠️ [WEBHOOK RESPOSTA COM ERRO] Status: ${webhookRes.status} ${webhookRes.statusText} | Resposta:`,
+          resJson,
         );
       } else {
-        const resJson = await webhookRes.json().catch(() => null);
-        console.info(`[ZapVoice Webhook] Sucesso no disparo para ZapVoice:`, resJson);
+        console.info(`✅ [WEBHOOK SUCESSO] Resposta do ZapVoice:`, resJson);
       }
     } catch (webhookError) {
-      console.error("Aviso: erro ao enviar webhook para ZapVoice:", webhookError);
+      console.error("❌ [WEBHOOK FALHA]: Erro ao enviar webhook para ZapVoice:", webhookError);
     }
 
     return { ok: true };
