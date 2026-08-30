@@ -164,7 +164,6 @@ export const submitLead = createServerFn({ method: "POST" })
       console.log(
         `📡 [WEBHOOK DISPARADO - ${dataHoraBrasilia} (Horário de Brasília)] Enviando para ZapVoice (https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart)`,
       );
-      console.log(`📦 [WEBHOOK JSON PAYLOAD]:\n${JSON.stringify(hotmartPayload, null, 2)}`);
 
       const webhookRes = await fetch(
         "https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart",
