@@ -13,7 +13,7 @@ describe("WhatsappButton Component", () => {
 
     const href = link.getAttribute("href");
     expect(href).toContain("554792331247");
-    expect(href).toContain("Gostaria%20de%20saber%20mais%20sobre%20o%20Bussola%20Astrologica");
+    expect(href).toContain(encodeURIComponent("Quero saber mais sobre o Bússola Astrológico"));
     expect(href).not.toContain("%3F");
   });
 
