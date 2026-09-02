@@ -115,3 +115,38 @@ describe("Bussola Sales Page Components", () => {
     expect(screen.getByRole("link", { name: /Termos de Uso/i })).toBeInTheDocument();
   });
 });
+
+describe("Hotmart Direct Checkout URL & Redirection", () => {
+  it("should have the correct Hotmart direct checkout URL with pre-populated parameters", async () => {
+    const { HOTMART_CHECKOUT_URL, buildHotmartCheckoutUrl } = await import("@/routes/bussola");
+    expect(HOTMART_CHECKOUT_URL).toBe(
+      "https://pay.hotmart.com/Q107238351O?checkoutMode=10&name=ARYARAJ+ALVES+FERNANDES&phonenumber=8588146141&phoneac=55",
+    );
+
+    const defaultUrl = buildHotmartCheckoutUrl();
+    const parsedDefault = new URL(defaultUrl);
+    expect(parsedDefault.origin + parsedDefault.pathname).toBe(
+      "https://pay.hotmart.com/Q107238351O",
+    );
+    expect(parsedDefault.searchParams.get("checkoutMode")).toBe("10");
+    expect(parsedDefault.searchParams.get("name")).toBe("ARYARAJ ALVES FERNANDES");
+    expect(parsedDefault.searchParams.get("phonenumber")).toBe("8588146141");
+    expect(parsedDefault.searchParams.get("phoneac")).toBe("55");
+  });
+
+  it("should forward UTM and src parameters to direct Hotmart URL", async () => {
+    const { buildHotmartCheckoutUrl } = await import("@/routes/bussola");
+    const search = "?utm_source=meta_ads&utm_medium=stories&utm_campaign=bussola_v2&src=anuncio1";
+    const builtUrl = buildHotmartCheckoutUrl(search);
+    const parsed = new URL(builtUrl);
+
+    expect(parsed.searchParams.get("checkoutMode")).toBe("10");
+    expect(parsed.searchParams.get("name")).toBe("ARYARAJ ALVES FERNANDES");
+    expect(parsed.searchParams.get("phonenumber")).toBe("8588146141");
+    expect(parsed.searchParams.get("phoneac")).toBe("55");
+    expect(parsed.searchParams.get("utm_source")).toBe("meta_ads");
+    expect(parsed.searchParams.get("utm_medium")).toBe("stories");
+    expect(parsed.searchParams.get("utm_campaign")).toBe("bussola_v2");
+    expect(parsed.searchParams.get("src")).toBe("anuncio1");
+  });
+});
