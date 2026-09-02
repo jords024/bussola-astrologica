@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type House = {
+export type House = {
   n: number;
   r: string;
   name: string;
@@ -27,7 +27,7 @@ type House = {
   tags: string[];
 };
 
-const HOUSES: House[] = [
+export const HOUSES: House[] = [
   {
     n: 1,
     r: "I",

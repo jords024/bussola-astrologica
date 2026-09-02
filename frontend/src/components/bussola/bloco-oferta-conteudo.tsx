@@ -28,7 +28,7 @@ const BONUS = [
   {
     icon: BookOpen,
     title: "E-book: A Linguagem Astrológica",
-    body: "A lógica por trás de tudo isso, sem misticismo e sem decoreba. É o material que te dá argumento pra explicar o que você tá fazendo — pra amiga, pro marido, pro cético que sempre aparece.",
+    body: "A lógica por trás de tudo isso, sem misticismo e sem decoreba. É o material que te dá argumento pra explicar o que você tá fazendo, pra amiga, pro marido, pro cético que sempre aparece.",
   },
 ];
 
@@ -69,7 +69,7 @@ export default function BlocoOfertaConteudo() {
 
           <p className="relative mt-6 text-[15.5px] leading-relaxed text-muted-foreground sm:text-base">
             O guia que te ensina a abrir o seu mapa e enxergar, com os seus próprios olhos, quais
-            portas da sua vida estão abertas neste momento — e quais não vão abrir por mais que você
+            portas da sua vida estão abertas neste momento, e quais não vão abrir por mais que você
             empurre.
           </p>
 
@@ -156,7 +156,7 @@ export default function BlocoOfertaConteudo() {
           className="mt-8 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground/80"
         >
           <Clock className="h-3.5 w-3.5 text-gold" />
-          Acesso imediato após a confirmação — sem espera.
+          Acesso imediato após a confirmação, sem espera.
         </motion.p>
       </div>
     </section>

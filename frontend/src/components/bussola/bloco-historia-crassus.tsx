@@ -6,7 +6,7 @@ import retratoImg from "../../assets/crassus-retrato.webp";
 const PARAGRAFOS = [
   "Minha mãe é astróloga há quase 50 anos, então eu cresci ouvindo esses nomes na mesa de jantar do mesmo jeito que outras famílias falam de futebol. E olha só a ironia: eu passei metade da vida fugindo disso…",
   "Fui empresário. Tive vários negócios. Ganhei dinheiro. Por um certo tempo me parecia o verdadeiro sucesso: jovem, bem-sucedido, aquela história toda de “sonho americano da Shopee”…",
-  "Acontece que eu chegava na minha própria empresa contando as horas pra ir embora. Começava a segunda-feira torcendo pra sexta chegar logo — e não era pra descansar. Era pra parar de fazer o que eu tava fazendo…",
+  "Acontece que eu chegava na minha própria empresa contando as horas pra ir embora. Começava a segunda-feira torcendo pra sexta chegar logo, e não era pra descansar. Era pra parar de fazer o que eu tava fazendo…",
 ];
 
 export default function BlocoHistoriaCrassus() {
