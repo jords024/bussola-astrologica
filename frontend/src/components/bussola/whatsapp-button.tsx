@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fbqTrackCustom } from "@/lib/fbq";
 
 const WHATSAPP_NUMBER = "554792331247";
-const WHATSAPP_MESSAGE = "Gostaria de saber mais sobre o Bussola Astrologica";
+const WHATSAPP_MESSAGE = "Quero saber mais sobre o Bússola Astrológico";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
 export default function WhatsappButton() {

@@ -11,7 +11,7 @@ const fadeUp = {
 };
 
 const ITENS = [
-  { nome: "Bússola Astrológica — Guia de Previsões Diárias", preco: "R$197" },
+  { nome: "Bússola Astrológica: Guia de Previsões Diárias", preco: "R$197" },
   { nome: "Apostila com 60 Interpretações dos Trânsitos", preco: "R$67" },
   { nome: "Checklist Prático de Previsões Astrológicas", preco: "R$47" },
   { nome: "Super Guia das Casas Astrológicas", preco: "R$47" },
