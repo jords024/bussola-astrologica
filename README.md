@@ -1,3 +1,13 @@
+# Bússola Astrológica: quiz
+
+A aplicação atual está em [`quiz/`](quiz/README.md): quiz com leitura personalizada, cálculo astrológico em Python, mandala e oferta das aulas.
+
+Para executar o quiz, siga [estas instruções](quiz/README.md). O serviço Python serve a experiência completa na raiz `/`. A configuração Docker específica está em `docker/docker-compose-quiz.yml`.
+
+O código anterior da página de vendas permanece em `frontend/`, com suas configurações de execução abaixo. Os scripts Node existentes continuam atendendo esse frontend; não iniciam o novo quiz.
+
+---
+
 # 🌌 Bússola Astrológica & Astrowake
 
 Plataforma web e landing pages de alta conversão do astrólogo **Crassus Gobbi**, desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**.

@@ -1,0 +1,15 @@
+services:
+  quiz:
+    build:
+      context: ../quiz
+    env_file:
+      - ../quiz/.env
+    environment:
+      DIR_DADOS: /app/dados
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - quiz_dados:/app/dados
+    restart: unless-stopped
+volumes:
+  quiz_dados:

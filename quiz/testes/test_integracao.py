@@ -1,0 +1,123 @@
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch, AsyncMock
+
+from fastapi.testclient import TestClient
+import main
+from api.leitura import Pedido, _pipeline
+from servicos import llm, registro
+
+
+def pedido():
+    return dict(nome_completo='Pessoa de Teste',
+        quiz=dict(area='carreira', espelho='Entrego muito e sou pouco reconhecida', quebra='muitas'),
+        nascimento=dict(ano=1991, mes=3, dia=14, hora=4, minuto=20),
+        cidade=dict(nome='Passo Fundo', lat=-28.2628, lng=-52.4067, tz='America/Sao_Paulo'))
+
+
+class Integracao(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(main.app)
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        for name in ('DIR_CACHE', 'DIR_LEITURAS'):
+            path = Path(self.temp.name) / name
+            path.mkdir()
+            patcher = patch.object(registro, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_original_preservado(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Uma das suas <em>12 portas</em> está aberta agora.', response.text)
+        self.assertIn("fetch('/api/leitura'", response.text)
+        self.assertNotIn('sk-proj-', response.text)
+
+    def test_dados_invalidos(self):
+        for change in ({'mes':2,'dia':31}, {'hora':None}, {'precisao':'periodo','periodo':'invalido'}):
+            data = pedido()
+            data['nascimento'].update(change)
+            self.assertEqual(self.client.post('/api/leitura', json=data).status_code, 422)
+        data = pedido()
+        data['cidade']['tz'] = 'Inexistente/Fuso'
+        self.assertEqual(self.client.post('/api/leitura', json=data).status_code, 422)
+
+    def test_sem_hora_nao_inventa_casas(self):
+        data = pedido()
+        data['nascimento'].update(precisao='desconhecida', hora=None)
+        with patch.object(llm, 'OPENAI_API_KEY', ''):
+            response = self.client.post('/api/leitura', json=data)
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertIsNone(result['bussola']['slot'])
+        self.assertIsNone(result['bussola']['casa_fechada'])
+        self.assertEqual(result['svg'], '')
+        self.assertTrue(result['carta']['ressalva'])
+
+    def test_reserva_e_registro(self):
+        with patch.object(llm, 'OPENAI_API_KEY', ''):
+            response = self.client.post('/api/leitura', json=pedido())
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['meta']['validacao'], 'reserva')
+        self.assertGreaterEqual(len(data['carta']['paragrafos']), 4)
+        self.assertIn('<svg', data['svg'])
+        self.assertTrue((registro.DIR_LEITURAS / (data['leitura_id']+'.json')).exists())
+
+    def test_falha_calculo_recuperavel(self):
+        with patch('api.leitura._pipeline', side_effect=RuntimeError('teste')):
+            self.assertEqual(self.client.post('/api/leitura', json=pedido()).status_code, 503)
+
+    def test_cache_varia_com_fatos_e_respostas(self):
+        _, _, v, _, quiz, fatos, _ = _pipeline(Pedido(**pedido()), datetime.now(timezone.utc))
+        today = datetime.now().date()
+        key = registro.chave_cache(v, fatos, quiz, today)
+        self.assertNotEqual(key, registro.chave_cache(v, dict(fatos, bloco_fatos=fatos['bloco_fatos']+' diferente'), quiz, today))
+        self.assertNotEqual(key, registro.chave_cache(v, fatos, dict(quiz, espelho='Outro recorte'), today))
+
+    def test_mandala_e_fatos_correspondem_ao_nascimento(self):
+        instant = datetime(2026,9,5,20,tzinfo=timezone.utc)
+        first = pedido()
+        second = pedido()
+        second['nascimento'].update(ano=1985, mes=7, dia=22, hora=18)
+        result_a = _pipeline(Pedido(**first), instant)
+        result_b = _pipeline(Pedido(**second), instant)
+        self.assertNotEqual(result_a[-1], result_b[-1])
+        self.assertNotEqual(result_a[-2]['bloco_fatos'], result_b[-2]['bloco_fatos'])
+        self.assertIn('<svg', result_a[-1])
+
+    def test_respostas_entram_no_prompt_sem_mudar_mapa(self):
+        instant = datetime(2026,9,5,20,tzinfo=timezone.utc)
+        first = pedido()
+        second = pedido()
+        second['quiz'].update(area='amor', espelho='Quero entender o que atraio e por quê', quebra='nao')
+        result_a = _pipeline(Pedido(**first), instant)
+        result_b = _pipeline(Pedido(**second), instant)
+        self.assertEqual(result_a[0].natal.sun.abs_pos, result_b[0].natal.sun.abs_pos)
+        self.assertEqual(result_a[1].casas, result_b[1].casas)
+        prompt_a = llm.montar_user(result_a[-2])
+        prompt_b = llm.montar_user(result_b[-2])
+        self.assertIn(first['quiz']['espelho'], prompt_a)
+        self.assertIn(second['quiz']['espelho'], prompt_b)
+        self.assertIn('Muitas vezes. É quase um padrão', prompt_a)
+        self.assertIn('Não sei dizer', prompt_b)
+        self.assertNotEqual(prompt_a, prompt_b)
+        self.assertIn(result_a[-2]['bloco_fatos'], prompt_a)
+
+    def test_fuso_transito(self):
+        data = pedido()
+        p = Pedido(**data)
+        instante = datetime(2026,9,5,20,tzinfo=timezone.utc)
+        mapa, *_ = _pipeline(p, instante)
+        self.assertEqual(mapa.transito.hour, 17)
+        self.assertTrue(all(a.natal not in ('Transito',) for a in mapa.aspectos))
+
+    def test_contato_nao_aceita_caminho(self):
+        self.assertFalse(registro.anexar_contato('../../config', 'teste'))
+
+
+if __name__ == '__main__':
+    unittest.main()

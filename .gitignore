@@ -37,3 +37,9 @@ backup/
 *.njsproj
 *.sln
 *.sw?
+
+# Quiz Python e dados privados
+**/.venv/
+**/__pycache__/
+*.pyc
+quiz/dados/
