@@ -295,15 +295,16 @@ border-radius:10px;padding:11px 13px;margin:10px 0;font-size:12.5px}
 a{color:var(--amber)}
 .vazio{color:var(--sand2);padding:16px 0;font-size:13px}
 .abas{display:flex;gap:8px;border-bottom:1px solid var(--line);margin:26px 0 20px;padding-bottom:1px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.aba-btn{background:none;border:none;color:var(--sand2);font:inherit;font-size:13px;font-weight:600;padding:10px 18px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s ease;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border-radius:6px 6px 0 0}
+.aba-btn{background:none;border:none;color:var(--sand2);font:inherit;font-size:13px;font-weight:600;padding:10px 18px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s ease;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border-radius:6px 6px 0 0;user-select:none;-webkit-user-select:none}
 .aba-btn:hover{color:var(--sand);background:rgba(255,255,255,.03)}
 .aba-btn.on{color:var(--amber);border-bottom-color:var(--amber);background:rgba(229,169,60,.08)}
-.aba-painel{display:none}
-.aba-painel.on{display:block;animation:fadein .2s ease}
-.tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;cursor:grab}
-.tbl-wrap:active{cursor:grabbing}
-.tbl-wrap.arrastando{cursor:grabbing !important;user-select:none !important;-webkit-user-select:none !important}
-.tbl-wrap.arrastando *{cursor:grabbing !important;user-select:none !important;-webkit-user-select:none !important}
+.aba-painel{display:none !important}
+.aba-painel.on{display:block !important;animation:fadein .2s ease}
+.tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;cursor:default}
+#aba-leituras .tbl-wrap, .tbl-wrap-leituras{cursor:grab}
+#aba-leituras .tbl-wrap:active, .tbl-wrap-leituras:active{cursor:grabbing}
+#aba-leituras .tbl-wrap.arrastando, .tbl-wrap-leituras.arrastando{cursor:grabbing !important;user-select:none !important;-webkit-user-select:none !important}
+#aba-leituras .tbl-wrap.arrastando *, .tbl-wrap-leituras.arrastando *{cursor:grabbing !important;user-select:none !important;-webkit-user-select:none !important}
 .tbl-wrap a, .tbl-wrap button, .tbl-wrap input{cursor:pointer}
 .paginacao{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:16px 0 8px;padding:12px 0;border-top:1px solid var(--line)}
 .pag-info{font-size:12.5px;color:var(--sand2)}
@@ -379,13 +380,48 @@ a{color:var(--amber)}
 """
 
 JS_PAINEL = r"""
+function abrirAba(id){
+  if(!id) return;
+  document.querySelectorAll(".aba-btn").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-tab") === id);
+  });
+  document.querySelectorAll(".aba-painel").forEach(function(s){
+    s.classList.toggle("on", s.id === id);
+  });
+  try{
+    history.replaceState(null, "", "#" + id);
+    localStorage.setItem("painel_aba_ativa", id);
+  }catch(e){}
+  iniciarArrastoScroll();
+}
+window.abrirAba = abrirAba;
+
+function vincularAbas(){
+  document.querySelectorAll(".aba-btn").forEach(function(btn){
+    if(btn._vinculado) return;
+    btn._vinculado = true;
+    btn.addEventListener("click", function(e){
+      e.preventDefault();
+      var id = this.getAttribute("data-tab");
+      if(id){
+        window.abrirAba(id);
+      }
+    });
+  });
+}
+
 var _activeWrap = null;
 var _startX = 0;
 var _scrollLeft = 0;
 var _hasMoved = false;
 
 function iniciarArrastoScroll(){
-  document.querySelectorAll(".tbl-wrap").forEach(function(wrap){
+  // Ativa a mãozinha e o arrasto horizontal com o botão esquerdo EXCLUSIVAMENTE na tabela de Leituras
+  var wraps = document.querySelectorAll("#aba-leituras .tbl-wrap, .tbl-wrap-leituras");
+  if(wraps.length === 0 && window.location.pathname.indexOf("/painel/leituras") === 0){
+    wraps = document.querySelectorAll(".tbl-wrap");
+  }
+  wraps.forEach(function(wrap){
     if(wrap._dragIniciado) return;
     wrap._dragIniciado = true;
 
@@ -427,13 +463,6 @@ window.addEventListener("mouseup", function(){
     setTimeout(function(){ _hasMoved = false; }, 60);
   }
 });
-
-function abrirAba(id){
-  document.querySelectorAll(".aba-btn").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-tab")===id);});
-  document.querySelectorAll(".aba-painel").forEach(function(s){s.classList.toggle("on",s.id===id);});
-  try{history.replaceState(null,"","#"+id);localStorage.setItem("painel_aba_ativa",id);}catch(e){}
-  iniciarArrastoScroll();
-}
 function toggleAcordeao(grupoId, btn){
   var subRows = document.querySelectorAll(".grupo-" + grupoId);
   var estaAberto = btn.classList.contains("aberto");
@@ -954,10 +983,11 @@ function processarMensagemTempoReal(msg){
 }
 
 (function(){
+  vincularAbas();
   var hash=(location.hash||"").replace("#","");
   var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}
   var alvo=hash||salva;
-  if(alvo&&document.getElementById(alvo)){abrirAba(alvo);}
+  if(alvo&&document.getElementById(alvo)){window.abrirAba(alvo);}
   iniciarArrastoScroll();
   conectarWebSocketPainel();
 })();
@@ -965,7 +995,8 @@ function processarMensagemTempoReal(msg){
 
 
 def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "",
-            tr_attrs: Optional[list[str]] = None, tbody_id: str = "") -> str:
+            tr_attrs: Optional[list[str]] = None, tbody_id: str = "",
+            wrap_class: str = "tbl-wrap") -> str:
     if not linhas:
         return '<p class="vazio">Ainda sem dados neste período.</p>'
     th = "".join(f'<th class="{"n" if h.startswith("#") else ""}">{html.escape(h.lstrip("#"))}</th>'
@@ -977,7 +1008,7 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "",
                       for h, c in zip(cabecalhos, l))
         tr += f"<tr{extra}>{tds}</tr>"
     tbody_attr = f' id="{tbody_id}"' if tbody_id else ""
-    return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody{tbody_attr}>{tr}</tbody></table></div>'
+    return f'<div class="{wrap_class}"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody{tbody_attr}>{tr}</tbody></table></div>'
 
 
 def _modal_confirmar_exclusao() -> str:
@@ -1442,7 +1473,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         corpo = _tabela([
             "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
             "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
-        ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras")
+        ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras", wrap_class="tbl-wrap tbl-wrap-leituras")
 
     return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou)
 
@@ -1598,11 +1629,11 @@ def painel(request: Request, _=Depends(exigir_senha),
 
     # ---- navegação de abas ----
     p.append('<nav class="abas">'
-             '<button type="button" class="aba-btn on" data-tab="aba-funil" onclick="abrirAba(\'aba-funil\')">📊 Funil por Tela</button>'
-             '<button type="button" class="aba-btn" data-tab="aba-leituras" onclick="abrirAba(\'aba-leituras\')">📖 Leituras</button>'
-             '<button type="button" class="aba-btn" data-tab="aba-formulario" onclick="abrirAba(\'aba-formulario\')">📝 Formulário & Horário</button>'
-             '<button type="button" class="aba-btn" data-tab="aba-astrologia" onclick="abrirAba(\'aba-astrologia\')">🔮 Áreas & Casas</button>'
-             '<button type="button" class="aba-btn" data-tab="aba-agente" onclick="abrirAba(\'aba-agente\')">⚡ Saúde do Agente</button>'
+             '<button type="button" class="aba-btn on" data-tab="aba-funil" onclick="window.abrirAba(\'aba-funil\');return false;">📊 Funil por Tela</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-leituras" onclick="window.abrirAba(\'aba-leituras\');return false;">📖 Leituras</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-formulario" onclick="window.abrirAba(\'aba-formulario\');return false;">📝 Formulário & Horário</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-astrologia" onclick="window.abrirAba(\'aba-astrologia\');return false;">🔮 Áreas & Casas</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-agente" onclick="window.abrirAba(\'aba-agente\');return false;">⚡ Saúde do Agente</button>'
              '</nav>')
 
     # ==================== ABA 1: FUNIL ====================

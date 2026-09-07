@@ -888,16 +888,19 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertTrue(arq3.exists())
 
     def test_arrasto_scroll_horizontal_tabela(self):
-        """Verifica se os estilos e scripts de arrasto horizontal (drag-to-scroll) com botão esquerdo estão presentes."""
+        """Verifica se os estilos e scripts de arrasto horizontal (drag-to-scroll) com botão esquerdo estão presentes e restritos à aba Leituras."""
         from api.painel import ESTILO, JS_PAINEL, painel, lista, _tabela
         from starlette.requests import Request
 
-        # 1. Verifica regras de CSS para arrasto no .tbl-wrap
-        self.assertIn(".tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;cursor:grab}", ESTILO)
-        self.assertIn(".tbl-wrap.arrastando{cursor:grabbing !important;user-select:none !important", ESTILO)
-        self.assertIn(".tbl-wrap.arrastando *{cursor:grabbing !important", ESTILO)
+        # 1. Verifica que tabelas gerais não têm mãozinha e apenas a tabela de Leituras tem cursor:grab
+        self.assertIn(".tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px;cursor:default}", ESTILO)
+        self.assertIn("#aba-leituras .tbl-wrap, .tbl-wrap-leituras{cursor:grab}", ESTILO)
+        self.assertIn(".tbl-wrap-leituras.arrastando{cursor:grabbing !important;user-select:none !important", ESTILO)
+        self.assertIn(".tbl-wrap-leituras.arrastando *{cursor:grabbing !important", ESTILO)
 
         # 2. Verifica funções e listeners no JS_PAINEL
+        self.assertIn("window.abrirAba", JS_PAINEL)
+        self.assertIn("vincularAbas", JS_PAINEL)
         self.assertIn("iniciarArrastoScroll", JS_PAINEL)
         self.assertIn("_activeWrap", JS_PAINEL)
         self.assertIn("wrap.classList.add(\"arrastando\")", JS_PAINEL)
@@ -905,14 +908,19 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.assertIn("window.addEventListener(\"mousemove\"", JS_PAINEL)
         self.assertIn("window.addEventListener(\"mouseup\"", JS_PAINEL)
 
-        # 3. Verifica se a função _tabela gera container com classe .tbl-wrap
+        # 3. Verifica se a função _tabela gera container com classe .tbl-wrap e suporta wrap_class
         html_tbl = _tabela(["id", "nome"], [["1", "Teste"]])
         self.assertIn('<div class="tbl-wrap">', html_tbl)
+        html_tbl_leituras = _tabela(["id", "nome"], [["1", "Teste"]], wrap_class="tbl-wrap tbl-wrap-leituras")
+        self.assertIn('<div class="tbl-wrap tbl-wrap-leituras">', html_tbl_leituras)
 
-        # 4. Verifica se /painel e /painel/leituras incluem o script de arrasto
+        # 4. Verifica se /painel e /painel/leituras incluem o script de arrasto e controle de abas
         req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
         resp_painel = painel(req, _="crassus")
-        self.assertIn("iniciarArrastoScroll", resp_painel.body.decode("utf-8"))
+        html_p = resp_painel.body.decode("utf-8")
+        self.assertIn("iniciarArrastoScroll", html_p)
+        self.assertIn("window.abrirAba", html_p)
+        self.assertIn("vincularAbas", html_p)
 
         resp_lista = lista(_="crassus")
         self.assertIn("iniciarArrastoScroll", resp_lista.body.decode("utf-8"))
