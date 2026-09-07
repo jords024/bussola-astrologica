@@ -237,9 +237,9 @@ class LeiturasPainelSemMascara(unittest.TestCase):
 
     def test_formatadores_completos(self):
         from api.painel import f_data, f_hora, f_tempo
-        # Data completa com ano de 4 dígitos
-        self.assertEqual(f_data({"dia": 9, "mes": 3, "ano": 1998}), "09/03/1998")
-        self.assertEqual(f_data({"dia": 5, "mes": 11, "ano": 2003}), "05/11/2003")
+        # Data com ano de 2 dígitos (ex: 09/03/98, 05/11/03)
+        self.assertEqual(f_data({"dia": 9, "mes": 3, "ano": 1998}), "09/03/98")
+        self.assertEqual(f_data({"dia": 5, "mes": 11, "ano": 2003}), "05/11/03")
         self.assertEqual(f_data({}), "—")
 
         # Hora e minuto de nascimento
@@ -306,8 +306,8 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("Aryaraj Alves Fernandes", txt_lista)
                 self.assertNotIn("Ary***", txt_lista)
 
-                # Data com ano completo
-                self.assertIn("09/03/1998", txt_lista)
+                # Data com ano de 2 dígitos
+                self.assertIn("09/03/98", txt_lista)
                 self.assertNotIn("19XX", txt_lista)
 
                 # Horário e minuto
@@ -329,7 +329,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 txt_detalhe = resp_detalhe.text
 
                 self.assertIn("Aryaraj Alves Fernandes", txt_detalhe)
-                self.assertIn("09/03/1998", txt_detalhe)
+                self.assertIn("09/03/98", txt_detalhe)
                 self.assertIn("18h35", txt_detalhe)
                 self.assertIn("85999998888", txt_detalhe)
                 self.assertIn("https://wa.me/5585999998888", txt_detalhe)
@@ -358,20 +358,27 @@ class LeiturasPainelSemMascara(unittest.TestCase):
     def test_f_chegada_bsb_calculo_correto(self):
         from api.painel import f_chegada_bsb
         # 2026-09-07 13:26:22 UTC = 10:26:22 BSB.
-        # Com tempo_quiz_ms = 197000 ms (3m 17s), chegada = 10:23:05 BSB.
+        # Com tempo_quiz_ms = 197000 ms (3m 17s), chegada = 10:23:05 BSB -> formato curto 07/09/26 10:23.
         d = {
             "gravado_em": "2026-09-07T13:26:22",
             "tempo_quiz_ms": 197000
         }
         chegada, gerada = f_chegada_bsb(d, "20260907-132622")
-        self.assertEqual(chegada, "07/09/2026 10:23:05")
-        self.assertEqual(gerada, "07/09/2026 10:26:22")
+        self.assertEqual(chegada, "07/09/26 10:23")
+        self.assertEqual(gerada, "07/09/26 10:26")
 
         # Teste quando tempo_quiz_ms é ausente ou zero
         d2 = {"gravado_em": "2026-09-07T13:00:00"}
         chegada2, gerada2 = f_chegada_bsb(d2, "20260907-130000")
-        self.assertEqual(chegada2, "07/09/2026 10:00:00")
-        self.assertEqual(gerada2, "07/09/2026 10:00:00")
+        self.assertEqual(chegada2, "07/09/26 10:00")
+        self.assertEqual(gerada2, "07/09/26 10:00")
+
+    def test_f_data_dois_digitos(self):
+        from api.painel import f_data
+        self.assertEqual(f_data({"dia": 9, "mes": 3, "ano": 1998}), "09/03/98")
+        self.assertEqual(f_data({"dia": 7, "mes": 9, "ano": 2026}), "07/09/26")
+        self.assertEqual(f_data({"dia": 15, "mes": 8, "ano": 1995}), "15/08/95")
+        self.assertEqual(f_data({}), "—")
 
     def test_paginacao_leituras_20_por_pagina(self):
         from api.painel import _tabela_leituras
@@ -518,9 +525,10 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("etapa alcançada", corpo)
                 self.assertIn("checkout", corpo)
 
-                # Verifica valores na linha de dados
-                self.assertIn("07/09/2026 10:25:00", corpo)
-                self.assertIn("07/09/2026 10:30:00", corpo)
+                # Verifica valores na linha de dados (formato curto: 2 dígitos no ano e sem segundos)
+                self.assertIn("07/09/26 10:25", corpo)
+                self.assertIn("07/09/26 10:30", corpo)
+                self.assertIn("10/05/92", corpo)
                 self.assertIn("Tela 10 (Oferta)", corpo)
                 self.assertIn("tag-checkout sim", corpo)
                 self.assertIn("✦ SIM", corpo)
@@ -554,7 +562,10 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 resp = detalhe(lid, _="crassus")
                 html_resp = resp.body.decode("utf-8")
                 self.assertIn("chegou ao quiz:", html_resp)
+                self.assertIn("07/09/26 10:20", html_resp)
                 self.assertIn("preencheu dados:", html_resp)
+                self.assertIn("07/09/26 10:30", html_resp)
+                self.assertIn("22/03/88", html_resp)
                 self.assertIn("etapa:", html_resp)
                 self.assertIn("Tela 8 (Portas)", html_resp)
                 self.assertIn("checkout:", html_resp)

@@ -105,8 +105,8 @@ def gravar_lead(leitura_id: str, dados: dict) -> None:
         dados = dict(
             dados,
             gravado_em=agora_utc.isoformat(timespec="seconds"),
-            gravado_em_bsb=agora_bsb.strftime("%d/%m/%Y %H:%M:%S"),
-            chegou_em_bsb=chegou_bsb.strftime("%d/%m/%Y %H:%M:%S"),
+            gravado_em_bsb=agora_bsb.strftime("%d/%m/%y %H:%M"),
+            chegou_em_bsb=chegou_bsb.strftime("%d/%m/%y %H:%M"),
             pesos_v=PESOS_V,
             etapa_max=etapa_inicial,
             etapa_nome=dados.get("etapa_nome", ETAPAS_ROTULOS.get(etapa_inicial, f"Tela {etapa_inicial}")),

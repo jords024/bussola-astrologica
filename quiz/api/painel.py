@@ -70,10 +70,19 @@ def m_fone(f: str) -> str:
 
 
 def f_data(nasc: dict) -> str:
-    """Data de nascimento completa com dia, mês e ano de 4 dígitos."""
+    """Data de nascimento com dia, mês e ano de 2 dígitos (ex.: 09/03/98)."""
     if not nasc:
         return "—"
-    return f"{nasc.get('dia', '?'):0>2}/{nasc.get('mes', '?'):0>2}/{nasc.get('ano', '????')}"
+    dia = nasc.get("dia")
+    mes = nasc.get("mes")
+    ano = str(nasc.get("ano") or "")
+    if dia is None or mes is None or not ano:
+        return "—"
+    ano_2d = ano[-2:] if len(ano) >= 2 else ano
+    try:
+        return f"{int(dia):0>2}/{int(mes):0>2}/{ano_2d}"
+    except (ValueError, TypeError):
+        return f"{dia}/{mes}/{ano_2d}"
 
 
 def f_hora(nasc: dict, pr: Optional[dict] = None) -> str:
@@ -115,10 +124,32 @@ def f_wa(w: Optional[str]) -> str:
 TZ_BRASILIA = pytz.timezone("America/Sao_Paulo")
 
 
+def _formatar_data_hora_curta(val: datetime | str) -> str:
+    """Formata datetime ou string existente para dd/mm/aa HH:MM (ano 2 dígitos, sem segundos)."""
+    if isinstance(val, datetime):
+        return val.strftime("%d/%m/%y %H:%M")
+    if not val:
+        return "—"
+    s = str(val).strip()
+    m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?", s)
+    if m:
+        dia, mes, ano, hora, minuto = m.groups()
+        ano_2d = ano[-2:] if len(ano) >= 2 else ano
+        return f"{int(dia):0>2}/{int(mes):0>2}/{ano_2d} {int(hora):0>2}:{int(minuto):0>2}"
+    try:
+        dt = datetime.fromisoformat(s)
+        return dt.strftime("%d/%m/%y %H:%M")
+    except Exception:
+        return s
+
+
 def f_chegada_bsb(d: dict, arq_stem: str) -> tuple[str, str]:
-    """Retorna (chegou_em_bsb, gerado_em_bsb) formatados no horário de Brasília (UTC-3)."""
+    """Retorna (chegou_em_bsb, gerado_em_bsb) formatados no horário de Brasília (UTC-3) como dd/mm/aa HH:MM."""
     if d.get("chegou_em_bsb") and d.get("gravado_em_bsb"):
-        return str(d["chegou_em_bsb"]), str(d["gravado_em_bsb"])
+        return (
+            _formatar_data_hora_curta(d["chegou_em_bsb"]),
+            _formatar_data_hora_curta(d["gravado_em_bsb"])
+        )
 
     dt_gerada_utc = None
     gravado_em = d.get("gravado_em")
@@ -149,8 +180,8 @@ def f_chegada_bsb(d: dict, arq_stem: str) -> tuple[str, str]:
         dt_chegada_bsb = dt_gerada_bsb
 
     return (
-        dt_chegada_bsb.strftime("%d/%m/%Y %H:%M:%S"),
-        dt_gerada_bsb.strftime("%d/%m/%Y %H:%M:%S")
+        dt_chegada_bsb.strftime("%d/%m/%y %H:%M"),
+        dt_gerada_bsb.strftime("%d/%m/%y %H:%M")
     )
 
 
