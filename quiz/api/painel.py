@@ -172,6 +172,38 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "") -
     return f'<table class="{classes}"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table>'
 
 
+def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
+    arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
+    recorte = arquivos[pagina * 50:(pagina + 1) * 50]
+
+    linhas = []
+    for arq in recorte:
+        try:
+            d = json.loads(arq.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
+            continue          # fixtures da suite de testes
+        v, pr = d.get("veredito") or {}, d.get("precisao") or {}
+        nasc = d.get("nascimento") or {}
+        cid = d.get("cidade") or {}
+        linhas.append([
+            f'<a href="/painel/leitura/{html.escape(arq.stem)}">{html.escape(arq.stem[:15])}</a>',
+            html.escape(d.get("nome_completo") or "—"),
+            f_data(nasc),
+            html.escape(cid.get("uf") or cid.get("nome") or "—"),
+            html.escape(str((d.get("quiz") or {}).get("area") or "—")),
+            html.escape(str(v.get("tipo") or "—")),
+            "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
+            f_hora(nasc, pr),
+            f_tempo(d.get("tempo_quiz_ms")),
+            html.escape(d.get("whatsapp") or "—"),
+        ])
+    corpo = _tabela(["id / gerada em", "nome", "nascimento", "uf", "área", "cenário",
+                     "casa", "hora", "tempo no quiz", "whatsapp"], linhas)
+    return corpo, len(arquivos)
+
+
 @router.get("/painel", response_class=HTMLResponse)
 def painel(request: Request, _=Depends(exigir_senha),
            de: Optional[str] = None, ate: Optional[str] = None,
@@ -234,6 +266,7 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ---- navegação de abas ----
     p.append('<nav class="abas">'
              '<button type="button" class="aba-btn on" data-tab="aba-funil" onclick="abrirAba(\'aba-funil\')">📊 Funil por Tela</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-leituras" onclick="abrirAba(\'aba-leituras\')">📖 Leituras</button>'
              '<button type="button" class="aba-btn" data-tab="aba-formulario" onclick="abrirAba(\'aba-formulario\')">📝 Formulário & Horário</button>'
              '<button type="button" class="aba-btn" data-tab="aba-astrologia" onclick="abrirAba(\'aba-astrologia\')">🔮 Áreas & Casas</button>'
              '<button type="button" class="aba-btn" data-tab="aba-agente" onclick="abrirAba(\'aba-agente\')">⚡ Saúde do Agente</button>'
@@ -260,6 +293,16 @@ def painel(request: Request, _=Depends(exigir_senha),
              '<b>Tempo na tela:</b> mediana do tempo de permanência nesta etapa específica. '
              '<b>Cronômetro:</b> tempo acumulado desde o momento em que o visitante entrou na página até atingir a tela. '
              'A linha <b>✦ Clique no Checkout</b> registra quem apertou o botão de compra na oferta.</p>')
+    p.append('</section>')
+
+    # ==================== ABA 2: LEITURAS ====================
+    p.append('<section class="aba-painel" id="aba-leituras">')
+    p.append("<h2>Leituras Geradas</h2>")
+    corpo_leituras, total_leituras = _tabela_leituras(0)
+    p.append(f'<p class="sub">{total_leituras} leitura(s) no total · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
+    p.append(corpo_leituras)
+    if total_leituras > 50:
+        p.append('<p class="nota"><a href="/painel/leituras?pagina=1">ver próximas leituras antigas →</a></p>')
     p.append('</section>')
 
     # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
@@ -338,7 +381,7 @@ def painel(request: Request, _=Depends(exigir_senha),
              + (", ".join(f"{html.escape(str(k))} ({v})" for k, v in g["modelos"]) or "—") + ".</p>")
 
     p.append(f'<h2>Leituras</h2><p class="nota">'
-             f'<a href="/painel/leituras">ver a lista de leituras geradas</a>.</p>')
+             f'<a href="#aba-leituras" onclick="abrirAba(\'aba-leituras\');return false;">ver a lista na aba Leituras</a>.</p>')
     p.append('</section>')
 
     p.append('<script>'
@@ -360,44 +403,16 @@ def painel(request: Request, _=Depends(exigir_senha),
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
 def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
-    # o id comeca com AAAAMMDD-HHMMSS, entao ordem alfabetica e ordem cronologica
-    arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
-    recorte = arquivos[pagina * 50:(pagina + 1) * 50]
-
-    linhas = []
-    for arq in recorte:
-        try:
-            d = json.loads(arq.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
-            continue          # fixtures da suite de testes
-        v, pr = d.get("veredito") or {}, d.get("precisao") or {}
-        nasc = d.get("nascimento") or {}
-        cid = d.get("cidade") or {}
-        linhas.append([
-            f'<a href="/painel/leitura/{html.escape(arq.stem)}">{html.escape(arq.stem[:15])}</a>',
-            html.escape(d.get("nome_completo") or "—"),
-            f_data(nasc),
-            html.escape(cid.get("uf") or cid.get("nome") or "—"),
-            html.escape(str((d.get("quiz") or {}).get("area") or "—")),
-            html.escape(str(v.get("tipo") or "—")),
-            "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
-            f_hora(nasc, pr),
-            f_tempo(d.get("tempo_quiz_ms")),
-            html.escape(d.get("whatsapp") or "—"),
-        ])
-    corpo = _tabela(["id / gerada em", "nome", "nascimento", "uf", "área", "cenário",
-                     "casa", "hora", "tempo no quiz", "whatsapp"], linhas)
+    corpo, total_arquivos = _tabela_leituras(pagina)
     nav = ""
     if pagina:
         nav += f'<a href="/painel/leituras?pagina={pagina-1}">← anteriores</a> '
-    if len(arquivos) > (pagina + 1) * 50:
+    if total_arquivos > (pagina + 1) * 50:
         nav += f'<a href="/painel/leituras?pagina={pagina+1}">próximas →</a>'
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
-        f'<h1>Leituras</h1><p class="sub">{len(arquivos)} no total · '
-        f'<a href="/painel">voltar ao painel</a></p>{corpo}'
+        f'<h1>Leituras</h1><p class="sub">{total_arquivos} no total · '
+        f'<a href="/painel#aba-leituras">voltar ao painel</a></p>{corpo}'
         f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p>'
         f'<p class="nota">{nav}</p></div>',
         headers=CABECALHOS)
@@ -430,7 +445,7 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>{html.escape(leitura_id)}</title><div class=w>"
         f'<h1>{html.escape(leitura_id)}</h1><p class="sub">{ident} · '
-        f'<a href="/painel/leituras">voltar</a></p>'
+        f'<a href="/painel#aba-leituras">voltar ao painel</a></p>'
         f'<h2>{html.escape(c.get("selo",""))}</h2>'
         f'<p><b>{html.escape(c.get("titulo",""))}</b></p>'
         f'<p style="color:var(--amber)">{html.escape(c.get("destaque",""))}</p>'

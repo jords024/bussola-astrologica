@@ -198,11 +198,13 @@ class Endpoint(unittest.TestCase):
             # Barra de navegação de abas
             self.assertIn('<nav class="abas">', html_text)
             self.assertIn('data-tab="aba-funil"', html_text)
+            self.assertIn('data-tab="aba-leituras"', html_text)
             self.assertIn('data-tab="aba-formulario"', html_text)
             self.assertIn('data-tab="aba-astrologia"', html_text)
             self.assertIn('data-tab="aba-agente"', html_text)
             # Painéis correspondentes
             self.assertIn('id="aba-funil"', html_text)
+            self.assertIn('id="aba-leituras"', html_text)
             self.assertIn('id="aba-formulario"', html_text)
             self.assertIn('id="aba-astrologia"', html_text)
             self.assertIn('id="aba-agente"', html_text)
