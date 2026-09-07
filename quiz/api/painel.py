@@ -67,6 +67,25 @@ def m_fone(f: str) -> str:
     return f"…{d[-4:]}" if len(d) >= 4 else "—"
 
 
+def f_data(nasc: dict) -> str:
+    """Data de nascimento completa com dia, mês e ano de 4 dígitos."""
+    if not nasc:
+        return "—"
+    return f"{nasc.get('dia', '?'):0>2}/{nasc.get('mes', '?'):0>2}/{nasc.get('ano', '????')}"
+
+
+def f_hora(nasc: dict, pr: Optional[dict] = None) -> str:
+    """Horário e minuto de nascimento (ex.: 18h35), ou período/modo quando não houver hora exata."""
+    if not nasc:
+        return html.escape(str((pr or {}).get("modo_hora") or "—"))
+    hora = nasc.get("hora")
+    if hora is not None:
+        minuto = nasc.get("minuto") or 0
+        return f"{int(hora):0>2}h{int(minuto):0>2}"
+    modo = nasc.get("periodo") or (pr or {}).get("modo_hora") or "desconhecida"
+    return html.escape(str(modo))
+
+
 # --------------------------------------------------------------------- helpers
 def _periodo(de: Optional[str], ate: Optional[str], dias: int) -> tuple[date, date]:
     hoje = date.today()
@@ -299,7 +318,7 @@ def painel(request: Request, _=Depends(exigir_senha),
              + (", ".join(f"{html.escape(str(k))} ({v})" for k, v in g["modelos"]) or "—") + ".</p>")
 
     p.append(f'<h2>Leituras</h2><p class="nota">'
-             f'<a href="/painel/leituras">ver a lista de leituras geradas</a> — dados mascarados.</p>')
+             f'<a href="/painel/leituras">ver a lista de leituras geradas</a>.</p>')
     p.append('</section>')
 
     p.append('<script>'
@@ -334,16 +353,18 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
         if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
             continue          # fixtures da suite de testes
         v, pr = d.get("veredito") or {}, d.get("precisao") or {}
+        nasc = d.get("nascimento") or {}
+        cid = d.get("cidade") or {}
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(arq.stem)}">{html.escape(arq.stem[:15])}</a>',
-            html.escape(m_nome(d.get("nome_completo", ""))),
-            m_data(d.get("nascimento") or {}),
-            html.escape((d.get("cidade") or {}).get("uf") or "—"),
+            html.escape(d.get("nome_completo") or "—"),
+            f_data(nasc),
+            html.escape(cid.get("uf") or cid.get("nome") or "—"),
             html.escape(str((d.get("quiz") or {}).get("area") or "—")),
             html.escape(str(v.get("tipo") or "—")),
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
-            html.escape(str(pr.get("modo_hora") or "—")),
-            m_fone(d.get("whatsapp", "")),
+            f_hora(nasc, pr),
+            html.escape(d.get("whatsapp") or "—"),
         ])
     corpo = _tabela(["id", "nome", "nascimento", "uf", "área", "cenário",
                      "casa", "hora", "whatsapp"], linhas)
@@ -356,8 +377,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
         f'<h1>Leituras</h1><p class="sub">{len(arquivos)} no total · '
         f'<a href="/painel">voltar ao painel</a></p>{corpo}'
-        f'<p class="nota">Nome, data de nascimento e telefone aparecem mascarados. '
-        f'O conteúdo completo fica na página de cada leitura.</p><p class="nota">{nav}</p></div>',
+        f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p>'
+        f'<p class="nota">{nav}</p></div>',
         headers=CABECALHOS)
 
 
@@ -372,16 +393,14 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     c = d.get("carta") or {}
     n = d.get("nascimento") or {}
     cid = d.get("cidade") or {}
+    pr = d.get("precisao") or {}
 
-    if revelar:
-        ident = (f'{html.escape(d.get("nome_completo",""))} · '
-                 f'{n.get("dia")}/{n.get("mes")}/{n.get("ano")} '
-                 f'{n.get("hora","?")}h{n.get("minuto",0):0>2} · '
-                 f'{html.escape(cid.get("nome",""))} · {html.escape(d.get("whatsapp","—"))}')
-    else:
-        ident = (f'{html.escape(m_nome(d.get("nome_completo","")))} · {m_data(n)} · '
-                 f'{html.escape(cid.get("uf","—"))} · {m_fone(d.get("whatsapp",""))} '
-                 f'· <a href="?revelar=1">revelar</a>')
+    h_str = f_hora(n, pr)
+    uf_str = f' ({html.escape(cid.get("uf"))})' if cid.get("uf") else ''
+    ident = (f'{html.escape(d.get("nome_completo") or "—")} · '
+             f'{f_data(n)} {h_str} · '
+             f'{html.escape(cid.get("nome") or "—")}{uf_str} · '
+             f'{html.escape(d.get("whatsapp") or "—")}')
 
     ps = "".join(f"<p>{html.escape(x)}</p>" for x in (c.get("paragrafos") or []))
     notas = "".join(f"<li>{html.escape(x)}</li>" for x in (c.get("notas") or []))

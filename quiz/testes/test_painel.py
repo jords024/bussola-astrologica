@@ -194,5 +194,92 @@ class Mascaramento(unittest.TestCase):
         self.assertEqual(m_fone("(54) 99999-1234"), "…1234")
 
 
+class LeiturasPainelSemMascara(unittest.TestCase):
+    def setUp(self):
+        from main import app
+        self.c = TestClient(app)
+
+    def test_formatadores_completos(self):
+        from api.painel import f_data, f_hora
+        # Data completa com ano de 4 dígitos
+        self.assertEqual(f_data({"dia": 9, "mes": 3, "ano": 1998}), "09/03/1998")
+        self.assertEqual(f_data({"dia": 5, "mes": 11, "ano": 2003}), "05/11/2003")
+        self.assertEqual(f_data({}), "—")
+
+        # Hora e minuto de nascimento
+        self.assertEqual(f_hora({"hora": 18, "minuto": 35}), "18h35")
+        self.assertEqual(f_hora({"hora": 4, "minuto": 5}), "04h05")
+        self.assertEqual(f_hora({"hora": 0, "minuto": 0}), "00h00")
+        self.assertEqual(f_hora({"hora": None, "periodo": "manha"}), "manha")
+        self.assertEqual(f_hora({"hora": None}, {"modo_hora": "desconhecida"}), "desconhecida")
+        self.assertEqual(f_hora({}), "—")
+
+    def test_lista_e_detalhe_leituras_mostram_dados_completos(self):
+        """Verifica se /painel/leituras e /painel/leitura/{id} exibem nome completo, ano completo e hora/minuto sem máscara."""
+        leitura_id = "20260907-123456-abcdef12"
+        dados_leitura = {
+            "cliente_id": "test-id",
+            "nome_completo": "Aryaraj Alves Fernandes",
+            "nascimento": {
+                "ano": 1998,
+                "mes": 3,
+                "dia": 9,
+                "hora": 18,
+                "minuto": 35,
+                "precisao": "exata",
+            },
+            "cidade": {"nome": "Fortaleza", "uf": "Ceará"},
+            "quiz": {"area": "amor"},
+            "veredito": {"tipo": "CONFIRMACAO", "casa_eleita_real": True, "casa_aberta": 7},
+            "precisao": {"modo_hora": "exata"},
+            "whatsapp": "85999998888",
+            "carta": {
+                "selo": "Selo Teste",
+                "titulo": "Titulo Teste",
+                "destaque": "Destaque Teste",
+                "paragrafos": ["Paragrafo 1"],
+                "notas": ["Nota 1"]
+            },
+            "meta": {}
+        }
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            arq_leitura = dir_leituras / f"{leitura_id}.json"
+            arq_leitura.write_text(json.dumps(dados_leitura), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras), \
+                 mock.patch.object(config, "PAINEL_SENHA", "senha_teste"), \
+                 mock.patch.object(config, "PAINEL_USUARIO", "crassus"):
+
+                # Teste da lista de leituras
+                resp_lista = self.c.get("/painel/leituras", auth=("crassus", "senha_teste"))
+                self.assertEqual(resp_lista.status_code, 200)
+                txt_lista = resp_lista.text
+
+                # Nome completo sem asteriscos
+                self.assertIn("Aryaraj Alves Fernandes", txt_lista)
+                self.assertNotIn("Ary***", txt_lista)
+
+                # Data com ano completo
+                self.assertIn("09/03/1998", txt_lista)
+                self.assertNotIn("19XX", txt_lista)
+
+                # Horário e minuto
+                self.assertIn("18h35", txt_lista)
+
+                # WhatsApp completo
+                self.assertIn("85999998888", txt_lista)
+
+                # Teste do detalhe da leitura
+                resp_detalhe = self.c.get(f"/painel/leitura/{leitura_id}", auth=("crassus", "senha_teste"))
+                self.assertEqual(resp_detalhe.status_code, 200)
+                txt_detalhe = resp_detalhe.text
+
+                self.assertIn("Aryaraj Alves Fernandes", txt_detalhe)
+                self.assertIn("09/03/1998", txt_detalhe)
+                self.assertIn("18h35", txt_detalhe)
+                self.assertIn("85999998888", txt_detalhe)
+
+
 if __name__ == "__main__":
     unittest.main()
