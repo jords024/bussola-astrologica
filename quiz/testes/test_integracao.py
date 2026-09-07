@@ -119,5 +119,16 @@ class Integracao(unittest.TestCase):
         self.assertFalse(registro.anexar_contato('../../config', 'teste'))
 
 
+    def test_variaveis_css_e_dropdown_cidade(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        import re
+        root_vars = set(re.findall(r'--([a-zA-Z0-9_-]+):', html[:2500]))
+        used_vars = set(re.findall(r'var\(--([a-zA-Z0-9_-]+)\)', html))
+        undefined = used_vars - root_vars
+        self.assertEqual(undefined, set(), f"Variáveis CSS não definidas: {undefined}")
+        self.assertIn('z-index:100;', html)
+
 if __name__ == '__main__':
     unittest.main()
