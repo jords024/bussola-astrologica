@@ -102,6 +102,35 @@ class Agregador(unittest.TestCase):
         self.assertEqual(r["funil"][11]["sessoes"], 1)
         self.assertEqual(r["funil"][11]["tela"], "✦")
 
+    def test_cronometro_e_tempos_por_tela(self):
+        """Verifica se o tempo em cada tela e o cronômetro acumulado são calculados."""
+        d = [
+            ev("time1", 1, "tela", {"de": 0, "para": 1, "ms_na_anterior": 4000, "ms_acumulado": 4000}),
+            ev("time1", 2, "tela", {"de": 1, "para": 5, "ms_na_anterior": 2000, "ms_acumulado": 6000}),
+            ev("time1", 3, "form_envio", {"ms_na_tela5": 15000}),
+            ev("time1", 4, "tela", {"de": 5, "para": 10, "ms_na_anterior": 15000, "ms_acumulado": 21000}),
+            ev("time1", 5, "oferta_clique", {"ms_na_tela": 8000, "ms_acumulado": 29000}),
+        ]
+        r = agregar(d, HOJE, HOJE)
+        funil = {f["tela"]: f for f in r["funil"]}
+        # Tela 0: durou 4000ms, cronômetro inicial 0
+        self.assertEqual(funil[0]["tempo_na_tela_ms"], 4000.0)
+        self.assertEqual(funil[0]["cronometro_ms"], 0.0)
+        # Tela 1: durou 2000ms, cronômetro acumulado 4000ms
+        self.assertEqual(funil[1]["tempo_na_tela_ms"], 2000.0)
+        self.assertEqual(funil[1]["cronometro_ms"], 4000.0)
+        # Tela 5: durou 15000ms, cronômetro acumulado 6000ms
+        self.assertEqual(funil[5]["tempo_na_tela_ms"], 15000.0)
+        self.assertEqual(funil[5]["cronometro_ms"], 6000.0)
+        # Tela 10 (A oferta): durou 8000ms, cronômetro acumulado 21000ms
+        self.assertEqual(funil[10]["tempo_na_tela_ms"], 8000.0)
+        self.assertEqual(funil[10]["cronometro_ms"], 21000.0)
+        # Checkout (✦): cronômetro acumulado 29000ms
+        self.assertEqual(funil["✦"]["cronometro_ms"], 29000.0)
+        # Resumo de tempos
+        self.assertEqual(r["tempos"]["mediana_ate_oferta_ms"], 21000.0)
+        self.assertEqual(r["tempos"]["mediana_ate_checkout_ms"], 29000.0)
+
 
 class Eventos(unittest.TestCase):
     def test_evento_invalido_e_descartado(self):
@@ -183,6 +212,11 @@ class Endpoint(unittest.TestCase):
             # Métricas e linha de checkout
             self.assertIn('foram ao checkout', html_text)
             self.assertIn('Clique no Checkout', html_text)
+            # Métricas de tempo e cronômetro
+            self.assertIn('tempo na tela', html_text)
+            self.assertIn('cronômetro', html_text)
+            self.assertIn('tempo médio no funil', html_text)
+            self.assertIn('tempo até a oferta', html_text)
 
 
 class Mascaramento(unittest.TestCase):
@@ -200,7 +234,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.c = TestClient(app)
 
     def test_formatadores_completos(self):
-        from api.painel import f_data, f_hora
+        from api.painel import f_data, f_hora, f_tempo
         # Data completa com ano de 4 dígitos
         self.assertEqual(f_data({"dia": 9, "mes": 3, "ano": 1998}), "09/03/1998")
         self.assertEqual(f_data({"dia": 5, "mes": 11, "ano": 2003}), "05/11/2003")
@@ -214,8 +248,17 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.assertEqual(f_hora({"hora": None}, {"modo_hora": "desconhecida"}), "desconhecida")
         self.assertEqual(f_hora({}), "—")
 
+        # Formatador de tempo e cronômetro
+        self.assertEqual(f_tempo(None), "—")
+        self.assertEqual(f_tempo(-10), "—")
+        self.assertEqual(f_tempo(3500), "4s")
+        self.assertEqual(f_tempo(45000), "45s")
+        self.assertEqual(f_tempo(60000), "1m")
+        self.assertEqual(f_tempo(75000), "1m 15s")
+        self.assertEqual(f_tempo(135000), "2m 15s")
+
     def test_lista_e_detalhe_leituras_mostram_dados_completos(self):
-        """Verifica se /painel/leituras e /painel/leitura/{id} exibem nome completo, ano completo e hora/minuto sem máscara."""
+        """Verifica se /painel/leituras e /painel/leitura/{id} exibem nome completo, ano completo, hora/minuto e tempo no quiz."""
         leitura_id = "20260907-123456-abcdef12"
         dados_leitura = {
             "cliente_id": "test-id",
@@ -230,6 +273,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
             },
             "cidade": {"nome": "Fortaleza", "uf": "Ceará"},
             "quiz": {"area": "amor"},
+            "tempo_quiz_ms": 95000,
             "veredito": {"tipo": "CONFIRMACAO", "casa_eleita_real": True, "casa_aberta": 7},
             "precisao": {"modo_hora": "exata"},
             "whatsapp": "85999998888",
@@ -270,6 +314,10 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 # WhatsApp completo
                 self.assertIn("85999998888", txt_lista)
 
+                # Tempo no quiz
+                self.assertIn("tempo no quiz", txt_lista)
+                self.assertIn("1m 35s", txt_lista)
+
                 # Teste do detalhe da leitura
                 resp_detalhe = self.c.get(f"/painel/leitura/{leitura_id}", auth=("crassus", "senha_teste"))
                 self.assertEqual(resp_detalhe.status_code, 200)
@@ -279,6 +327,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("09/03/1998", txt_detalhe)
                 self.assertIn("18h35", txt_detalhe)
                 self.assertIn("85999998888", txt_detalhe)
+                self.assertIn("tempo no quiz: 1m 35s", txt_detalhe)
 
 
 if __name__ == "__main__":

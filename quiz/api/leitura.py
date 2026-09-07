@@ -81,6 +81,7 @@ class Pedido(BaseModel):
     quiz: Quiz
     nascimento: Nascimento
     cidade: Cidade
+    ms_ate_gerar: Optional[int] = None
 
 
 class Contato(BaseModel):
@@ -294,6 +295,7 @@ async def gerar(p: Pedido):
         "nascimento": p.nascimento.model_dump(),
         "cidade": p.cidade.model_dump(),
         "quiz": p.quiz.model_dump(),
+        "tempo_quiz_ms": p.ms_ate_gerar,
         "veredito": resposta["veredito"],
         "precisao": precisao,
         "placar": {str(k): round(v, 1) for k, v in placar.casas.items()},

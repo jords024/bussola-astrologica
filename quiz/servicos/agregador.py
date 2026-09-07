@@ -35,6 +35,11 @@ def _ts(ev: dict) -> Optional[datetime]:
         return None
 
 
+def _mediana(valores: Iterable[float]) -> Optional[float]:
+    v = [x for x in valores if x is not None and x >= 0]
+    return round(statistics.median(v), 1) if v else None
+
+
 def agregar(eventos: Iterable[dict], de: date, ate: date,
             incluir_bots: bool = False, incluir_teste: bool = False,
             agora: Optional[datetime] = None) -> dict:
@@ -72,6 +77,9 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
                 "campos": set(), "form_envio": False, "form_erros": [],
                 "leitura": None, "oferta": False, "disp": ev.get("disp"),
                 "contato": False, "falha": None,
+                "duracoes_tela": defaultdict(list),
+                "cronometro_tela": {0: 0.0},
+                "tempo_checkout": None,
             }
         t = _ts(ev)
         if t:
@@ -86,6 +94,17 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
                 v = props.get(k)
                 if isinstance(v, int) and 0 <= v <= 10:
                     s["telas"].add(v)
+            de_tela = props.get("de")
+            para_tela = props.get("para")
+            ms_ant = props.get("ms_na_anterior")
+            if isinstance(de_tela, int) and 0 <= de_tela <= 10 and isinstance(ms_ant, (int, float)) and 0 <= ms_ant < 1800000:
+                s["duracoes_tela"][de_tela].append(float(ms_ant))
+            ms_acum = props.get("ms_acumulado")
+            if isinstance(para_tela, int) and 0 <= para_tela <= 10 and para_tela not in s["cronometro_tela"]:
+                if isinstance(ms_acum, (int, float)) and ms_acum >= 0:
+                    s["cronometro_tela"][para_tela] = float(ms_acum)
+                elif t and s["primeiro"] and t >= s["primeiro"]:
+                    s["cronometro_tela"][para_tela] = (t - s["primeiro"]).total_seconds() * 1000
         elif evt == "escolha":
             # a ULTIMA escolha vale: quem clica em tres opcoes antes de decidir
             # nao pode virar tres pessoas na distribuicao de areas
@@ -100,6 +119,9 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         elif evt == "form_envio":
             s["form_envio"] = True
             s["modo_hora"] = props.get("modo_hora")
+            ms_tela5 = props.get("ms_na_tela5")
+            if isinstance(ms_tela5, (int, float)) and 0 <= ms_tela5 < 1800000:
+                s["duracoes_tela"][5].append(float(ms_tela5))
         elif evt == "leitura_entregue":
             s["leitura"] = props
             s["modo_hora"] = s["modo_hora"] or props.get("modo_hora")
@@ -108,6 +130,19 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
             s["falha"] = props.get("motivo")
         elif evt == "oferta_clique":
             s["oferta"] = True
+            ms_tela = props.get("ms_na_tela")
+            if isinstance(ms_tela, (int, float)) and 0 <= ms_tela < 1800000:
+                s["duracoes_tela"][10].append(float(ms_tela))
+            ms_acum = props.get("ms_acumulado")
+            if isinstance(ms_acum, (int, float)) and ms_acum >= 0:
+                s["tempo_checkout"] = float(ms_acum)
+            elif t and s["primeiro"] and t >= s["primeiro"]:
+                s["tempo_checkout"] = (t - s["primeiro"]).total_seconds() * 1000
+        elif evt == "saida":
+            tela_s = props.get("tela")
+            ms_tela = props.get("ms_na_tela")
+            if isinstance(tela_s, int) and 0 <= tela_s <= 10 and isinstance(ms_tela, (int, float)) and 0 <= ms_tela < 1800000:
+                s["duracoes_tela"][tela_s].append(float(ms_tela))
         elif evt == "contato_enviado":
             s["contato"] = True
 
@@ -128,6 +163,19 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         s["aberta"] = aberta
         sessoes.append(s)
 
+    duracoes_sessoes = []
+    for s in sessoes:
+        if s["primeiro"] and s["ultimo"]:
+            delta_ms = (s["ultimo"] - s["primeiro"]).total_seconds() * 1000
+            if 0 < delta_ms < 1800000:
+                duracoes_sessoes.append(delta_ms)
+
+    tempos = {
+        "mediana_sessao_ms": _mediana(duracoes_sessoes),
+        "mediana_ate_oferta_ms": _mediana([s["cronometro_tela"][10] for s in sessoes if 10 in s.get("cronometro_tela", {})]),
+        "mediana_ate_checkout_ms": _mediana([s["tempo_checkout"] for s in sessoes if s.get("tempo_checkout") is not None]),
+    }
+
     return {
         "periodo": {"de": de.isoformat(), "ate": ate.isoformat()},
         "sessoes": len(sessoes),
@@ -137,6 +185,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
             "cliques": sum(1 for s in sessoes if s["oferta"]),
             "pct_da_oferta": pct(sum(1 for s in sessoes if s["oferta"]), sum(1 for s in sessoes if 10 in s["telas"])),
         },
+        "tempos": tempos,
         "formulario": _formulario(sessoes),
         "areas": _contagem(s["area"] for s in sessoes if s["area"]),
         "cenarios": _cenarios(sessoes),
@@ -171,8 +220,13 @@ def _funil(sessoes: list[dict]) -> list[dict]:
             parou = sum(1 for s in sessoes if s["max_tela"] == 10 and not s["oferta"] and not s["aberta"])
         else:
             parou = sum(1 for s in sessoes if s["max_tela"] == n and not s["aberta"])
+        duracoes = [d for s in sessoes for d in s.get("duracoes_tela", {}).get(n, [])]
+        cronos = [s["cronometro_tela"][n] for s in sessoes if n in s.get("cronometro_tela", {})]
+
         linhas.append({
             "tela": n, "nome": nome, "sessoes": alcanceou,
+            "tempo_na_tela_ms": _mediana(duracoes),
+            "cronometro_ms": _mediana(cronos),
             "pct_do_topo": pct(alcanceou, base),
             "parou_aqui": parou,
             "queda": (anterior - alcanceou) if anterior is not None else None,
@@ -181,10 +235,14 @@ def _funil(sessoes: list[dict]) -> list[dict]:
 
     # Etapa de conversão final: clique no botão da oferta direcionando ao checkout da Hotmart
     clicou_checkout = sum(1 for s in sessoes if s["oferta"])
+    duracoes_checkout = [d for s in sessoes if s.get("oferta") for d in s.get("duracoes_tela", {}).get(10, [])]
+    cronos_checkout = [s["tempo_checkout"] for s in sessoes if s.get("tempo_checkout") is not None]
     linhas.append({
         "tela": "✦",
         "nome": "Clique no Checkout",
         "sessoes": clicou_checkout,
+        "tempo_na_tela_ms": _mediana(duracoes_checkout),
+        "cronometro_ms": _mediana(cronos_checkout),
         "pct_do_topo": pct(clicou_checkout, base),
         "parou_aqui": clicou_checkout,
         "queda": (anterior - clicou_checkout) if anterior is not None else None,

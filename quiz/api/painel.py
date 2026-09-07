@@ -86,6 +86,18 @@ def f_hora(nasc: dict, pr: Optional[dict] = None) -> str:
     return html.escape(str(modo))
 
 
+def f_tempo(ms: Optional[float]) -> str:
+    """Formata milissegundos em duração legível: ex.: 5s, 42s, 1m 15s."""
+    if ms is None or ms < 0:
+        return "—"
+    seg = round(ms / 1000)
+    if seg < 60:
+        return f"{seg}s"
+    m = seg // 60
+    s = seg % 60
+    return f"{m}m {s:0>2}s" if s else f"{m}m"
+
+
 # --------------------------------------------------------------------- helpers
 def _periodo(de: Optional[str], ate: Optional[str], dias: int) -> tuple[date, date]:
     hoje = date.today()
@@ -203,9 +215,12 @@ def painel(request: Request, _=Depends(exigir_senha),
     checkout_item = next((f for f in d["funil"] if f["tela"] == "✦"), None)
     clicaram_checkout = checkout_item["sessoes"] if checkout_item else d.get("checkout", {}).get("cliques", 0)
 
+    tempos = d.get("tempos") or {}
     p.append('<div class="cards">')
     for valor, rot in [
         (d["sessoes"], "sessões"),
+        (f_tempo(tempos.get("mediana_sessao_ms")), "tempo médio no funil"),
+        (f_tempo(tempos.get("mediana_ate_oferta_ms")), "tempo até a oferta"),
         (d["funil"][5]["sessoes"], "chegaram aos dados"),
         (g["total"], "cartas entregues"),
         (chegaram_oferta, "chegaram à oferta"),
@@ -233,13 +248,18 @@ def painel(request: Request, _=Depends(exigir_senha),
         linhas.append([
             rotulo,
             f'<div class="bar">{_barra(f["pct_do_topo"])}</div>',
-            str(f["sessoes"]), _n(f["pct_do_topo"]),
+            str(f["sessoes"]),
+            f_tempo(f.get("tempo_na_tela_ms")),
+            f_tempo(f.get("cronometro_ms")),
+            _n(f["pct_do_topo"]),
             "—" if f["queda"] in (None, 0) else f'−{f["queda"]}',
             str(f["parou_aqui"]),
         ])
-    p.append(_tabela(["etapa / tela", "", "#sessões", "#% do topo", "#queda", "#pararam aqui"], linhas))
-    p.append('<p class="nota">Conta quem <b>chegou pelo menos uma vez</b> em cada tela. A linha '
-             '<b>✦ Clique no Checkout</b> registra exatamente quantas pessoas apertaram o botão de compra na tela da oferta para ir à página de pagamento da Hotmart.</p>')
+    p.append(_tabela(["etapa / tela", "", "#sessões", "tempo na tela", "cronômetro", "#% do topo", "#queda", "#pararam aqui"], linhas))
+    p.append('<p class="nota">Conta quem <b>chegou pelo menos uma vez</b> em cada tela. '
+             '<b>Tempo na tela:</b> mediana do tempo de permanência nesta etapa específica. '
+             '<b>Cronômetro:</b> tempo acumulado desde o momento em que o visitante entrou na página até atingir a tela. '
+             'A linha <b>✦ Clique no Checkout</b> registra quem apertou o botão de compra na oferta.</p>')
     p.append('</section>')
 
     # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
@@ -364,10 +384,11 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
             html.escape(str(v.get("tipo") or "—")),
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
+            f_tempo(d.get("tempo_quiz_ms")),
             html.escape(d.get("whatsapp") or "—"),
         ])
-    corpo = _tabela(["id", "nome", "nascimento", "uf", "área", "cenário",
-                     "casa", "hora", "whatsapp"], linhas)
+    corpo = _tabela(["id / gerada em", "nome", "nascimento", "uf", "área", "cenário",
+                     "casa", "hora", "tempo no quiz", "whatsapp"], linhas)
     nav = ""
     if pagina:
         nav += f'<a href="/painel/leituras?pagina={pagina-1}">← anteriores</a> '
@@ -397,10 +418,12 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
 
     h_str = f_hora(n, pr)
     uf_str = f' ({html.escape(cid.get("uf"))})' if cid.get("uf") else ''
+    t_quiz_str = f' · tempo no quiz: {f_tempo(d.get("tempo_quiz_ms"))}' if d.get("tempo_quiz_ms") else ''
     ident = (f'{html.escape(d.get("nome_completo") or "—")} · '
              f'{f_data(n)} {h_str} · '
              f'{html.escape(cid.get("nome") or "—")}{uf_str} · '
-             f'{html.escape(d.get("whatsapp") or "—")}')
+             f'{html.escape(d.get("whatsapp") or "—")}'
+             f'{t_quiz_str}')
 
     ps = "".join(f"<p>{html.escape(x)}</p>" for x in (c.get("paragrafos") or []))
     notas = "".join(f"<li>{html.escape(x)}</li>" for x in (c.get("notas") or []))

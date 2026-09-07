@@ -832,6 +832,8 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     /* sid em sessionStorage: um F5 no meio do funil e a MESMA visita, mas aba
        nova e visita nova. Em localStorage, todo refresh inflaria a tela 0. */
     let sid = ss.getItem('bsl_sid'); if(!sid){ sid = uid(); ss.setItem('bsl_sid', sid); }
+    let tEntrada = parseInt(ss.getItem('bsl_t_entrada')||'0', 10);
+    if(!tEntrada){ tEntrada = Date.now(); ss.setItem('bsl_t_entrada', String(tEntrada)); }
 
     let fila = [], seq = 0, timer = null, enviando = false;
     try{ fila = JSON.parse(ss.getItem('bsl_fila')||'[]'); }catch(e){ fila = []; }
@@ -854,7 +856,11 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     }
 
     A.sid = sid;
-    A.novoSid = function(){ sid = uid(); ss.setItem('bsl_sid', sid); A.sid = sid; seq = 0; };
+    A.tEntrada = tEntrada;
+    A.novoSid = function(){
+      sid = uid(); ss.setItem('bsl_sid', sid); A.sid = sid; seq = 0;
+      tEntrada = Date.now(); ss.setItem('bsl_t_entrada', String(tEntrada)); A.tEntrada = tEntrada;
+    };
     A.flush = function(beacon){ clearTimeout(timer); timer = null; enviar(beacon); };
     A.ev = function(evt, props, urgente){
       trackFb(evt, props);
@@ -895,9 +901,9 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     scr[i].classList.remove('on');
     i = Math.max(0, Math.min(scr.length-1, n));
     scr[i].classList.add('on');
-    /* ponto unico de passagem do funil: cobre os botoes, o voltar com o salto
-       7->5, o go(6) do calcular, o go(7) da entrega e o go(5) do erro */
-    A.ev('tela', {de:de, para:i, ms_na_anterior: Date.now()-tTela,
+    const msNaAnterior = Date.now()-tTela;
+    const msAcumulado = Date.now()-(A.tEntrada || tTela);
+    A.ev('tela', {de:de, para:i, ms_na_anterior: msNaAnterior, ms_acumulado: msAcumulado,
       direcao: (de===6 && i===5) ? 'erro' : (i>de ? 'frente' : 'tras')});
     const nomeEtapa = NOMES_ETAPAS[i] || ('Etapa_' + i);
     if(typeof window.fbq === 'function'){
@@ -1316,6 +1322,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     return {
       nome_completo:S.nomeCompleto,
       cliente_id: A.sid,
+      ms_ate_gerar: Date.now() - (A.tEntrada || tTela),
       quiz:{area:S.area, espelho:S.mirror,
         espelho_idx:MIRROR[S.area].o.findIndex(o=>o[0]===S.mirror), quebra:S.brk},
       nascimento:{ano:Number($('#yy').value),mes:Number(mm.value),dia:Number(dd.value),
@@ -1546,7 +1553,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   if($('#today')) $('#today').textContent = `${D.getDate()} de ${MS[D.getMonth()]} de ${D.getFullYear()}`;
   const CHECKOUT_URL = 'https://pay.hotmart.com/Q107238351O?checkoutMode=10&bid=1788742865072';
   $('#buy').addEventListener('click', function(){
-    A.ev('oferta_clique', {botao:'principal', ms_na_tela: Date.now()-tTela}, true);
+    A.ev('oferta_clique', {botao:'principal', ms_na_tela: Date.now()-tTela, ms_acumulado: Date.now()-(A.tEntrada || tTela)}, true);
     A.flush(true);
     try {
       const u = new URL(CHECKOUT_URL);
@@ -1564,7 +1571,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     }
   });
   addEventListener('pagehide', ()=>{
-    A.ev('saida', {tela:i, ms_na_tela: Date.now()-tTela, motivo:'saiu'});
+    A.ev('saida', {tela:i, ms_na_tela: Date.now()-tTela, ms_acumulado: Date.now()-(A.tEntrada || tTela), motivo:'saiu'});
     A.flush(true);
   });
 })();
