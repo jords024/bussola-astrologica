@@ -223,6 +223,25 @@ class Integracao(unittest.TestCase):
         self.assertIn('whatsapp:S.whatsapp', html)
         self.assertIn('phonenumber', html)
 
+    def test_validacao_tela5_visual_e_acessibilidade(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        # Placeholder claro e desambiguado para não parecer preenchido
+        self.assertIn('placeholder="DDD + seu número"', html)
+        # Elementos de feedback visual e acessibilidade
+        self.assertIn('id="telAviso"', html)
+        self.assertIn('id="calcAviso"', html)
+        self.assertIn('id="calcAvisoLista"', html)
+        # Classes CSS de erro e animações
+        self.assertIn('.input-erro', html)
+        self.assertIn('shake-erro', html)
+        self.assertIn('.calc-aviso', html)
+        # Validação com foco no primeiro campo faltante e limpeza em tempo real
+        self.assertIn('primeiroErroEl.focus()', html)
+        self.assertIn('primeiroErroEl.scrollIntoView', html)
+        self.assertIn("['nm', 'tel', 'dd', 'mm', 'yy', 'hh', 'mi', 'cid']", html)
+
     def test_whatsapp_persistido_no_lead(self):
         import json
         dados = pedido()

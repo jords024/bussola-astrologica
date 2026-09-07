@@ -168,6 +168,46 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     border-radius:10px;padding:14px;color:var(--sand);font-size:16px;font-family:inherit;min-height:50px;}
   .fg input::placeholder{color:rgba(242,239,233,.28);}
   .fg input:focus,.fg select:focus{outline:none;border-color:var(--amber);background:var(--card-2);}
+  .fg input.input-erro, .fg select.input-erro {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.08) !important;
+    box-shadow: 0 0 0 1.5px #ef4444 !important;
+    animation: shake-erro 0.35s ease;
+  }
+  @keyframes shake-erro {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  .calc-aviso {
+    display: none;
+    width: 100%;
+    margin-bottom: 16px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid #ef4444;
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-align: left;
+    color: #fca5a5;
+    font-size: 13.5px;
+    line-height: 1.5;
+    animation: rise .3s ease both;
+  }
+  .calc-aviso.on { display: block; }
+  .calc-aviso .aviso-titulo {
+    display: block;
+    font-weight: 600;
+    color: #fee2e2;
+    margin-bottom: 6px;
+  }
+  .calc-aviso ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .calc-aviso li {
+    margin-bottom: 3px;
+    color: #fca5a5;
+  }
   .trio{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:7px;}
   .duo-tel{display:grid;grid-template-columns:130px 1fr;gap:8px;align-items:center;}
   .duo-tel select{padding:14px 10px;cursor:pointer;}
@@ -553,9 +593,10 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
           <option value="+353">🇮🇪 +353</option>
           <option value="+61">🇦🇺 +61</option>
         </select>
-        <input type="tel" id="tel" placeholder="(11) 98765-4321" inputmode="tel" autocomplete="tel">
+        <input type="tel" id="tel" placeholder="DDD + seu número" inputmode="tel" autocomplete="tel">
       </div>
       <p class="hint">Com DDD e número completo. Para envio do resultado da sua leitura.</p>
+      <p class="campo-aviso" id="telAviso" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;font-weight:500;">⚠️ Por favor, digite seu WhatsApp com DDD.</p>
     </div>
 
     <div class="fg"><label>Data de nascimento</label>
@@ -609,6 +650,11 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
         <button type="button" id="trocarCid">trocar</button>
       </div>
     </div>
+  </div>
+
+  <div class="calc-aviso" id="calcAviso" style="display:none;" role="alert">
+    <span class="aviso-titulo">⚠️ Preencha os campos obrigatórios para continuar:</span>
+    <ul id="calcAvisoLista"></ul>
   </div>
 
   <button class="go" id="calc">Traçar minha leitura</button>
@@ -1108,11 +1154,11 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     ddiSelect.addEventListener('change', () => {
       if (telInput) {
         if (ddiSelect.value === '+55') {
-          telInput.placeholder = '(11) 98765-4321';
+          telInput.placeholder = 'DDD + seu número';
         } else if (ddiSelect.value === '+351') {
-          telInput.placeholder = '912 345 678';
+          telInput.placeholder = 'Digite seu número';
         } else if (ddiSelect.value === '+1') {
-          telInput.placeholder = '(555) 000-0000';
+          telInput.placeholder = 'Digite seu número';
         } else {
           telInput.placeholder = 'Número completo';
         }
@@ -1319,46 +1365,116 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
 
   /* ---- validação antes de calcular ---- */
   let tentativaCalc = 0;
+
+  // Limpeza de erros em tempo real conforme o usuário digita
+  ['nm', 'tel', 'dd', 'mm', 'yy', 'hh', 'mi', 'cid'].forEach(id => {
+    const el = $(`#${id}`);
+    if (el) {
+      const limpar = () => {
+        el.classList.remove('input-erro');
+        if (id === 'tel') {
+          const telAviso = $('#telAviso');
+          if (telAviso) telAviso.style.display = 'none';
+        }
+        const calcAviso = $('#calcAviso');
+        if (calcAviso && !document.querySelector('.input-erro')) {
+          calcAviso.style.display = 'none';
+          calcAviso.classList.remove('on');
+        }
+      };
+      el.addEventListener('input', limpar);
+      el.addEventListener('change', limpar);
+    }
+  });
+
   $('#calc').addEventListener('click', () => {
     const faltando = [];
+    let primeiroErroEl = null;
+
+    function marcarErro(el, msg) {
+      if (el) el.classList.add('input-erro');
+      if (!primeiroErroEl && el) primeiroErroEl = el;
+      if (msg) faltando.push(msg);
+    }
+
+    // Resetar erros visuais anteriores
+    document.querySelectorAll('.input-erro').forEach(el => el.classList.remove('input-erro'));
+    const calcAviso = $('#calcAviso');
+    const calcAvisoLista = $('#calcAvisoLista');
+    const telAviso = $('#telAviso');
+    if (calcAviso) { calcAviso.style.display = 'none'; calcAviso.classList.remove('on'); }
+    if (telAviso) { telAviso.style.display = 'none'; }
+
     S.nomeCompleto = $('#nm').value.trim().replace(/\s+/g,' ');
     /* guarda o completo para o cadastro, usa só o primeiro no texto */
     S.nome = S.nomeCompleto.split(' ')[0] || '';
-    if (!S.nomeCompleto) faltando.push('seu nome completo');
-    else if (S.nomeCompleto.split(' ').length < 2) faltando.push('o sobrenome também');
+    if (!S.nomeCompleto) {
+      marcarErro($('#nm'), 'Seu nome completo');
+    } else if (S.nomeCompleto.split(' ').length < 2) {
+      marcarErro($('#nm'), 'Seu sobrenome também');
+    }
 
     const telVal = ($('#tel') ? $('#tel').value : '').trim();
     const ddiVal = ($('#ddi') ? $('#ddi').value : '+55').trim();
     const telDigitos = telVal.replace(/\D/g, '');
     if (!telVal) {
-      faltando.push('seu WhatsApp completo com DDD');
+      marcarErro($('#tel'), 'Seu WhatsApp completo com DDD');
+      if (telAviso) { telAviso.textContent = '⚠️ Digite seu número de WhatsApp com DDD.'; telAviso.style.display = 'block'; }
     } else if (ddiVal === '+55' && telDigitos.length < 10) {
-      faltando.push('o DDD e o número completo do seu WhatsApp (ex: 11 98765-4321)');
+      marcarErro($('#tel'), 'O DDD e o número completo do seu WhatsApp (ex: 11 98765-4321)');
+      if (telAviso) { telAviso.textContent = '⚠️ Digite o DDD + número completo do seu WhatsApp.'; telAviso.style.display = 'block'; }
     } else if (telDigitos.length < 7) {
-      faltando.push('um número de WhatsApp válido');
+      marcarErro($('#tel'), 'Um número de WhatsApp válido');
+      if (telAviso) { telAviso.textContent = '⚠️ Digite um número de WhatsApp válido.'; telAviso.style.display = 'block'; }
     } else {
       S.whatsapp = `${ddiVal} ${telVal}`;
     }
-    if (!dd.value || !mm.value || !$('#yy').value) faltando.push('a data completa');
-    else {
+
+    if (!dd.value || !mm.value || !$('#yy').value) {
+      if (!dd.value) marcarErro(dd, null);
+      if (!mm.value) marcarErro(mm, null);
+      if (!$('#yy').value) marcarErro($('#yy'), null);
+      faltando.push('Sua data de nascimento completa (dia, mês e ano)');
+    } else {
       const y = Number($('#yy').value), m = Number(mm.value), d = Number(dd.value);
       const dt = new Date(y,m-1,d);
-      if (y < 1900 || dt > new Date() || dt.getFullYear() !== y || dt.getMonth() !== m-1 || dt.getDate() !== d)
-        faltando.push('uma data de nascimento válida');
+      if (y < 1900 || dt > new Date() || dt.getFullYear() !== y || dt.getMonth() !== m-1 || dt.getDate() !== d) {
+        marcarErro($('#yy'), 'Uma data de nascimento válida');
+      }
     }
-    if (!S.cidade) faltando.push('a cidade escolhida na lista');
+
+    if (!S.cidade) {
+      marcarErro($('#cid'), 'Sua cidade de nascimento (escolha na lista suspensa)');
+    }
+
     if (S.horaModo === 'exata'){
       const h = $('#hh').value, m = $('#mi').value;
-      if (h === '' ) faltando.push('a hora (ou toque em "não sei meu horário")');
-      else { S.hora = +h; S.min = m === '' ? 0 : +m; }
+      if (h === '' ) {
+        marcarErro($('#hh'), 'A hora em que você nasceu (ou selecione "não sei meu horário")');
+      } else {
+        S.hora = +h; S.min = m === '' ? 0 : +m;
+      }
     }
+
     if (faltando.length){
       A.ev('form_erro', {faltando: faltando}, true);
       notaHora('');
       const el = $('#signEcho');
-      el.innerHTML = `<span>falta pouco</span>Ainda preciso de ${faltando.join(', ')}.`;
-      el.classList.add('on');
-      el.scrollIntoView({block:'center',behavior:'smooth'});
+      if (el) {
+        el.innerHTML = `<span>falta pouco</span>Ainda preciso de: ${faltando.join(', ')}.`;
+        el.classList.add('on');
+      }
+      if (calcAviso && calcAvisoLista) {
+        calcAvisoLista.innerHTML = faltando.map(item => `<li>${item}</li>`).join('');
+        calcAviso.style.display = 'block';
+        calcAviso.classList.add('on');
+      }
+      if (primeiroErroEl) {
+        primeiroErroEl.scrollIntoView({block:'center',behavior:'smooth'});
+        setTimeout(() => {
+          try { primeiroErroEl.focus(); } catch(e){}
+        }, 300);
+      }
       return;
     }
     S.leitura = null;
