@@ -150,5 +150,21 @@ class Integracao(unittest.TestCase):
         self.assertIn("slice(0, 2)", html)
         self.assertIn("slice(0, 4)", html)
 
+    def test_docker_compose_quiz_producao_valido(self):
+        import yaml
+        compose_path = Path(__file__).resolve().parent.parent.parent / 'docker' / 'docker-compose-quiz-producao.yml'
+        self.assertTrue(compose_path.exists(), "Arquivo docker-compose-quiz-producao.yml não encontrado")
+        with open(compose_path, encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        self.assertIn('services', data)
+        self.assertIn('quiz_crassus', data['services'])
+        svc = data['services']['quiz_crassus']
+        self.assertIn('image', svc)
+        self.assertIn('network_swarm_public', svc['networks'])
+        self.assertIn('quiz_dados:/app/dados', svc['volumes'])
+        labels = svc['deploy']['labels']
+        self.assertTrue(any('server.port=8765' in lbl for lbl in labels))
+        self.assertTrue(any('traefik.enable=true' in lbl for lbl in labels))
+
 if __name__ == '__main__':
     unittest.main()

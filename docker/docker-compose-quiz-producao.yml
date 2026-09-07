@@ -1,0 +1,96 @@
+version: "3.7"
+
+services:
+  # ============================================================================
+  # Serviço do Quiz Astrológico (FastAPI, Cálculos Kerykeion & Leitura IA)
+  # ============================================================================
+  quiz_crassus:
+    # Imagem de produção do Quiz da Bússola
+    image: aryalvesfernandes/quiz-crassus:1.0.0
+
+    # Configura o Hostname para identificação única da réplica no Swarm
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+
+    # Configura a rede pública do Swarm compartilhada com o Traefik
+    networks:
+      - network_swarm_public
+
+    # Configura o volume para persistência das leituras, eventos e cache
+    volumes:
+      - quiz_dados:/app/dados
+
+    # Variáveis de ambiente da aplicação
+    environment:
+      # Diretório gravável dentro do container para armazenar dados e cache
+      - DIR_DADOS=/app/dados
+
+      # Chave da API OpenAI para geração da carta personalizada
+      - OPENAI_API_KEY=
+
+      # Modelo utilizado para redação da carta astrológica
+      - MODELO_LEITURA=gpt-5.6-luna
+
+      # Credenciais de acesso ao painel de métricas (/painel)
+      - PAINEL_USUARIO=crassus
+      - PAINEL_SENHA=bussola_painel_senha_segura_2026
+
+      # Política de retenção de dados (dias)
+      - EVENTOS_RETENCAO_DIAS=180
+      - LEITURAS_RETENCAO_DIAS=180
+
+    deploy:
+      # Modo de implantação replicado no Swarm
+      mode: replicated
+      replicas: 1
+
+      # Estratégia de placement (nó manager)
+      placement:
+        constraints:
+          - node.role == manager
+
+      # Limites de recursos do container
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1024M
+
+      labels:
+        # Habilita o serviço no Traefik
+        - traefik.enable=true
+
+        # Configura o domínio de acesso público (altere conforme seu DNS)
+        - traefik.http.routers.quiz_crassus.rule=Host(`quiz.crassusastrologo.com.br`)
+
+        # Ponto de entrada HTTPS e certificado SSL automático Let's Encrypt
+        - traefik.http.routers.quiz_crassus.entrypoints=websecure
+        - traefik.http.routers.quiz_crassus.tls.certresolver=letsencryptresolver
+
+        # Vincula o roteador ao serviço interno
+        - traefik.http.routers.quiz_crassus.service=quiz_crassus
+
+        # Porta interna do FastAPI / Uvicorn dentro do container
+        - traefik.http.services.quiz_crassus.loadbalancer.server.port=8765
+
+        # Encaminha o cabeçalho Host original para o backend
+        - traefik.http.services.quiz_crassus.loadbalancer.passHostHeader=true
+
+        # Middlewares de segurança e compressão
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.middlewares.quiz_compress.compress=true
+        - traefik.http.routers.quiz_crassus.middlewares=sslheader@docker,quiz_compress@docker
+
+# ==============================================================================
+# Definição dos Volumes do Stack
+# ==============================================================================
+volumes:
+  quiz_dados:
+    external: true
+    name: quiz_dados
+
+# ==============================================================================
+# Definição das Redes do Stack
+# ==============================================================================
+networks:
+  network_swarm_public:
+    external: true
+    name: network_swarm_public
