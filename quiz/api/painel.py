@@ -256,21 +256,81 @@ a{color:var(--amber)}
 .tag-checkout.sim{background:rgba(62,145,102,.22);color:#58B982;border:1px solid rgba(62,145,102,.5)}
 .tag-checkout.nao{background:rgba(255,255,255,.04);color:var(--sand2);border:1px solid var(--line)}
 .tag-rep{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(229,169,60,.18);color:var(--amber);border:1px solid rgba(229,169,60,.35);margin-left:6px;vertical-align:middle}
+.filtros-leituras{display:flex;gap:8px;margin:12px 0 16px;flex-wrap:wrap;align-items:center}
+.btn-filtro-leituras{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;color:var(--sand2);text-decoration:none;font-size:12px;font-weight:600;background:rgba(255,255,255,.02);cursor:pointer;transition:all .15s ease}
+.btn-filtro-leituras:hover{border-color:var(--amber);color:var(--amber);background:rgba(229,169,60,.08)}
+.btn-filtro-leituras.on{border-color:var(--amber);background:rgba(229,169,60,.12);color:var(--amber);font-weight:700}
+.btn-filtro-leituras.chk:hover{border-color:var(--green);color:#58B982;background:rgba(78,157,110,.08)}
+.btn-filtro-leituras.chk.on{border-color:var(--green);background:rgba(78,157,110,.18);color:#58B982;font-weight:700}
+.btn-filtro-leituras .badge-count{display:inline-block;padding:1px 6px;border-radius:999px;font-size:11px;background:rgba(255,255,255,.06);margin-left:2px}
+.btn-filtro-leituras.on .badge-count{background:rgba(229,169,60,.22);color:var(--amber)}
+.btn-filtro-leituras.chk.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
+JS_PAINEL = """
+function abrirAba(id){
+  document.querySelectorAll(".aba-btn").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-tab")===id);});
+  document.querySelectorAll(".aba-painel").forEach(function(s){s.classList.toggle("on",s.id===id);});
+  try{history.replaceState(null,"","#"+id);localStorage.setItem("painel_aba_ativa",id);}catch(e){}
+}
+function filtrarCheckoutClient(soChk, btn, evt){
+  var tbody = document.getElementById("tbody-leituras");
+  if(!tbody){ return true; }
+  var rows = tbody.querySelectorAll("tr[data-checkout]");
+  var totalRows = rows.length;
+  if(totalRows > 0 && totalRows <= 20){
+    if(evt && evt.preventDefault){ evt.preventDefault(); }
+    var visiveis = 0;
+    rows.forEach(function(r){
+      var chk = r.getAttribute("data-checkout") === "1";
+      if(soChk === 1 && !chk){
+        r.style.display = "none";
+      } else {
+        r.style.display = "";
+        visiveis++;
+      }
+    });
+    document.querySelectorAll(".btn-filtro-leituras").forEach(function(b){
+      var bSoChk = parseInt(b.getAttribute("data-so-checkout") || "0", 10);
+      b.classList.toggle("on", bSoChk === soChk);
+    });
+    var sub = document.getElementById("sub-leituras-info");
+    if(sub){
+      var tipo = soChk === 1 ? "leituras com checkout" : "leituras no total";
+      sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + " · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
+    }
+    try{
+      var href = btn.getAttribute("href");
+      if(href){ history.replaceState(null, "", href); }
+    }catch(e){}
+    return false;
+  }
+  return true;
+}
+(function(){
+  var hash=(location.hash||"").replace("#","");
+  var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}
+  var alvo=hash||salva;
+  if(alvo&&document.getElementById(alvo)){abrirAba(alvo);}
+})();
+"""
 
-def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "") -> str:
+
+def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "",
+            tr_attrs: Optional[list[str]] = None, tbody_id: str = "") -> str:
     if not linhas:
         return '<p class="vazio">Ainda sem dados neste período.</p>'
     th = "".join(f'<th class="{"n" if h.startswith("#") else ""}">{html.escape(h.lstrip("#"))}</th>'
                  for h in cabecalhos)
     tr = ""
-    for l in linhas:
+    for idx, l in enumerate(linhas):
+        extra = f" {tr_attrs[idx]}" if tr_attrs and idx < len(tr_attrs) else ""
         tds = "".join(f'<td class="{"n" if h.startswith("#") else ""}">{c}</td>'
                       for h, c in zip(cabecalhos, l))
-        tr += f"<tr>{tds}</tr>"
-    return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>'
+        tr += f"<tr{extra}>{tds}</tr>"
+    tbody_attr = f' id="{tbody_id}"' if tbody_id else ""
+    return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody{tbody_attr}>{tr}</tbody></table></div>'
 
 
 def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
@@ -386,7 +446,7 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
     return progresso
 
 
-def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
+def _contagens_leituras_dados(dados: list[tuple[str, dict]]) -> tuple[dict[str, int], int]:
     """Agrupa leituras da mesma pessoa por WhatsApp, ID do visitante ou (nome, data de nascimento).
 
     Retorna:
@@ -394,11 +454,7 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
       - total de pessoas únicas
     """
     leads = []
-    for arq in arquivos:
-        try:
-            d = json.loads(arq.read_text(encoding="utf-8"))
-        except Exception:
-            continue
+    for stem, d in dados:
         if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
             continue
         nome = " ".join((d.get("nome_completo") or "").strip().lower().split())
@@ -410,7 +466,7 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
             wa = wa[2:]
         cid = str(d.get("cliente_id") or "").strip()
         leads.append({
-            "stem": arq.stem,
+            "stem": stem,
             "nome_norm": nome,
             "dn": dn,
             "wa": wa if len(wa) >= 8 else "",
@@ -459,28 +515,55 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
     return mapa_contagens, len(clusters)
 
 
-def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, int, int]:
-    arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
-    total_arquivos = len(arquivos)
-    contagens_map, total_pessoas = _contagens_leituras(arquivos)
-    total_paginas = max(1, (total_arquivos + por_pagina - 1) // por_pagina)
-    pagina_ajustada = min(max(0, pagina), total_paginas - 1) if total_arquivos > 0 else 0
-    recorte = arquivos[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
+def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
+    dados = []
+    for arq in arquivos:
+        try:
+            dados.append((arq.stem, json.loads(arq.read_text(encoding="utf-8"))))
+        except Exception:
+            continue
+    return _contagens_leituras_dados(dados)
 
-    dados_recorte: list[tuple[str, dict]] = []
-    for arq in recorte:
+
+def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
+                     so_checkout: bool = False) -> tuple[str, int, int, int, int, int]:
+    arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
+
+    todos_dados: list[tuple[str, dict]] = []
+    for arq in arquivos:
         try:
             d = json.loads(arq.read_text(encoding="utf-8"))
         except Exception:
             continue
         if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
             continue          # fixtures da suite de testes
-        dados_recorte.append((arq.stem, d))
+        todos_dados.append((arq.stem, d))
 
-    progresso_map = obter_progresso_leituras(dados_recorte)
+    total_geral = len(todos_dados)
+
+    # Identifica progresso e checkout de todas as leituras
+    progresso_map = obter_progresso_leituras(todos_dados)
+    total_checkout = sum(1 for stem, _ in todos_dados if progresso_map.get(stem, {}).get("checkout"))
+
+    # Mapeia submissões por pessoa usando todos os envios para badge Nx
+    contagens_map, _ = _contagens_leituras_dados(todos_dados)
+
+    if so_checkout:
+        dados_filtrados = [(stem, d) for stem, d in todos_dados if progresso_map.get(stem, {}).get("checkout")]
+    else:
+        dados_filtrados = todos_dados
+
+    total_exibidos = len(dados_filtrados)
+    _, total_pessoas_exibidas = _contagens_leituras_dados(dados_filtrados)
+
+    total_paginas = max(1, (total_exibidos + por_pagina - 1) // por_pagina)
+    pagina_int = pagina.default if hasattr(pagina, "default") else int(pagina)
+    pagina_ajustada = min(max(0, pagina_int), total_paginas - 1) if total_exibidos > 0 else 0
+    recorte = dados_filtrados[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
 
     linhas = []
-    for stem, d in dados_recorte:
+    tr_attrs = []
+    for stem, d in recorte:
         v, pr = d.get("veredito") or {}, d.get("precisao") or {}
         nasc = d.get("nascimento") or {}
         cid = d.get("cidade") or {}
@@ -495,6 +578,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
         tag_rep = f' <span class="tag-rep" title="Preencheu o formulário {qtd_submissoes} vezes">{qtd_submissoes}x</span>' if qtd_submissoes > 1 else ''
         nome_completo = html.escape(d.get("nome_completo") or "—") + tag_rep
 
+        tr_attrs.append(f'data-checkout="{"1" if prog.get("checkout") else "0"}"')
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
@@ -511,24 +595,30 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
             f_hora(nasc, pr),
             f_tempo(d.get("tempo_quiz_ms")),
         ])
-    corpo = _tabela([
-        "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
-        "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz"
-    ], linhas)
-    return corpo, total_arquivos, total_paginas, total_pessoas
+
+    if not linhas and so_checkout:
+        corpo = '<p class="vazio">Nenhum visitante foi ao checkout neste período.</p>'
+    else:
+        corpo = _tabela([
+            "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
+            "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz"
+        ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras")
+
+    return corpo, total_exibidos, total_paginas, total_pessoas_exibidas, total_checkout, total_geral
 
 
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
                      por_pagina: int = 20, param_nome: str = "pag_leituras",
-                     hash_tab: str = "") -> str:
+                     hash_tab: str = "", rotulo_item: str = "leituras") -> str:
     if total_arquivos == 0:
         return ""
     total_paginas = max(1, (total_arquivos + por_pagina - 1) // por_pagina)
-    pagina = min(max(0, pagina), total_paginas - 1)
+    pagina_int = pagina.default if hasattr(pagina, "default") else int(pagina)
+    pagina = min(max(0, pagina_int), total_paginas - 1)
 
     inicio = pagina * por_pagina + 1
     fim = min((pagina + 1) * por_pagina, total_arquivos)
-    info = f"Mostrando <b>{inicio}–{fim}</b> de <b>{total_arquivos}</b> leituras · Página {pagina + 1} de {total_paginas}"
+    info = f"Mostrando <b>{inicio}–{fim}</b> de <b>{total_arquivos}</b> {rotulo_item} · Página {pagina + 1} de {total_paginas}"
 
     def make_url(p: int) -> str:
         q = {k: v for k, v in params.items() if v is not None}
@@ -586,23 +676,28 @@ def painel(request: Request, _=Depends(exigir_senha),
            de: Optional[str] = None, ate: Optional[str] = None,
            dias: int = Query(7, ge=1, le=365),
            bots: int = 0, teste: int = 0,
-           pag_leituras: int = Query(0, ge=0)):
-    d1, d2 = _periodo(de, ate, dias)
+           pag_leituras: int = Query(0, ge=0),
+           so_checkout: int = 0):
+    dias_int = dias.default if hasattr(dias, "default") else int(dias)
+    pag_leituras_int = pag_leituras.default if hasattr(pag_leituras, "default") else int(pag_leituras)
+    d1, d2 = _periodo(de, ate, dias_int)
     # acolchoa um dia de cada lado: sessao que comeca 23h57 e continua depois da
     # meia-noite tem que ser lida inteira, senao aparece cortada em duas
     brutos = eventos.ler_dias(d1 - timedelta(days=1), d2 + timedelta(days=1))
     d = agregar(brutos, d1, d2, incluir_bots=bool(bots), incluir_teste=bool(teste))
 
     def link(rot, **kw):
-        q = {"dias": kw.get("dias", dias)}
+        q = {"dias": kw.get("dias", dias_int)}
         if bots:
             q["bots"] = 1
         if teste:
             q["teste"] = 1
         if pag_leituras:
             q["pag_leituras"] = pag_leituras
+        if so_checkout:
+            q["so_checkout"] = 1
         qs = "&".join(f"{k}={v}" for k, v in q.items())
-        on = " on" if kw.get("dias") == dias else ""
+        on = " on" if kw.get("dias") == dias_int else ""
         return f'<a class="f{on}" href="/painel?{qs}">{rot}</a>'
 
     p = [f"<style>{ESTILO}</style><title>Painel · Bússola</title><div class=w>"]
@@ -692,11 +787,46 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ==================== ABA 2: LEITURAS ====================
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
-    corpo_leituras, total_leituras, total_pags, total_pessoas = _tabela_leituras(pag_leituras, por_pagina=20)
-    p_params = {"dias": dias, "bots": bots if bots else None, "teste": teste if teste else None}
-    barra_pag = _barra_paginacao(pag_leituras, total_leituras, "/painel", p_params,
-                                 por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras")
-    p.append(f'<p class="sub"><b>{total_leituras}</b> leituras ({total_pessoas} pessoas únicas) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
+    corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = _tabela_leituras(
+        pag_leituras_int, por_pagina=20, so_checkout=bool(so_checkout)
+    )
+
+    def link_filtro_leituras(so_chk: int) -> str:
+        q = {"dias": dias_int}
+        if bots:
+            q["bots"] = 1
+        if teste:
+            q["teste"] = 1
+        if so_chk:
+            q["so_checkout"] = 1
+        qs = "&".join(f"{k}={v}" for k, v in q.items())
+        url = f"/painel?{qs}#aba-leituras"
+        cls_chk = " chk" if so_chk else ""
+        cls_on = " on" if (bool(so_chk) == bool(so_checkout)) else ""
+        rotulo = "✦ Só quem foi pro checkout" if so_chk else "Todas as leituras"
+        cnt = total_chk if so_chk else total_geral
+        return (f'<a href="{url}" class="btn-filtro-leituras{cls_chk}{cls_on}" '
+                f'data-so-checkout="{so_chk}" onclick="return filtrarCheckoutClient({so_chk}, this, event);">'
+                f'{rotulo} <span class="badge-count">{cnt}</span></a>')
+
+    p.append('<div class="filtros-leituras">'
+             + link_filtro_leituras(0)
+             + link_filtro_leituras(1)
+             + '</div>')
+
+    p_params = {
+        "dias": dias_int,
+        "bots": bots if bots else None,
+        "teste": teste if teste else None,
+        "so_checkout": 1 if so_checkout else None,
+    }
+    rotulo_pag = "leituras com checkout" if so_checkout else "leituras"
+    barra_pag = _barra_paginacao(pag_leituras_int, total_exibidos, "/painel", p_params,
+                                 por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras",
+                                 rotulo_item=rotulo_pag)
+    sub_tipo = "com checkout" if so_checkout else "no total"
+    txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
+    p.append(f'<p class="sub" id="sub-leituras-info"><b>{total_exibidos}</b> leituras {sub_tipo} ({txt_pessoas}) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
     p.append(corpo_leituras)
     p.append(barra_pag)
     p.append('</section>')
@@ -783,34 +913,51 @@ def painel(request: Request, _=Depends(exigir_senha),
              f'<a href="#aba-leituras" onclick="abrirAba(\'aba-leituras\');return false;">ver a lista na aba Leituras</a>.</p>')
     p.append('</section>')
 
-    p.append('<script>'
-             'function abrirAba(id){'
-             'document.querySelectorAll(".aba-btn").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-tab")===id);});'
-             'document.querySelectorAll(".aba-painel").forEach(function(s){s.classList.toggle("on",s.id===id);});'
-             'try{history.replaceState(null,"","#"+id);localStorage.setItem("painel_aba_ativa",id);}catch(e){}'
-             '}'
-             '(function(){'
-             'var hash=(location.hash||"").replace("#","");'
-             'var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}'
-             'var alvo=hash||salva;'
-             'if(alvo&&document.getElementById(alvo)){abrirAba(alvo);}'
-             '})();'
-             '</script>')
+    p.append(f'<script>{JS_PAINEL}</script>')
     p.append("</div>")
     return HTMLResponse("".join(p), headers=CABECALHOS)
 
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
-def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
-    corpo, total_arquivos, total_pags, total_pessoas = _tabela_leituras(pagina, por_pagina=20)
-    barra_pag = _barra_paginacao(pagina, total_arquivos, "/painel/leituras", {},
-                                 por_pagina=20, param_nome="pagina")
+def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0), so_checkout: int = 0):
+    corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = _tabela_leituras(
+        pagina, por_pagina=20, so_checkout=bool(so_checkout)
+    )
+    p_params = {"so_checkout": 1 if so_checkout else None}
+    rotulo_pag = "leituras com checkout" if so_checkout else "leituras"
+    barra_pag = _barra_paginacao(pagina, total_exibidos, "/painel/leituras", p_params,
+                                 por_pagina=20, param_nome="pagina", rotulo_item=rotulo_pag)
+
+    def link_filtro_lista(so_chk: int) -> str:
+        q = {}
+        if so_chk:
+            q["so_checkout"] = 1
+        qs = ("?" + "&".join(f"{k}={v}" for k, v in q.items())) if q else ""
+        url = f"/painel/leituras{qs}"
+        cls_chk = " chk" if so_chk else ""
+        cls_on = " on" if (bool(so_chk) == bool(so_checkout)) else ""
+        rotulo = "✦ Só quem foi pro checkout" if so_chk else "Todas as leituras"
+        cnt = total_chk if so_chk else total_geral
+        return (f'<a href="{url}" class="btn-filtro-leituras{cls_chk}{cls_on}" '
+                f'data-so-checkout="{so_chk}" onclick="return filtrarCheckoutClient({so_chk}, this, event);">'
+                f'{rotulo} <span class="badge-count">{cnt}</span></a>')
+
+    botoes_filtro = ('<div class="filtros-leituras">'
+                     + link_filtro_lista(0)
+                     + link_filtro_lista(1)
+                     + '</div>')
+
+    sub_tipo = "com checkout" if so_checkout else "no total"
+    txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
-        f'<h1>Leituras</h1><p class="sub"><b>{total_arquivos}</b> leituras ({total_pessoas} pessoas únicas) · mostrando 20 por página · '
-        f'<a href="/painel#aba-leituras">voltar ao painel</a></p>{corpo}'
+        f'<h1>Leituras</h1><p class="sub" id="sub-leituras-info"><b>{total_exibidos}</b> leituras {sub_tipo} ({txt_pessoas}) · mostrando 20 por página · '
+        f'<a href="/painel#aba-leituras">voltar ao painel</a></p>'
+        f'{botoes_filtro}'
+        f'{corpo}'
         f'{barra_pag}'
-        f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>',
+        f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>'
+        f'<script>{JS_PAINEL}</script>',
         headers=CABECALHOS)
 
 

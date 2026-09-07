@@ -399,19 +399,21 @@ class LeiturasPainelSemMascara(unittest.TestCase):
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
                 # Página 0 (deve trazer 20 itens)
-                corpo_p0, total_p0, pags_p0, unicos_p0 = _tabela_leituras(pagina=0, por_pagina=20)
+                corpo_p0, total_p0, pags_p0, unicos_p0, chk_p0, geral_p0 = _tabela_leituras(pagina=0, por_pagina=20)
                 self.assertEqual(total_p0, 25)
+                self.assertEqual(geral_p0, 25)
                 self.assertEqual(unicos_p0, 25)
                 self.assertEqual(pags_p0, 2)
                 # O corpo da página 0 tem 20 linhas de dados (mais o cabeçalho)
-                self.assertEqual(corpo_p0.count("<tr>"), 21)
+                self.assertEqual(corpo_p0.count("<tr"), 21)
 
                 # Página 1 (deve trazer os 5 itens restantes)
-                corpo_p1, total_p1, pags_p1, unicos_p1 = _tabela_leituras(pagina=1, por_pagina=20)
+                corpo_p1, total_p1, pags_p1, unicos_p1, chk_p1, geral_p1 = _tabela_leituras(pagina=1, por_pagina=20)
                 self.assertEqual(total_p1, 25)
+                self.assertEqual(geral_p1, 25)
                 self.assertEqual(unicos_p1, 25)
                 self.assertEqual(pags_p1, 2)
-                self.assertEqual(corpo_p1.count("<tr>"), 6)
+                self.assertEqual(corpo_p1.count("<tr"), 6)
 
     def test_barra_paginacao_html(self):
         from api.painel import _barra_paginacao
@@ -520,8 +522,10 @@ class LeiturasPainelSemMascara(unittest.TestCase):
             arq.write_text(json.dumps(conteudo), encoding="utf-8")
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
-                corpo, total, pags, unicos = _tabela_leituras(pagina=0, por_pagina=20)
+                corpo, total, pags, unicos, chk, geral = _tabela_leituras(pagina=0, por_pagina=20)
                 self.assertEqual(total, 1)
+                self.assertEqual(geral, 1)
+                self.assertEqual(chk, 1)
                 self.assertEqual(unicos, 1)
                 # Verifica cabeçalhos esperados
                 self.assertIn("chegou ao quiz (bsb)", corpo)
@@ -565,12 +569,75 @@ class LeiturasPainelSemMascara(unittest.TestCase):
             arq_b.write_text(json.dumps(conteudo_b), encoding="utf-8")
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
-                corpo, total, pags, unicos = _tabela_leituras(pagina=0, por_pagina=20)
+                corpo, total, pags, unicos, chk, geral = _tabela_leituras(pagina=0, por_pagina=20)
                 self.assertEqual(total, 4)
+                self.assertEqual(geral, 4)
                 self.assertEqual(unicos, 2)  # 4 envios, mas apenas 2 pessoas únicas
                 self.assertIn('Carlos Eduardo <span class="tag-rep" title="Preencheu o formulário 3 vezes">3x</span>', corpo)
                 self.assertIn("Fernanda Lima", corpo)
                 self.assertNotIn("Fernanda Lima <span class=\"tag-rep\"", corpo)
+
+    def test_filtro_so_checkout_na_tabela_e_painel(self):
+        """Verifica o botão e filtro para exibir exclusivamente leads que foram ao checkout."""
+        from api.painel import _tabela_leituras, painel
+        from starlette.requests import Request
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # Lead 1: foi ao checkout
+            arq1 = dir_leituras / "20260907-100000-11111111.json"
+            arq1.write_text(json.dumps({
+                "nome_completo": "Lead Com Checkout 1",
+                "checkout": True,
+                "etapa_max": 10,
+                "nascimento": {"dia": 1, "mes": 1, "ano": 1990},
+            }), encoding="utf-8")
+
+            # Lead 2: foi ao checkout
+            arq2 = dir_leituras / "20260907-100100-22222222.json"
+            arq2.write_text(json.dumps({
+                "nome_completo": "Lead Com Checkout 2",
+                "checkout": True,
+                "etapa_max": 10,
+                "nascimento": {"dia": 2, "mes": 2, "ano": 1991},
+            }), encoding="utf-8")
+
+            # Lead 3: parou na tela 7, NÃO foi ao checkout
+            arq3 = dir_leituras / "20260907-100200-33333333.json"
+            arq3.write_text(json.dumps({
+                "nome_completo": "Lead Sem Checkout",
+                "checkout": False,
+                "etapa_max": 7,
+                "nascimento": {"dia": 3, "mes": 3, "ano": 1992},
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Sem filtro: traz os 3
+                corpo_all, tot_all, pags_all, unicos_all, chk_all, geral_all = _tabela_leituras(pagina=0, so_checkout=False)
+                self.assertEqual(tot_all, 3)
+                self.assertEqual(chk_all, 2)
+                self.assertEqual(geral_all, 3)
+                self.assertIn("Lead Com Checkout 1", corpo_all)
+                self.assertIn("Lead Com Checkout 2", corpo_all)
+                self.assertIn("Lead Sem Checkout", corpo_all)
+
+                # 2. Com filtro so_checkout=True: traz somente os 2 de checkout
+                corpo_chk, tot_chk, pags_chk, unicos_chk, chk_chk, geral_chk = _tabela_leituras(pagina=0, so_checkout=True)
+                self.assertEqual(tot_chk, 2)
+                self.assertEqual(chk_chk, 2)
+                self.assertEqual(geral_chk, 3)
+                self.assertIn("Lead Com Checkout 1", corpo_chk)
+                self.assertIn("Lead Com Checkout 2", corpo_chk)
+                self.assertNotIn("Lead Sem Checkout", corpo_chk)
+
+                # 3. Testa resposta HTML de /painel com so_checkout=1
+                req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+                resp = painel(req, _="crassus", so_checkout=1)
+                html_resp = resp.body.decode("utf-8")
+                self.assertIn("✦ Só quem foi pro checkout", html_resp)
+                self.assertIn("Todas as leituras", html_resp)
+                self.assertIn("btn-filtro-leituras chk on", html_resp)
+                self.assertIn("Lead Com Checkout 1", html_resp)
+                self.assertNotIn("Lead Sem Checkout", html_resp)
 
     def test_pessoas_unicas_no_agregador(self):
         """Verifica se o agregador contabiliza pessoas únicas via aid e inclui no funil."""
