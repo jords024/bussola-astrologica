@@ -166,5 +166,22 @@ class Integracao(unittest.TestCase):
         self.assertTrue(any('server.port=8765' in lbl for lbl in labels))
         self.assertTrue(any('traefik.enable=true' in lbl for lbl in labels))
 
+    def test_docker_compose_producao_unificado_valido(self):
+        import yaml
+        compose_path = Path(__file__).resolve().parent.parent.parent / 'docker' / 'docker-compose-producao.yml'
+        self.assertTrue(compose_path.exists(), "Arquivo docker-compose-producao.yml não encontrado")
+        with open(compose_path, encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        self.assertIn('services', data)
+        self.assertIn('landing_crassus', data['services'])
+        self.assertIn('quiz_crassus', data['services'])
+        landing = data['services']['landing_crassus']
+        self.assertIn('image', landing)
+        self.assertIn('network_swarm_public', landing['networks'])
+        quiz = data['services']['quiz_crassus']
+        self.assertIn('quiz_dados:/app/dados', quiz['volumes'])
+        quiz_labels = quiz['deploy']['labels']
+        self.assertTrue(any('server.port=8765' in lbl for lbl in quiz_labels))
+
 if __name__ == '__main__':
     unittest.main()
