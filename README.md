@@ -1,31 +1,39 @@
-# Bússola Astrológica: quiz
+# 🌌 Bússola Astrológica: Quiz, Leitura Personalizada & Painel de Leads
 
-A aplicação atual está em [`quiz/`](quiz/README.md): quiz com leitura personalizada, cálculo astrológico em Python, mandala e oferta das aulas.
-
-Para executar o quiz, siga [estas instruções](quiz/README.md). O serviço Python serve a experiência completa na raiz `/`. A configuração Docker específica está em `docker/docker-compose-quiz.yml`.
-
-O código anterior da página de vendas permanece em `frontend/`, com suas configurações de execução abaixo. Os scripts Node existentes continuam atendendo esse frontend; não iniciam o novo quiz.
+Plataforma astrológica completa desenvolvida para o astrólogo **Crassus Gobbi**, integrando quiz interativo com leitura personalizada via IA, cálculo de precisão astrológica, painel administrativo com atualização em tempo real via WebSockets e landing pages de alta conversão.
 
 ---
 
-# 🌌 Bússola Astrológica & Astrowake
+## 🧭 Visão Geral do Ecossistema
 
-Plataforma web e landing pages de alta conversão do astrólogo **Crassus Gobbi**, desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**.
+O ecossistema da **Bússola Astrológica** é composto por duas aplicações integradas:
+
+1. **Aplicação do Quiz & Painel de Leads (`quiz/`)**:
+   - Desenvolvida em **Python 3.10+ / FastAPI / WebSockets**, servindo na raiz `/` o quiz em 11 etapas, cálculo astrológico de casas e trânsitos (Swiss Ephemeris / Kerykeion), geração de carta personalizada por IA, acompanhamento em tempo real e painel administrativo protegido (`/painel`).
+2. **Landing Pages & Vendas (`frontend/`)**:
+   - Desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**, com apresentação das 12 casas (as 12 portas da vida), animações e checkout Hotmart.
 
 ---
 
-## 🧭 Visão Geral do Projeto
+## ✨ Recursos do Quiz e Leitura Personalizada (`quiz/`)
 
-A **Bússola Astrológica** é uma experiência web imersiva voltada para apresentação e venda do método de interpretação de trânsitos astrológicos e ciclos das 12 casas (as 12 portas da vida).
+- **Quiz Dinâmico em 11 Etapas:** Interface responsiva guiando o visitante desde a identificação até a escolha de áreas da vida e preenchimento de nascimento (data, hora e cidade com geolocalização).
+- **Cálculo Astrológico de Precisão:** Cálculo real de casas astrológicas e posicionamentos planetários.
+- **Carta Personalizada por IA:** Análise profunda e personalizada com fallback automático para carta de reserva.
+- **Mandala Interativa & Oferta:** Apresentação visual da mandala astrológica e transição para a oferta das aulas.
 
-### ✨ Principais Recursos:
-- **Página de Vendas (`/bussola`):** Apresentação das 12 portas, animações suaves com GSAP e Framer Motion, ilustrações cósmicas em alta definição e checkout integrado Hotmart.
-- **Página de Captura (`/`):** Captação de leads para encontros ao vivo, com validação de dados e geolocalização por IP.
-- **Página de Agradecimento (`/obrigado`):** Redirecionamento automático para grupos VIP de WhatsApp e rastreamento de conversão.
-- **Painel Administrativo (`/admin`):** Dashboard protegido para visualização, filtragem e exportação em CSV de todos os leads cadastrados.
-- **Autenticação Segura (`/auth`):** Login com hash de senha (`bcryptjs`), tokens de sessão JWT (`jose`), cookies `HttpOnly` e controle de permissões por perfil (`user_roles`).
-- **Suporte e Contato:** Botão flutuante direto para o canal oficial de atendimento via WhatsApp.
-- **Páginas Legais:** Políticas de Privacidade (`/politicas-de-privacidade`) e Termos de Uso (`/termos-de-uso`) em conformidade com a LGPD.
+---
+
+## ⚡ Painel Administrativo em Tempo Real (`/painel`)
+
+O painel administrativo (`/painel`, protegido por autenticação HTTP Basic) conta com:
+
+- **Sincronização em Tempo Real via WebSocket (`/painel/ws`):** Atualizações instantâneas de novos leads, avanço de etapas no funil, cliques no checkout e status de compra sem recarregar a página (F5).
+- **Filtro de Visitantes Ao Vivo (`🟢 Ao vivo agora`):** Monitoramento instantâneo de quem está com o quiz aberto nos últimos 90s e qual tela está visualizando.
+- **Marcação de Compra com Confirmação Segura:** Botão interativo (`💰 Comprou` / `✅ Comprou`) com popup modal centralizado e elegante (com proteção contra fechamento ao clicar fora) e filtro rápido `"💰 Só quem comprou"`.
+- **Agrupamento de Múltiplos Envios:** Detecção automática de contatos repetidos com acordeão expansível (`▶ 2x`, `▶ 3x`) e opção de exclusão individual ou coletiva.
+- **Arrasto Horizontal com o Mouse (`drag-to-scroll`):** Navegação horizontal rápida com o botão esquerdo do mouse na tabela de Leituras.
+- **5 Abas de Controle:** Funil por Tela, Leituras, Formulário & Horário, Áreas & Casas e Saúde do Agente.
 
 ---
 
@@ -77,64 +85,59 @@ Landing Page - Bussula Astrologica/
 
 ## 🚀 Como Executar o Projeto
 
-### Opção 1: Via Docker (Recomendado)
+### 1. Executando o Quiz e Painel de Leads (Python / Docker)
 
-Suba a aplicação e o banco de dados PostgreSQL com um único comando:
-
+#### Opção A: Via Docker Compose (Recomendado)
+Execute na raiz do projeto:
 ```bash
-# Na raiz do projeto:
-npm run docker:local
+docker compose -f docker/docker-compose-quiz.yml up -d --build
 ```
+Acesse:
+- **Quiz Completo:** [http://localhost:8765](http://localhost:8765)
+- **Painel Administrativo:** [http://localhost:8765/painel](http://localhost:8765/painel)
 
-Ou diretamente pelo Docker Compose:
+#### Opção B: Localmente com Python
 ```bash
-docker compose -f docker/docker-compose-local.yml up -d --build
-```
+cd quiz
+python -m venv .venv
 
-Acesse no navegador:
-- **Aplicação Web:** [http://localhost:3000](http://localhost:3000)
-- **Página de Vendas da Bússola:** [http://localhost:3000/bussola](http://localhost:3000/bussola)
-- **Painel Admin:** [http://localhost:3000/admin](http://localhost:3000/admin)
-- **Banco PostgreSQL:** `localhost:5432` (`user: postgres`, `password: postgres`, `db: bussola_astrologica`)
+# Ative o ambiente virtual:
+# Windows: .\.venv\Scripts\activate
+# Linux/Mac: source .venv/bin/activate
 
-Para parar os contêineres:
-```bash
-npm run docker:down
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8765 --reload
 ```
 
 ---
 
-### Opção 2: Desenvolvimento Local (Node.js)
-
-Se preferir rodar apenas o servidor de desenvolvimento com hot-reload:
+### 2. Executando a Landing Page (Frontend SSR / Node.js)
 
 ```bash
-# 1. Instale as dependências (caso ainda não tenha feito)
 cd frontend
 npm install
-
-# 2. Inicie o servidor Vite de desenvolvimento
 npm run dev
 ```
-
-Ou execute a partir da raiz do repositório:
-```bash
-npm run dev
-```
+Acesse: [http://localhost:3000](http://localhost:3000)
 
 ---
 
 ## 🧪 Testes Unitários
 
-O projeto possui cobertura completa de testes unitários para componentes visuais, rotas, autenticação, hashing de senhas e validação de leads:
+O projeto conta com cobertura completa e testes automatizados em ambas as aplicações:
 
+### Backend (Python / Pytest)
 ```bash
-# Rodar todos os testes unitários da suíte:
-npm run test
+cd quiz
+.\.venv\Scripts\pytest -o pythonpath=. testes
+# 75 testes cobrindo integração, painel, tempo real, websocket, webhooks e persistência
 ```
 
-Para rodar em modo contínuo (*watch*):
+### Frontend (Vitest)
 ```bash
+npm test -- --run
+# 68 testes cobrindo componentes, validações, autenticação, modais e rotas
+```
 cd frontend
 npm run test -- --watch
 ```

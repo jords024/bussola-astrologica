@@ -28,21 +28,33 @@ docker compose -f docker/docker-compose-quiz.yml up -d --build
 
 O volume `quiz_dados` guarda leituras, eventos e cache. A porta é local por padrão. Para publicar, configure seu proxy HTTPS para este serviço; o frontend React antigo não executa Python. Os arquivos Compose anteriores continuam destinados à aplicação anterior.
 
-## Componentes
+## Componentes e Funcionalidades
 
-- `publico/`: quiz, mandala exibida como imagem e carrossel interativo.
-- `api/` e `servicos/`: cálculo Kerykeion, geração da carta, auditoria, eventos e painel.
-- `prompts/carta.txt`: instruções da carta personalizada.
-- `/painel`: painel protegido pela senha configurada.
-- `/api/saude`: diagnóstico de dependências e configuração.
-- `testes/`: testes de cálculo, leitura e eventos.
+- `publico/`: quiz dinâmico em 11 etapas, mandala cósmica e carrossel interativo das 12 casas.
+- `api/` e `servicos/`:
+  - Cálculo astrológico com Swiss Ephemeris / Kerykeion.
+  - Geração de carta astrológica personalizada via IA com fallback para carta de reserva.
+  - Sincronização em tempo real via WebSockets (`/painel/ws`).
+  - Monitoramento de presença e tela atual de visitantes ativos em tempo real (`rastreador_presenca.py`).
+  - Gestão de status de compra (`comprou: true/false`), agrupamento de envios repetidos e exclusão segura.
+- `prompts/carta.txt`: instruções contextuais para a IA.
+- `/painel`: painel administrativo protegido com 5 abas (Funil, Leituras, Formulário & Horário, Áreas & Casas, Saúde do Agente):
+  - **Filtros rápidos:** Todas as leituras, Só quem foi pro checkout, 🟢 Ao vivo agora, 💰 Só quem comprou.
+  - **Mão de arrasto horizontal (`drag-to-scroll`):** navegação fluida com o botão esquerdo do mouse exclusiva na tabela de Leituras.
+  - **Popup Modal Centralizado:** confirmação elegante ao marcar e desmarcar compra de contatos (sem fechar ao clicar fora).
+  - **Acordeão de Múltiplos Envios:** visualização compactada de envios repetidos (`▶ 2x`, `▶ 3x`).
+- `/api/saude`: diagnóstico de dependências, latência e configuração.
+- `testes/`: suíte de 75 testes automatizados cobrindo cálculo, leitura, persistência, websocket e painel.
 
-Configure uma senha fictícia em `PAINEL_SENHA` para o teste de autenticação do painel.
+## Testes Unitários
+
+Configure as variáveis de teste e execute:
 
 ```sh
-python -m unittest discover -s testes -p "test_*.py" -q
+python -m pytest -o pythonpath=. testes
 ```
 
 ## Limites atuais
 
-O checkout ainda é demonstrativo. O PDF mencionado na oferta ainda não tem geração e entrega implementadas. A publicação no GitHub não conecta pagamentos, credenciais nem hospedagem. Sem horário confiável, o quiz não inventa uma casa aberta. Falhas do modelo podem usar a carta de reserva calculada pelo servidor.
+O checkout é demonstrativo. A publicação no GitHub não conecta credenciais privadas. Sem horário confiável, o quiz não inventa uma casa aberta. Falhas do modelo LLM acionam a carta de reserva calculada localmente pelo servidor.
+
