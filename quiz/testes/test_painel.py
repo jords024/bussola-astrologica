@@ -88,6 +88,20 @@ class Agregador(unittest.TestCase):
              ev("h", 2, "escolha", {"campo": "area", "valor": "amor"})]
         self.assertEqual(agregar(d, HOJE, HOJE)["areas"], [("amor", 1)])
 
+    def test_clique_checkout_no_funil(self):
+        """Verifica se o clique no checkout na tela da oferta é agregado corretamente no funil."""
+        d = [
+            ev("chk", 1, "tela", {"de": 0, "para": 10}),
+            ev("chk", 2, "oferta_clique", {"botao": "principal"}),
+        ]
+        r = agregar(d, HOJE, HOJE)
+        self.assertEqual(r["checkout"]["cliques"], 1)
+        self.assertEqual(r["funil"][10]["nome"], "A oferta")
+        self.assertEqual(r["funil"][10]["sessoes"], 1)
+        self.assertEqual(r["funil"][11]["nome"], "Clique no Checkout")
+        self.assertEqual(r["funil"][11]["sessoes"], 1)
+        self.assertEqual(r["funil"][11]["tela"], "✦")
+
 
 class Eventos(unittest.TestCase):
     def test_evento_invalido_e_descartado(self):
@@ -166,6 +180,9 @@ class Endpoint(unittest.TestCase):
             # Script de alternância e persistência de abas
             self.assertIn('function abrirAba(id)', html_text)
             self.assertIn('painel_aba_ativa', html_text)
+            # Métricas e linha de checkout
+            self.assertIn('foram ao checkout', html_text)
+            self.assertIn('Clique no Checkout', html_text)
 
 
 class Mascaramento(unittest.TestCase):

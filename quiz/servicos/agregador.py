@@ -17,7 +17,7 @@ from typing import Iterable, Optional
 TELAS = [
     (0, "O chamado"), (1, "O mecanismo"), (2, "A área"), (3, "O espelho"),
     (4, "A quebra"), (5, "Os dados"), (6, "O cálculo"), (7, "A leitura"),
-    (8, "A ponte"), (9, "A oferta"),
+    (8, "As 12 portas"), (9, "A ponte"), (10, "A oferta"),
 ]
 
 # Abaixo disto, porcentagem engana mais do que informa: "33%" a partir de três
@@ -84,7 +84,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         if evt == "tela":
             for k in ("de", "para"):
                 v = props.get(k)
-                if isinstance(v, int) and 0 <= v <= 9:
+                if isinstance(v, int) and 0 <= v <= 10:
                     s["telas"].add(v)
         elif evt == "escolha":
             # a ULTIMA escolha vale: quem clica em tres opcoes antes de decidir
@@ -133,6 +133,10 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         "sessoes": len(sessoes),
         "abertas": sum(1 for s in sessoes if s["aberta"]),
         "funil": _funil(sessoes),
+        "checkout": {
+            "cliques": sum(1 for s in sessoes if s["oferta"]),
+            "pct_da_oferta": pct(sum(1 for s in sessoes if s["oferta"]), sum(1 for s in sessoes if 10 in s["telas"])),
+        },
         "formulario": _formulario(sessoes),
         "areas": _contagem(s["area"] for s in sessoes if s["area"]),
         "cenarios": _cenarios(sessoes),
@@ -163,8 +167,10 @@ def _funil(sessoes: list[dict]) -> list[dict]:
     for n, nome in TELAS:
         alcanceou = sum(1 for s in sessoes if n in s["telas"])
         # quem parou aqui: nunca passou desta tela e nao esta com a sessao aberta
-        parou = sum(1 for s in sessoes
-                    if s["max_tela"] == n and not s["aberta"])
+        if n == 10:
+            parou = sum(1 for s in sessoes if s["max_tela"] == 10 and not s["oferta"] and not s["aberta"])
+        else:
+            parou = sum(1 for s in sessoes if s["max_tela"] == n and not s["aberta"])
         linhas.append({
             "tela": n, "nome": nome, "sessoes": alcanceou,
             "pct_do_topo": pct(alcanceou, base),
@@ -172,6 +178,17 @@ def _funil(sessoes: list[dict]) -> list[dict]:
             "queda": (anterior - alcanceou) if anterior is not None else None,
         })
         anterior = alcanceou
+
+    # Etapa de conversão final: clique no botão da oferta direcionando ao checkout da Hotmart
+    clicou_checkout = sum(1 for s in sessoes if s["oferta"])
+    linhas.append({
+        "tela": "✦",
+        "nome": "Clique no Checkout",
+        "sessoes": clicou_checkout,
+        "pct_do_topo": pct(clicou_checkout, base),
+        "parou_aqui": clicou_checkout,
+        "queda": (anterior - clicou_checkout) if anterior is not None else None,
+    })
     return linhas
 
 
@@ -234,20 +251,23 @@ def _horario(sessoes: list[dict]) -> list[dict]:
     Atenção ao ler: os três grupos atravessam quantidades diferentes de atrito
     para chegar ao fim, então isto compara caminhos, não tipos de pessoa.
     """
-    grupos = defaultdict(lambda: {"n": 0, "leitura": 0, "oferta": 0})
+    grupos = defaultdict(lambda: {"n": 0, "leitura": 0, "oferta": 0, "checkout": 0})
     for s in sessoes:
         m = s["modo_hora"]
         if not m:
             continue
         g = grupos[m]
         g["n"] += 1
-        if s["leitura"]:
+        if s["leitura"] or 7 in s["telas"]:
             g["leitura"] += 1
-        if s["oferta"]:
+        if 10 in s["telas"] or s["oferta"]:
             g["oferta"] += 1
+        if s["oferta"]:
+            g["checkout"] += 1
     return [{"modo": k, **v,
              "pct_leitura": pct(v["leitura"], v["n"]),
-             "pct_oferta": pct(v["oferta"], v["n"])}
+             "pct_oferta": pct(v["oferta"], v["n"]),
+             "pct_checkout": pct(v["checkout"], v["n"])}
             for k, v in sorted(grupos.items(), key=lambda x: -x[1]["n"])]
 
 

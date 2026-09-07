@@ -179,12 +179,18 @@ def painel(request: Request, _=Depends(exigir_senha),
                  'movem decisão que não deveria ser movida. Os números absolutos valem.</div>')
 
     g = d["geracao"]
+    oferta_item = next((f for f in d["funil"] if f["tela"] == 10), None)
+    chegaram_oferta = oferta_item["sessoes"] if oferta_item else 0
+    checkout_item = next((f for f in d["funil"] if f["tela"] == "✦"), None)
+    clicaram_checkout = checkout_item["sessoes"] if checkout_item else d.get("checkout", {}).get("cliques", 0)
+
     p.append('<div class="cards">')
     for valor, rot in [
         (d["sessoes"], "sessões"),
         (d["funil"][5]["sessoes"], "chegaram aos dados"),
         (g["total"], "cartas entregues"),
-        (sum(1 for _ in []) or d["funil"][9]["sessoes"], "chegaram à oferta"),
+        (chegaram_oferta, "chegaram à oferta"),
+        (clicaram_checkout, "foram ao checkout"),
         (f'{g["mediana_ms"]/1000:.1f}s', "mediana do agente"),
         (g["reserva"], "cartas de reserva"),
     ]:
@@ -204,18 +210,17 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append("<h2>Funil por tela</h2>")
     linhas = []
     for f in d["funil"]:
+        rotulo = f'{f["tela"]} · {html.escape(f["nome"])}' if f["tela"] != "✦" else f'✦ {html.escape(f["nome"])}'
         linhas.append([
-            f'{f["tela"]} · {html.escape(f["nome"])}',
+            rotulo,
             f'<div class="bar">{_barra(f["pct_do_topo"])}</div>',
             str(f["sessoes"]), _n(f["pct_do_topo"]),
             "—" if f["queda"] in (None, 0) else f'−{f["queda"]}',
             str(f["parou_aqui"]),
         ])
-    p.append(_tabela(["tela", "", "#sessões", "#% do topo", "#queda", "#pararam aqui"], linhas))
-    p.append('<p class="nota">Conta quem <b>chegou pelo menos uma vez</b> em cada tela, não a tela '
-             'atual: com o botão voltar, quem chegou na leitura e voltou aos dados não pode contar '
-             'como abandono nos dados. A tela 6 não é conteúdo, é a espera do cálculo — a queda ali '
-             'mede a paciência com a demora do agente, não a copy.</p>')
+    p.append(_tabela(["etapa / tela", "", "#sessões", "#% do topo", "#queda", "#pararam aqui"], linhas))
+    p.append('<p class="nota">Conta quem <b>chegou pelo menos uma vez</b> em cada tela. A linha '
+             '<b>✦ Clique no Checkout</b> registra exatamente quantas pessoas apertaram o botão de compra na tela da oferta para ir à página de pagamento da Hotmart.</p>')
     p.append('</section>')
 
     # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
@@ -234,10 +239,11 @@ def painel(request: Request, _=Depends(exigir_senha),
 
     # ---- horário ----
     p.append("<h2>Hora de nascimento</h2>")
-    p.append(_tabela(["modo", "#sessões", "#chegaram à carta", "#chegaram à oferta"],
+    p.append(_tabela(["modo", "#sessões", "#chegaram à carta", "#chegaram à oferta", "#foram ao checkout"],
                      [[html.escape(str(h["modo"])), str(h["n"]),
                        f'{h["leitura"]} ({_n(h["pct_leitura"])})',
-                       f'{h["oferta"]} ({_n(h["pct_oferta"])})'] for h in d["horario"]]))
+                       f'{h["oferta"]} ({_n(h["pct_oferta"])})',
+                       f'{h.get("checkout", 0)} ({_n(h.get("pct_checkout"))})'] for h in d["horario"]]))
     p.append('<p class="nota">Cuidado ao comparar: quem não sabe a hora atravessa mais cliques até '
              'o fim do que quem digita dois números. Isto compara caminhos com atritos diferentes, '
              'não tipos de pessoa.</p>')
