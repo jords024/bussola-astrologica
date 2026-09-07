@@ -265,6 +265,26 @@ a{color:var(--amber)}
 .btn-filtro-leituras .badge-count{display:inline-block;padding:1px 6px;border-radius:999px;font-size:11px;background:rgba(255,255,255,.06);margin-left:2px}
 .btn-filtro-leituras.on .badge-count{background:rgba(229,169,60,.22);color:var(--amber)}
 .btn-filtro-leituras.chk.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
+.btn-del{background:rgba(196,86,74,.12);color:#E57373;border:1px solid rgba(196,86,74,.35);border-radius:6px;padding:3px 9px;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.btn-del:hover{background:rgba(196,86,74,.3);border-color:#E57373;color:#FFF}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.modal-backdrop.on{opacity:1;pointer-events:auto}
+.modal-card{background:#1B1917;border:1px solid rgba(196,86,74,.5);border-radius:14px;padding:26px 24px;max-width:440px;width:90%;box-shadow:0 20px 45px rgba(0,0,0,.85);text-align:center;transform:translateY(10px) scale(.98);transition:transform .2s ease}
+.modal-backdrop.on .modal-card{transform:translateY(0) scale(1)}
+.modal-icone{font-size:36px;margin-bottom:12px;line-height:1}
+.modal-titulo{font-size:18px;font-weight:700;color:var(--sand);margin:0 0 8px}
+.modal-texto{font-size:13.5px;color:var(--sand2);margin:0 0 16px;line-height:1.55}
+.modal-id{display:inline-block;font-size:11.5px;font-family:monospace;background:rgba(255,255,255,.05);padding:2px 7px;border-radius:4px;color:var(--amber);margin-top:4px}
+.modal-aviso{display:block;margin-top:10px;font-size:12px;color:#E57373;font-weight:600}
+.modal-erro{background:rgba(196,86,74,.18);border:1px solid rgba(196,86,74,.4);color:#FFA49E;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;text-align:left}
+.modal-acoes{display:flex;gap:10px;justify-content:center;margin-top:20px}
+.btn-modal-cancelar{background:rgba(255,255,255,.06);color:var(--sand);border:1px solid var(--line);border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease}
+.btn-modal-cancelar:hover{background:rgba(255,255,255,.12);border-color:var(--sand2)}
+.btn-modal-confirmar{background:#C4564A;color:#FFF;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s ease}
+.btn-modal-confirmar:hover{background:#D96558}
+.btn-modal-confirmar:disabled{opacity:.5;cursor:not-allowed}
+.painel-toast{position:fixed;bottom:24px;right:24px;background:#24201D;border:1px solid var(--amber);color:var(--sand);padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,.6);z-index:999999;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none}
+.painel-toast.on{opacity:1;transform:translateY(0);pointer-events:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -308,6 +328,103 @@ function filtrarCheckoutClient(soChk, btn, evt){
   }
   return true;
 }
+var _leituraParaExcluir = null;
+function abrirModalExcluir(id, nome){
+  _leituraParaExcluir = id;
+  var elNome = document.getElementById("modal-del-nome");
+  var elId = document.getElementById("modal-del-id");
+  var elErro = document.getElementById("modal-del-erro");
+  var btnConf = document.getElementById("btn-modal-confirmar");
+  if(elNome) elNome.textContent = nome || "Sem nome";
+  if(elId) elId.textContent = "ID: " + id;
+  if(elErro){ elErro.style.display = "none"; elErro.textContent = ""; }
+  if(btnConf){ btnConf.disabled = false; btnConf.textContent = "Sim, Excluir"; }
+  var modal = document.getElementById("modal-excluir-backdrop");
+  if(modal){ modal.classList.add("on"); }
+}
+function fecharModalExcluir(){
+  _leituraParaExcluir = null;
+  var modal = document.getElementById("modal-excluir-backdrop");
+  if(modal){ modal.classList.remove("on"); }
+}
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape"){ fecharModalExcluir(); }
+});
+function executarExclusao(){
+  if(!_leituraParaExcluir) return;
+  var id = _leituraParaExcluir;
+  var btnConf = document.getElementById("btn-modal-confirmar");
+  var elErro = document.getElementById("modal-del-erro");
+  if(btnConf){ btnConf.disabled = true; btnConf.textContent = "Excluindo..."; }
+  fetch("/painel/leitura/" + encodeURIComponent(id) + "/deletar", {
+    method: "POST",
+    headers: { "Accept": "application/json" }
+  }).then(function(res){
+    if(!res.ok){
+      return res.json().then(function(j){ throw new Error(j.detail || ("Erro " + res.status)); })
+             .catch(function(e){ throw new Error(e.message || ("Erro ao excluir (" + res.status + ")")); });
+    }
+    return res.json();
+  }).then(function(data){
+    fecharModalExcluir();
+    if(window.location.pathname.indexOf("/painel/leitura/") === 0){
+      window.location.href = "/painel#aba-leituras";
+      return;
+    }
+    var row = document.getElementById("row-leitura-" + id);
+    var foiChk = false;
+    if(row){
+      foiChk = row.getAttribute("data-checkout") === "1";
+      row.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+      row.style.opacity = "0";
+      row.style.transform = "translateX(20px)";
+      setTimeout(function(){
+        if(row.parentNode) row.parentNode.removeChild(row);
+      }, 260);
+    }
+    atualizarAposExclusao(foiChk);
+    mostrarToast("Registro de leitura excluído com sucesso!");
+  }).catch(function(err){
+    if(btnConf){ btnConf.disabled = false; btnConf.textContent = "Sim, Excluir"; }
+    if(elErro){
+      elErro.style.display = "block";
+      elErro.textContent = err.message || "Não foi possível excluir o registro.";
+    }
+  });
+}
+function atualizarAposExclusao(foiChk){
+  var badges = document.querySelectorAll(".btn-filtro-leituras .badge-count");
+  if(badges.length >= 2){
+    var bTodos = badges[0];
+    var bChk = badges[1];
+    var nTodos = Math.max(0, parseInt(bTodos.textContent || "0", 10) - 1);
+    bTodos.textContent = nTodos;
+    if(foiChk){
+      var nChk = Math.max(0, parseInt(bChk.textContent || "0", 10) - 1);
+      bChk.textContent = nChk;
+    }
+  }
+  var sub = document.getElementById("sub-leituras-info");
+  if(sub){
+    var b = sub.querySelector("b");
+    if(b){
+      var cur = Math.max(0, parseInt(b.textContent || "0", 10) - 1);
+      b.textContent = cur;
+    }
+  }
+}
+function mostrarToast(msg){
+  var t = document.getElementById("painel-toast");
+  if(!t){
+    t = document.createElement("div");
+    t.id = "painel-toast";
+    t.className = "painel-toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("on");
+  setTimeout(function(){ t.classList.remove("on"); }, 3200);
+}
 (function(){
   var hash=(location.hash||"").replace("#","");
   var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}
@@ -331,6 +448,27 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "",
         tr += f"<tr{extra}>{tds}</tr>"
     tbody_attr = f' id="{tbody_id}"' if tbody_id else ""
     return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody{tbody_attr}>{tr}</tbody></table></div>'
+
+
+def _modal_confirmar_exclusao() -> str:
+    return (
+        '<div id="modal-excluir-backdrop" class="modal-backdrop" onclick="if(event.target===this) fecharModalExcluir();">'
+        '  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-del-titulo">'
+        '    <div class="modal-icone">⚠️</div>'
+        '    <h3 id="modal-del-titulo" class="modal-titulo">Confirmar Exclusão</h3>'
+        '    <p class="modal-texto">'
+        '      Deseja realmente excluir permanentemente os dados de <b id="modal-del-nome">—</b>?'
+        '      <br><span id="modal-del-id" class="modal-id">ID: —</span>'
+        '      <span class="modal-aviso">Esta ação é irreversível e removerá o registro e mapa astrológico do sistema.</span>'
+        '    </p>'
+        '    <div id="modal-del-erro" class="modal-erro" style="display:none;"></div>'
+        '    <div class="modal-acoes">'
+        '      <button type="button" class="btn-modal-cancelar" onclick="fecharModalExcluir()">Cancelar</button>'
+        '      <button type="button" id="btn-modal-confirmar" class="btn-modal-confirmar" onclick="executarExclusao()">Sim, Excluir</button>'
+        '    </div>'
+        '  </div>'
+        '</div>'
+    )
 
 
 def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
@@ -578,7 +716,12 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         tag_rep = f' <span class="tag-rep" title="Preencheu o formulário {qtd_submissoes} vezes">{qtd_submissoes}x</span>' if qtd_submissoes > 1 else ''
         nome_completo = html.escape(d.get("nome_completo") or "—") + tag_rep
 
-        tr_attrs.append(f'data-checkout="{"1" if prog.get("checkout") else "0"}"')
+        tr_attrs.append(f'id="row-leitura-{stem}" data-checkout="{"1" if prog.get("checkout") else "0"}"')
+        nome_puro = d.get("nome_completo") or "—"
+        nome_js = html.escape(nome_puro).replace("'", "\\'")
+        btn_del = (f'<button type="button" class="btn-del" '
+                   f'onclick="abrirModalExcluir(\'{html.escape(stem)}\', \'{nome_js}\');" '
+                   f'title="Excluir dados desta leitura">🗑️ Excluir</button>')
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
@@ -594,6 +737,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
             f_tempo(d.get("tempo_quiz_ms")),
+            btn_del,
         ])
 
     if not linhas and so_checkout:
@@ -601,7 +745,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
     else:
         corpo = _tabela([
             "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
-            "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz"
+            "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
         ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras")
 
     return corpo, total_exibidos, total_paginas, total_pessoas_exibidas, total_checkout, total_geral
@@ -913,6 +1057,7 @@ def painel(request: Request, _=Depends(exigir_senha),
              f'<a href="#aba-leituras" onclick="abrirAba(\'aba-leituras\');return false;">ver a lista na aba Leituras</a>.</p>')
     p.append('</section>')
 
+    p.append(_modal_confirmar_exclusao())
     p.append(f'<script>{JS_PAINEL}</script>')
     p.append("</div>")
     return HTMLResponse("".join(p), headers=CABECALHOS)
@@ -956,6 +1101,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0), so_checkout: in
         f'{botoes_filtro}'
         f'{corpo}'
         f'{barra_pag}'
+        f'{_modal_confirmar_exclusao()}'
         f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>'
         f'<script>{JS_PAINEL}</script>',
         headers=CABECALHOS)
@@ -986,7 +1132,13 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     qtd_submissoes = contagens_map.get(leitura_id, 1)
     tag_rep_detalhe = f' · <span class="tag-rep">{qtd_submissoes} envios desta pessoa</span>' if qtd_submissoes > 1 else ''
 
-    ident = (f'{html.escape(d.get("nome_completo") or "—")}{tag_rep_detalhe} · '
+    nome_puro = d.get("nome_completo") or "—"
+    nome_js = html.escape(nome_puro).replace("'", "\\'")
+    btn_del = (f'<button type="button" class="btn-del" style="margin-left:8px;" '
+               f'onclick="abrirModalExcluir(\'{html.escape(leitura_id)}\', \'{nome_js}\');">'
+               f'🗑️ Excluir Leitura</button>')
+
+    ident = (f'{html.escape(nome_puro)}{tag_rep_detalhe} · '
              f'chegou ao quiz: <b style="color:var(--amber);">{html.escape(chegada_bsb)} (BSB)</b> · '
              f'preencheu dados: <b style="color:var(--amber);">{html.escape(gerada_bsb)} (BSB)</b> · '
              f'etapa: <b style="color:var(--amber);">{html.escape(prog["rotulo"])}</b> · '
@@ -1001,7 +1153,7 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>{html.escape(leitura_id)}</title><div class=w>"
         f'<h1>{html.escape(leitura_id)}</h1><p class="sub">{ident} · '
-        f'<a href="/painel#aba-leituras">voltar ao painel</a></p>'
+        f'<a href="/painel#aba-leituras">voltar ao painel</a> {btn_del}</p>'
         f'<h2>{html.escape(c.get("selo",""))}</h2>'
         f'<p><b>{html.escape(c.get("titulo",""))}</b></p>'
         f'<p style="color:var(--amber)">{html.escape(c.get("destaque",""))}</p>'
@@ -1011,5 +1163,24 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
         f'<h2>veredito</h2><pre class="nota">'
         f'{html.escape(json.dumps(d.get("veredito"), ensure_ascii=False, indent=1))}</pre>'
         f'<h2>meta</h2><pre class="nota">'
-        f'{html.escape(json.dumps(d.get("meta"), ensure_ascii=False, indent=1))}</pre></div>',
+        f'{html.escape(json.dumps(d.get("meta"), ensure_ascii=False, indent=1))}</pre>'
+        f'{_modal_confirmar_exclusao()}'
+        f'<script>{JS_PAINEL}</script></div>',
         headers=CABECALHOS)
+
+
+@router.post("/painel/leitura/{leitura_id}/deletar")
+def deletar_leitura(leitura_id: str, _=Depends(exigir_senha)):
+    """Exclui permanentemente o arquivo de uma leitura individual."""
+    if not re.fullmatch(r"[0-9]{8}-[0-9]{6}-[0-9a-f]{8}", leitura_id):
+        raise HTTPException(400, "identificador de leitura inválido")
+    arq = config.DIR_LEITURAS / f"{leitura_id}.json"
+    if not arq.exists():
+        raise HTTPException(404, "leitura não encontrada")
+    try:
+        arq.unlink()
+        logger.info("Leitura %s excluída com sucesso.", leitura_id)
+    except Exception as e:
+        logger.error("Erro ao excluir arquivo de leitura %s: %s", leitura_id, e)
+        raise HTTPException(500, f"falha ao excluir leitura: {e}")
+    return {"ok": True, "leitura_id": leitura_id, "mensagem": "Leitura excluída com sucesso"}

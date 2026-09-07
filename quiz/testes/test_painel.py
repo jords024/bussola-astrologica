@@ -702,7 +702,92 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("Tela 8 (Portas)", html_resp)
                 self.assertIn("checkout:", html_resp)
                 self.assertIn("Não", html_resp)
+                self.assertIn("🗑️ Excluir Leitura", html_resp)
+                self.assertIn("modal-excluir-backdrop", html_resp)
+
+    def test_deletar_leitura_sucesso_e_casos_de_erro(self):
+        """Verifica a exclusão física da leitura, erros 404, formato inválido e 401 sem autenticação."""
+        from main import app
+        client = TestClient(app)
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            lid = "20260907-150000-aaaaaaaa"
+            arq = dir_leituras / f"{lid}.json"
+            arq.write_text(json.dumps({"nome_completo": "Visitante Deletável"}), encoding="utf-8")
+            self.assertTrue(arq.exists())
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Sem autenticação -> 401
+                r_sem_auth = client.post(f"/painel/leitura/{lid}/deletar")
+                self.assertEqual(r_sem_auth.status_code, 401)
+                self.assertTrue(arq.exists())  # arquivo preservado
+
+                # 2. ID com formato inválido -> 400 ou 404
+                r_invalido = client.post(
+                    "/painel/leitura/id-invalido-123/deletar",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertIn(r_invalido.status_code, (400, 404))
+
+                # 3. ID inexistente com formato válido -> 404
+                r_404 = client.post(
+                    "/painel/leitura/20260907-150000-99999999/deletar",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(r_404.status_code, 404)
+
+                # 4. Exclusão com sucesso -> 200 e arquivo removido do disco
+                r_ok = client.post(
+                    f"/painel/leitura/{lid}/deletar",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(r_ok.status_code, 200)
+                dados_resp = r_ok.json()
+                self.assertTrue(dados_resp.get("ok"))
+                self.assertEqual(dados_resp.get("leitura_id"), lid)
+                self.assertFalse(arq.exists())  # arquivo foi excluído permanentemente
+
+    def test_tabela_e_painel_renderizam_botao_e_modal_excluir(self):
+        """Verifica se a tabela de leituras e o painel contêm o botão de deletar e o popup modal centralizado."""
+        from api.painel import _tabela_leituras, painel
+        from starlette.requests import Request
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            lid = "20260907-160000-bbbbbbbb"
+            arq = dir_leituras / f"{lid}.json"
+            arq.write_text(json.dumps({
+                "nome_completo": "Marcos Silva",
+                "nascimento": {"dia": 1, "mes": 1, "ano": 1990},
+                "etapa_max": 7,
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                corpo, _, _, _, _, _ = _tabela_leituras(pagina=0)
+                # Verifica a coluna 'ações' no cabeçalho
+                self.assertIn("ações", corpo)
+                # Verifica o ID da linha para remoção dinâmica no DOM
+                self.assertIn(f'id="row-leitura-{lid}"', corpo)
+                # Verifica o botão de exclusão
+                self.assertIn('class="btn-del"', corpo)
+                self.assertIn("🗑️ Excluir", corpo)
+                self.assertIn(f"abrirModalExcluir('{lid}', 'Marcos Silva')", corpo)
+
+                # Verifica o HTML completo do painel
+                req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+                resp = painel(req, _="crassus")
+                html_resp = resp.body.decode("utf-8")
+
+                # Verifica se o popup modal centralizado está presente no HTML
+                self.assertIn('id="modal-excluir-backdrop"', html_resp)
+                self.assertIn("Confirmar Exclusão", html_resp)
+                self.assertIn("btn-modal-cancelar", html_resp)
+                self.assertIn("btn-modal-confirmar", html_resp)
+                self.assertIn("fecharModalExcluir()", html_resp)
+                self.assertIn("executarExclusao()", html_resp)
 
 
 if __name__ == "__main__":
     unittest.main()
+
