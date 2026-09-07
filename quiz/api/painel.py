@@ -118,6 +118,13 @@ border-radius:10px;padding:11px 13px;margin:10px 0;font-size:12.5px}
 .nota{color:var(--sand2);font-size:11.5px;margin:8px 0 0;line-height:1.6}
 a{color:var(--amber)}
 .vazio{color:var(--sand2);padding:16px 0;font-size:13px}
+.abas{display:flex;gap:8px;border-bottom:1px solid var(--line);margin:26px 0 20px;padding-bottom:1px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.aba-btn{background:none;border:none;color:var(--sand2);font:inherit;font-size:13px;font-weight:600;padding:10px 18px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s ease;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border-radius:6px 6px 0 0}
+.aba-btn:hover{color:var(--sand);background:rgba(255,255,255,.03)}
+.aba-btn.on{color:var(--amber);border-bottom-color:var(--amber);background:rgba(229,169,60,.08)}
+.aba-painel{display:none}
+.aba-painel.on{display:block;animation:fadein .2s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
 
@@ -184,7 +191,16 @@ def painel(request: Request, _=Depends(exigir_senha),
         p.append(f'<div class="card"><b>{valor}</b><span>{rot}</span></div>')
     p.append("</div>")
 
-    # ---- funil ----
+    # ---- navegação de abas ----
+    p.append('<nav class="abas">'
+             '<button type="button" class="aba-btn on" data-tab="aba-funil" onclick="abrirAba(\'aba-funil\')">📊 Funil por Tela</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-formulario" onclick="abrirAba(\'aba-formulario\')">📝 Formulário & Horário</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-astrologia" onclick="abrirAba(\'aba-astrologia\')">🔮 Áreas & Casas</button>'
+             '<button type="button" class="aba-btn" data-tab="aba-agente" onclick="abrirAba(\'aba-agente\')">⚡ Saúde do Agente</button>'
+             '</nav>')
+
+    # ==================== ABA 1: FUNIL ====================
+    p.append('<section class="aba-painel on" id="aba-funil">')
     p.append("<h2>Funil por tela</h2>")
     linhas = []
     for f in d["funil"]:
@@ -200,8 +216,10 @@ def painel(request: Request, _=Depends(exigir_senha),
              'atual: com o botão voltar, quem chegou na leitura e voltou aos dados não pode contar '
              'como abandono nos dados. A tela 6 não é conteúdo, é a espera do cálculo — a queda ali '
              'mede a paciência com a demora do agente, não a copy.</p>')
+    p.append('</section>')
 
-    # ---- formulário ----
+    # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
+    p.append('<section class="aba-painel" id="aba-formulario">')
     fo = d["formulario"]
     p.append("<h2>Onde a tela dos dados trava</h2>")
     p.append(f'<div class="cards"><div class="card"><b>{fo["chegaram"]}</b><span>chegaram</span></div>'
@@ -214,6 +232,19 @@ def painel(request: Request, _=Depends(exigir_senha),
         p.append('<p class="nota">O que mais faltou ao clicar em calcular: '
                  + ", ".join(f"{html.escape(str(k))} ({v})" for k, v in fo["faltou"]) + ".</p>")
 
+    # ---- horário ----
+    p.append("<h2>Hora de nascimento</h2>")
+    p.append(_tabela(["modo", "#sessões", "#chegaram à carta", "#chegaram à oferta"],
+                     [[html.escape(str(h["modo"])), str(h["n"]),
+                       f'{h["leitura"]} ({_n(h["pct_leitura"])})',
+                       f'{h["oferta"]} ({_n(h["pct_oferta"])})'] for h in d["horario"]]))
+    p.append('<p class="nota">Cuidado ao comparar: quem não sabe a hora atravessa mais cliques até '
+             'o fim do que quem digita dois números. Isto compara caminhos com atritos diferentes, '
+             'não tipos de pessoa.</p>')
+    p.append('</section>')
+
+    # ==================== ABA 3: ÁREAS & CASAS ====================
+    p.append('<section class="aba-painel" id="aba-astrologia">')
     # ---- áreas ----
     p.append("<h2>Áreas escolhidas</h2>")
     tot_a = sum(v for _, v in d["areas"]) or 1
@@ -244,17 +275,10 @@ def painel(request: Request, _=Depends(exigir_senha),
                  '<b>empate técnico</b>: a primeira e a segunda casa ficaram a menos de 8% uma da '
                  'outra, então o vencedor foi quase arbitrário. Se essa fração for alta, a tabela '
                  'acima é mais ruído que sinal.</p>')
+    p.append('</section>')
 
-    # ---- horário ----
-    p.append("<h2>Hora de nascimento</h2>")
-    p.append(_tabela(["modo", "#sessões", "#chegaram à carta", "#chegaram à oferta"],
-                     [[html.escape(str(h["modo"])), str(h["n"]),
-                       f'{h["leitura"]} ({_n(h["pct_leitura"])})',
-                       f'{h["oferta"]} ({_n(h["pct_oferta"])})'] for h in d["horario"]]))
-    p.append('<p class="nota">Cuidado ao comparar: quem não sabe a hora atravessa mais cliques até '
-             'o fim do que quem digita dois números. Isto compara caminhos com atritos diferentes, '
-             'não tipos de pessoa.</p>')
-
+    # ==================== ABA 4: SAÚDE DO AGENTE ====================
+    p.append('<section class="aba-painel" id="aba-agente">')
     # ---- geração ----
     p.append("<h2>Saúde do agente</h2>")
     p.append(f'<div class="cards">'
@@ -270,6 +294,21 @@ def painel(request: Request, _=Depends(exigir_senha),
 
     p.append(f'<h2>Leituras</h2><p class="nota">'
              f'<a href="/painel/leituras">ver a lista de leituras geradas</a> — dados mascarados.</p>')
+    p.append('</section>')
+
+    p.append('<script>'
+             'function abrirAba(id){'
+             'document.querySelectorAll(".aba-btn").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-tab")===id);});'
+             'document.querySelectorAll(".aba-painel").forEach(function(s){s.classList.toggle("on",s.id===id);});'
+             'try{history.replaceState(null,"","#"+id);localStorage.setItem("painel_aba_ativa",id);}catch(e){}'
+             '}'
+             '(function(){'
+             'var hash=(location.hash||"").replace("#","");'
+             'var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}'
+             'var alvo=hash||salva;'
+             'if(alvo&&document.getElementById(alvo)){abrirAba(alvo);}'
+             '})();'
+             '</script>')
     p.append("</div>")
     return HTMLResponse("".join(p), headers=CABECALHOS)
 

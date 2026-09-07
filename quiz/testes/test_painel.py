@@ -146,6 +146,27 @@ class Endpoint(unittest.TestCase):
                 "eventos": [{"seq": 1, "evt": "tela"}]})
         self.assertEqual(r.status_code, 204)
 
+    def test_painel_renderiza_abas_e_conteudo(self):
+        with mock.patch.object(config, "PAINEL_SENHA", "senha_teste"), \
+             mock.patch.object(config, "PAINEL_USUARIO", "crassus"):
+            resp = self.c.get("/painel", auth=("crassus", "senha_teste"))
+            self.assertEqual(resp.status_code, 200)
+            html_text = resp.text
+            # Barra de navegação de abas
+            self.assertIn('<nav class="abas">', html_text)
+            self.assertIn('data-tab="aba-funil"', html_text)
+            self.assertIn('data-tab="aba-formulario"', html_text)
+            self.assertIn('data-tab="aba-astrologia"', html_text)
+            self.assertIn('data-tab="aba-agente"', html_text)
+            # Painéis correspondentes
+            self.assertIn('id="aba-funil"', html_text)
+            self.assertIn('id="aba-formulario"', html_text)
+            self.assertIn('id="aba-astrologia"', html_text)
+            self.assertIn('id="aba-agente"', html_text)
+            # Script de alternância e persistência de abas
+            self.assertIn('function abrirAba(id)', html_text)
+            self.assertIn('painel_aba_ativa', html_text)
+
 
 class Mascaramento(unittest.TestCase):
     def test_nome_data_e_fone(self):
