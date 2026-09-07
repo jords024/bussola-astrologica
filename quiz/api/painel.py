@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 import config
-from servicos import eventos
+from servicos import eventos, registro
 from servicos.agregador import MIN_PARA_PORCENTAGEM, agregar
 
 router = APIRouter()
@@ -219,6 +219,11 @@ a{color:var(--amber)}
 .pag-btn:hover{border-color:var(--amber);color:var(--amber);background:rgba(229,169,60,.08)}
 .pag-btn.on{border-color:var(--amber);background:var(--amber);color:#12100C;font-weight:700}
 .pag-btn.disabled{opacity:.35;pointer-events:none;cursor:default;color:var(--sand2)}
+.tag-etapa{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:rgba(229,169,60,.12);color:var(--amber);border:1px solid rgba(229,169,60,.3);white-space:nowrap}
+.tag-etapa.oferta{background:rgba(229,169,60,.25);border-color:var(--amber);color:#F6C467}
+.tag-checkout{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.tag-checkout.sim{background:rgba(62,145,102,.22);color:#58B982;border:1px solid rgba(62,145,102,.5)}
+.tag-checkout.nao{background:rgba(255,255,255,.04);color:var(--sand2);border:1px solid var(--line)}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -236,6 +241,119 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "") -
     return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>'
 
 
+def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
+    """Mapeia cada leitura para (max_tela, rotulo, checkout).
+
+    Combina os dados salvos no próprio JSON da leitura com os eventos registrados
+    em DIR_EVENTOS para as datas correspondentes.
+    """
+    progresso: dict[str, dict] = {}
+    sids_map: dict[str, list[str]] = {}
+    datas_pesquisa: set[date] = set()
+
+    for leitura_id, d in itens:
+        etapa_salva = int(d.get("etapa_max") or 7)
+        checkout_salvo = bool(d.get("checkout") or False)
+        sid = str(d.get("cliente_id") or "").strip()
+
+        progresso[leitura_id] = {
+            "max_tela": etapa_salva,
+            "rotulo": d.get("etapa_nome") or registro.ETAPAS_ROTULOS.get(etapa_salva, f"Tela {etapa_salva}"),
+            "checkout": checkout_salvo,
+            "sid": sid,
+        }
+        if sid:
+            sids_map.setdefault(sid, []).append(leitura_id)
+
+        dt_leitura = None
+        gravado_em = d.get("gravado_em")
+        if gravado_em:
+            try:
+                dt_leitura = datetime.fromisoformat(gravado_em).date()
+            except Exception:
+                pass
+        if not dt_leitura and len(leitura_id) >= 8 and leitura_id[:8].isdigit():
+            try:
+                dt_leitura = datetime.strptime(leitura_id[:8], "%Y%m%d").date()
+            except Exception:
+                pass
+        if not dt_leitura:
+            dt_leitura = date.today()
+
+        datas_pesquisa.add(dt_leitura)
+        datas_pesquisa.add(dt_leitura - timedelta(days=1))
+        datas_pesquisa.add(dt_leitura + timedelta(days=1))
+
+    lids_set = set(progresso.keys())
+    if not lids_set and not sids_map:
+        return progresso
+
+    for d_pesq in sorted(datas_pesquisa):
+        arq_ev = config.DIR_EVENTOS / f"{d_pesq:%Y-%m-%d}.jsonl"
+        if not arq_ev.exists():
+            continue
+        try:
+            with open(arq_ev, encoding="utf-8") as f:
+                for linha in f:
+                    linha = linha.strip()
+                    if not linha:
+                        continue
+                    try:
+                        ev = json.loads(linha)
+                    except Exception:
+                        continue
+                    ev_sid = str(ev.get("sid") or "").strip()
+                    props = ev.get("props") or {}
+                    ev_lid = str(props.get("leitura_id") or "").strip()
+                    evt = ev.get("evt")
+
+                    alvos: list[str] = []
+                    if ev_lid and ev_lid in lids_set:
+                        alvos.append(ev_lid)
+                        if ev_sid and ev_sid not in sids_map:
+                            sids_map.setdefault(ev_sid, []).append(ev_lid)
+                    elif ev_sid and ev_sid in sids_map:
+                        alvos.extend(sids_map[ev_sid])
+                    elif evt == "leitura_entregue":
+                        lid_entregue = str(props.get("leitura_id") or "").strip()
+                        if lid_entregue in lids_set:
+                            alvos.append(lid_entregue)
+                            if ev_sid:
+                                sids_map.setdefault(ev_sid, []).append(lid_entregue)
+
+                    if not alvos:
+                        continue
+
+                    for alvo_lid in alvos:
+                        info = progresso[alvo_lid]
+                        if evt == "tela":
+                            for k in ("para", "de"):
+                                val = props.get(k)
+                                if isinstance(val, int) and 0 <= val <= 10:
+                                    if val > info["max_tela"]:
+                                        info["max_tela"] = val
+                        elif evt == "oferta_clique":
+                            info["checkout"] = True
+                            if info["max_tela"] < 10:
+                                info["max_tela"] = 10
+                        elif evt == "saida":
+                            t_saida = props.get("tela")
+                            if isinstance(t_saida, int) and 0 <= t_saida <= 10:
+                                if t_saida > info["max_tela"]:
+                                    info["max_tela"] = t_saida
+                        elif evt == "leitura_entregue":
+                            if info["max_tela"] < 7:
+                                info["max_tela"] = 7
+        except Exception as err:
+            logger.warning("Erro ao ler eventos em %s: %s", arq_ev.name, err)
+
+    for lid, info in progresso.items():
+        m = info["max_tela"]
+        info["rotulo"] = registro.ETAPAS_ROTULOS.get(m, f"Tela {m}")
+
+    return progresso
+
+
 def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, int]:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
     total_arquivos = len(arquivos)
@@ -243,7 +361,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
     pagina_ajustada = min(max(0, pagina), total_paginas - 1) if total_arquivos > 0 else 0
     recorte = arquivos[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
 
-    linhas = []
+    dados_recorte: list[tuple[str, dict]] = []
     for arq in recorte:
         try:
             d = json.loads(arq.read_text(encoding="utf-8"))
@@ -251,14 +369,30 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
             continue
         if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
             continue          # fixtures da suite de testes
+        dados_recorte.append((arq.stem, d))
+
+    progresso_map = obter_progresso_leituras(dados_recorte)
+
+    linhas = []
+    for stem, d in dados_recorte:
         v, pr = d.get("veredito") or {}, d.get("precisao") or {}
         nasc = d.get("nascimento") or {}
         cid = d.get("cidade") or {}
-        chegada_bsb, gerada_bsb = f_chegada_bsb(d, arq.stem)
+        chegada_bsb, gerada_bsb = f_chegada_bsb(d, stem)
+        prog = progresso_map.get(stem, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
+        rotulo_etapa = prog["rotulo"]
+        etapa_cls = "tag-etapa oferta" if prog["max_tela"] == 10 else "tag-etapa"
+        tag_etapa = f'<span class="{etapa_cls}">{html.escape(rotulo_etapa)}</span>'
+        tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if prog["checkout"] else '<span class="tag-checkout nao">Não</span>'
+
         linhas.append([
-            f'<a href="/painel/leitura/{html.escape(arq.stem)}">{html.escape(arq.stem[:15])}</a>',
-            f'<span style="white-space:nowrap;" title="Gerada às {html.escape(gerada_bsb)} (BSB)">{html.escape(chegada_bsb)}</span>',
+            f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
+            f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
+            f'<span style="white-space:nowrap;">{html.escape(gerada_bsb)}</span>',
+            tag_etapa,
+            tag_chk,
             html.escape(d.get("nome_completo") or "—"),
+            f_wa(d.get("whatsapp")),
             f_data(nasc),
             html.escape(cid.get("uf") or cid.get("nome") or "—"),
             html.escape(str((d.get("quiz") or {}).get("area") or "—")),
@@ -266,10 +400,11 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
             f_tempo(d.get("tempo_quiz_ms")),
-            f_wa(d.get("whatsapp")),
         ])
-    corpo = _tabela(["id", "chegou ao quiz (bsb)", "nome", "nascimento", "uf", "área", "cenário",
-                     "casa", "hora nasc.", "tempo no quiz", "whatsapp"], linhas)
+    corpo = _tabela([
+        "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
+        "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz"
+    ], linhas)
     return corpo, total_arquivos, total_paginas
 
 
@@ -566,12 +701,16 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     pr = d.get("precisao") or {}
 
     chegada_bsb, gerada_bsb = f_chegada_bsb(d, leitura_id)
+    prog = obter_progresso_leituras([(leitura_id, d)]).get(leitura_id, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
     h_str = f_hora(n, pr)
     uf_str = f' ({html.escape(cid.get("uf"))})' if cid.get("uf") else ''
     t_quiz_str = f' · tempo no quiz: {f_tempo(d.get("tempo_quiz_ms"))}' if d.get("tempo_quiz_ms") else ''
+    chk_str = '<b style="color:var(--green);">✦ SIM</b>' if prog["checkout"] else '<span style="color:var(--sand2);">Não</span>'
     ident = (f'{html.escape(d.get("nome_completo") or "—")} · '
              f'chegou ao quiz: <b style="color:var(--amber);">{html.escape(chegada_bsb)} (BSB)</b> · '
-             f'gerada em: {html.escape(gerada_bsb)} (BSB) · '
+             f'preencheu dados: <b style="color:var(--amber);">{html.escape(gerada_bsb)} (BSB)</b> · '
+             f'etapa: <b style="color:var(--amber);">{html.escape(prog["rotulo"])}</b> · '
+             f'checkout: {chk_str} · '
              f'{f_data(n)} ({h_str}) · '
              f'{html.escape(cid.get("nome") or "—")}{uf_str} · '
              f'{f_wa(d.get("whatsapp"))}'

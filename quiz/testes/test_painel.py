@@ -422,6 +422,144 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.assertIn("pag_leituras=0#aba-leituras", html_p1)
         self.assertIn("class=\"pag-btn disabled\">Próxima →", html_p1)
 
+    def test_atualizar_progresso_registro(self):
+        from servicos import registro
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras), \
+                 mock.patch.object(registro, "DIR_LEITURAS", dir_leituras):
+                lid = "20260907-120000-11223344"
+                dados = {
+                    "nome_completo": "Cliente Teste",
+                    "etapa_max": 7,
+                    "etapa_nome": "Tela 7 (Leitura)",
+                    "checkout": False,
+                }
+                (dir_leituras / f"{lid}.json").write_text(json.dumps(dados), encoding="utf-8")
+
+                # Atualiza para tela 8
+                ok = registro.atualizar_progresso(lid, tela=8)
+                self.assertTrue(ok)
+                d_pos = json.loads((dir_leituras / f"{lid}.json").read_text(encoding="utf-8"))
+                self.assertEqual(d_pos["etapa_max"], 8)
+                self.assertEqual(d_pos["etapa_nome"], "Tela 8 (Portas)")
+                self.assertFalse(d_pos["checkout"])
+
+                # Atualiza para checkout
+                ok2 = registro.atualizar_progresso(lid, tela=10, checkout=True)
+                self.assertTrue(ok2)
+                d_pos2 = json.loads((dir_leituras / f"{lid}.json").read_text(encoding="utf-8"))
+                self.assertEqual(d_pos2["etapa_max"], 10)
+                self.assertEqual(d_pos2["etapa_nome"], "Tela 10 (Oferta)")
+                self.assertTrue(d_pos2["checkout"])
+
+    def test_obter_progresso_leituras_eventos(self):
+        from api.painel import obter_progresso_leituras
+        with TemporaryDirectory() as tmpdir:
+            dir_ev = Path(tmpdir)
+            hoje_str = date.today().strftime("%Y-%m-%d")
+            arq_ev = dir_ev / f"{hoje_str}.jsonl"
+
+            # Eventos: sid1 avançou até tela 8 (portas), sid2 avançou até tela 10 e clicou checkout
+            linhas_ev = [
+                {"sid": "sid1", "seq": 1, "evt": "tela", "props": {"de": 7, "para": 8}},
+                {"sid": "sid2", "seq": 1, "evt": "tela", "props": {"de": 7, "para": 10}},
+                {"sid": "sid2", "seq": 2, "evt": "oferta_clique", "props": {"botao": "principal"}},
+            ]
+            arq_ev.write_text("\n".join(json.dumps(e) for e in linhas_ev) + "\n", encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_EVENTOS", dir_ev):
+                itens = [
+                    ("20260907-100000-aaaa1111", {"cliente_id": "sid1", "etapa_max": 7}),
+                    ("20260907-100500-bbbb2222", {"cliente_id": "sid2", "etapa_max": 7}),
+                    ("20260907-101000-cccc3333", {"cliente_id": "sid3", "etapa_max": 7}),
+                ]
+                prog = obter_progresso_leituras(itens)
+
+                self.assertEqual(prog["20260907-100000-aaaa1111"]["max_tela"], 8)
+                self.assertEqual(prog["20260907-100000-aaaa1111"]["rotulo"], "Tela 8 (Portas)")
+                self.assertFalse(prog["20260907-100000-aaaa1111"]["checkout"])
+
+                self.assertEqual(prog["20260907-100500-bbbb2222"]["max_tela"], 10)
+                self.assertEqual(prog["20260907-100500-bbbb2222"]["rotulo"], "Tela 10 (Oferta)")
+                self.assertTrue(prog["20260907-100500-bbbb2222"]["checkout"])
+
+                self.assertEqual(prog["20260907-101000-cccc3333"]["max_tela"], 7)
+                self.assertEqual(prog["20260907-101000-cccc3333"]["rotulo"], "Tela 7 (Leitura)")
+                self.assertFalse(prog["20260907-101000-cccc3333"]["checkout"])
+
+    def test_tabela_leituras_exibe_novas_colunas(self):
+        from api.painel import _tabela_leituras
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            arq = dir_leituras / "20260907-120000-12345678.json"
+            conteudo = {
+                "nome_completo": "Ana Pereira",
+                "gravado_em": "2026-09-07T13:30:00",
+                "chegou_em_bsb": "07/09/2026 10:25:00",
+                "gravado_em_bsb": "07/09/2026 10:30:00",
+                "etapa_max": 10,
+                "etapa_nome": "Tela 10 (Oferta)",
+                "checkout": True,
+                "nascimento": {"dia": 10, "mes": 5, "ano": 1992, "hora": 14, "minuto": 30},
+                "cidade": {"nome": "Campinas", "uf": "SP"},
+                "quiz": {"area": "carreira"},
+                "whatsapp": "+55 (19) 99999-8888",
+                "tempo_quiz_ms": 300000,
+                "veredito": {"tipo": "CAUSA_OCULTA", "casa_eleita_real": True, "casa_aberta": 10}
+            }
+            arq.write_text(json.dumps(conteudo), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                corpo, total, pags = _tabela_leituras(pagina=0, por_pagina=20)
+                # Verifica cabeçalhos esperados
+                self.assertIn("chegou ao quiz (bsb)", corpo)
+                self.assertIn("preencheu dados (bsb)", corpo)
+                self.assertIn("etapa alcançada", corpo)
+                self.assertIn("checkout", corpo)
+
+                # Verifica valores na linha de dados
+                self.assertIn("07/09/2026 10:25:00", corpo)
+                self.assertIn("07/09/2026 10:30:00", corpo)
+                self.assertIn("Tela 10 (Oferta)", corpo)
+                self.assertIn("tag-checkout sim", corpo)
+                self.assertIn("✦ SIM", corpo)
+                self.assertIn("Ana Pereira", corpo)
+
+    def test_detalhe_leitura_exibe_progresso_e_checkout(self):
+        from api.painel import detalhe
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            lid = "20260907-120000-87654321"
+            arq = dir_leituras / f"{lid}.json"
+            conteudo = {
+                "nome_completo": "Juliana Souza",
+                "gravado_em": "2026-09-07T13:30:00",
+                "chegou_em_bsb": "07/09/2026 10:20:00",
+                "gravado_em_bsb": "07/09/2026 10:30:00",
+                "etapa_max": 8,
+                "etapa_nome": "Tela 8 (Portas)",
+                "checkout": False,
+                "nascimento": {"dia": 22, "mes": 3, "ano": 1988, "hora": 8, "minuto": 15},
+                "cidade": {"nome": "Rio de Janeiro", "uf": "RJ"},
+                "quiz": {"area": "amor"},
+                "whatsapp": "+55 (21) 98888-7777",
+                "tempo_quiz_ms": 600000,
+                "veredito": {"tipo": "CAUSA_OCULTA", "casa_eleita_real": True, "casa_aberta": 7},
+                "carta": {"selo": "Casa 7", "titulo": "A porta do encontro", "destaque": "Destaque", "paragrafos": ["P1"], "notas": ["N1"]}
+            }
+            arq.write_text(json.dumps(conteudo), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                resp = detalhe(lid, _="crassus")
+                html_resp = resp.body.decode("utf-8")
+                self.assertIn("chegou ao quiz:", html_resp)
+                self.assertIn("preencheu dados:", html_resp)
+                self.assertIn("etapa:", html_resp)
+                self.assertIn("Tela 8 (Portas)", html_resp)
+                self.assertIn("checkout:", html_resp)
+                self.assertIn("Não", html_resp)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@ import logging
 
 from fastapi import APIRouter, Request, Response
 
-from servicos import eventos
+from servicos import eventos, registro
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -40,6 +40,15 @@ async def receber(request: Request) -> Response:
         linhas = eventos.normalizar(lote, ip, ua)
         if linhas:
             await asyncio.to_thread(eventos.gravar, linhas)
+            for lin in linhas:
+                props = lin.get("props") or {}
+                lid = props.get("leitura_id")
+                evt = lin.get("evt")
+                if lid:
+                    tela = props.get("para") if evt == "tela" else (10 if evt == "oferta_clique" else None)
+                    checkout = True if evt == "oferta_clique" else None
+                    if tela is not None or checkout is not None:
+                        await asyncio.to_thread(registro.atualizar_progresso, lid, tela, checkout)
     except Exception as e:
         # nada aqui pode escapar: o funil da pessoa nao depende disto
         logger.warning("evento descartado: %s", str(e)[:160])

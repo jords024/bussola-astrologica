@@ -71,6 +71,21 @@ def novo_id() -> str:
     return f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}"
 
 
+ETAPAS_ROTULOS = {
+    0: "Tela 0 (Início)",
+    1: "Tela 1 (Contexto)",
+    2: "Tela 2 (Área)",
+    3: "Tela 3 (Espelho)",
+    4: "Tela 4 (Quebra)",
+    5: "Tela 5 (Dados)",
+    6: "Tela 6 (Cálculo)",
+    7: "Tela 7 (Leitura)",
+    8: "Tela 8 (Portas)",
+    9: "Tela 9 (Ponte)",
+    10: "Tela 10 (Oferta)",
+}
+
+
 def gravar_lead(leitura_id: str, dados: dict) -> None:
     """Nome completo, nascimento, respostas, veredito e a carta inteira.
 
@@ -86,17 +101,50 @@ def gravar_lead(leitura_id: str, dados: dict) -> None:
         tempo_quiz_ms = dados.get("tempo_quiz_ms") or 0
         chegou_bsb = (agora_utc - timedelta(milliseconds=tempo_quiz_ms)).astimezone(tz_bsb)
 
+        etapa_inicial = dados.get("etapa_max", 7)
         dados = dict(
             dados,
             gravado_em=agora_utc.isoformat(timespec="seconds"),
             gravado_em_bsb=agora_bsb.strftime("%d/%m/%Y %H:%M:%S"),
             chegou_em_bsb=chegou_bsb.strftime("%d/%m/%Y %H:%M:%S"),
             pesos_v=PESOS_V,
+            etapa_max=etapa_inicial,
+            etapa_nome=dados.get("etapa_nome", ETAPAS_ROTULOS.get(etapa_inicial, f"Tela {etapa_inicial}")),
+            checkout=dados.get("checkout", False),
         )
         (DIR_LEITURAS / f"{leitura_id}.json").write_text(
             json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
     except Exception as e:
         logger.error("FALHA AO GRAVAR LEAD %s: %s", leitura_id, e)
+
+
+def atualizar_progresso(leitura_id: str, tela: Optional[int] = None, checkout: Optional[bool] = None) -> bool:
+    """Atualiza a etapa máxima alcançada e se o lead foi ao checkout."""
+    import re
+    if not leitura_id or not re.fullmatch(r"\d{8}-\d{6}-[a-f0-9]{8}", leitura_id):
+        return False
+    caminho = DIR_LEITURAS / f"{leitura_id}.json"
+    if not caminho.exists():
+        return False
+    try:
+        d = json.loads(caminho.read_text(encoding="utf-8"))
+        modificado = False
+        if tela is not None:
+            tela_int = int(tela)
+            atual_max = d.get("etapa_max") or 0
+            if tela_int > atual_max:
+                d["etapa_max"] = tela_int
+                d["etapa_nome"] = ETAPAS_ROTULOS.get(tela_int, f"Tela {tela_int}")
+                modificado = True
+        if checkout is True and not d.get("checkout"):
+            d["checkout"] = True
+            modificado = True
+        if modificado:
+            caminho.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+            return True
+    except Exception as e:
+        logger.warning("falha ao atualizar progresso em %s: %s", leitura_id, e)
+    return False
 
 
 def anexar_contato(leitura_id: str, whatsapp: str) -> bool:
