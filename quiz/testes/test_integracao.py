@@ -33,6 +33,7 @@ class Integracao(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('Uma das suas <em>12 portas</em> está aberta agora.', response.text)
+        self.assertIn('Na Astrologia chamamos de casas.', response.text)
         self.assertIn("fetch('/api/leitura'", response.text)
         self.assertNotIn('sk-proj-', response.text)
 
