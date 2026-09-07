@@ -35,11 +35,14 @@ services:
           cpus: "1"
           memory: 1024M
       labels:
-        # Habilita o Traefik
+        # Habilita o Traefik para o serviço
         - traefik.enable=true
         
-        # Configura o Domínio / Roteamento HTTP(S)
-        - traefik.http.routers.landing_crassus.rule=Host(`crassusastrologo.com.br`)
+        # Define a rede que o Traefik deve utilizar para se comunicar com o container
+        - traefik.docker.network=network_swarm_public
+        
+        # Configura o Domínio / Roteamento HTTP(S) da Landing Page
+        - traefik.http.routers.landing_crassus.rule=Host(`crassusastrologo.com.br`) || Host(`www.crassusastrologo.com.br`)
         
         # Define o ponto de entrada HTTPS e Certificado SSL Let's Encrypt
         - traefik.http.routers.landing_crassus.entrypoints=websecure
@@ -48,11 +51,7 @@ services:
         # Define o serviço do Traefik e Porta interna
         - traefik.http.routers.landing_crassus.service=landing_crassus
         - traefik.http.services.landing_crassus.loadbalancer.server.port=3000
-        - traefik.http.services.landing_crassus.loadbalancer.passhostheader=true
-        
-        # Configura o Middleware para Headers SSL / HTTPS
-        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
-        - traefik.http.routers.landing_crassus.middlewares=sslheader@docker
+        - traefik.http.services.landing_crassus.loadbalancer.passHostHeader=true
 
   # ============================================================================
   # Serviço do Quiz Astrológico (FastAPI, Cálculos Kerykeion & Leitura IA)
@@ -96,8 +95,11 @@ services:
           cpus: "1"
           memory: 1024M
       labels:
-        # Habilita o Traefik
+        # Habilita o Traefik para o serviço
         - traefik.enable=true
+
+        # Define a rede que o Traefik deve utilizar para se comunicar com o container
+        - traefik.docker.network=network_swarm_public
 
         # Configura o Domínio / Roteamento HTTP(S) do Quiz
         - traefik.http.routers.quiz_crassus.rule=Host(`quiz.crassusastrologo.com.br`)
@@ -109,11 +111,7 @@ services:
         # Define o serviço do Traefik e Porta interna
         - traefik.http.routers.quiz_crassus.service=quiz_crassus
         - traefik.http.services.quiz_crassus.loadbalancer.server.port=8765
-        - traefik.http.services.quiz_crassus.loadbalancer.passhostheader=true
-
-        # Configura o Middleware para Headers SSL / HTTPS
-        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
-        - traefik.http.routers.quiz_crassus.middlewares=sslheader@docker
+        - traefik.http.services.quiz_crassus.loadbalancer.passHostHeader=true
 
 # ==============================================================================
 # Definição dos Volumes do Stack
