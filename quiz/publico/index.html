@@ -474,6 +474,103 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
 
   .fine{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--sand-3);
     letter-spacing:.1em;margin-top:20px;}
+
+  /* Botão fixo do WhatsApp no canto inferior direito - EXCLUSIVO da tela de oferta (data-s="10") */
+  .whatsapp-btn-wrapper {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+  }
+  .whatsapp-btn-wrapper.visivel {
+    display: flex;
+  }
+  .whatsapp-btn-tooltip {
+    display: none;
+    background: #17130d;
+    border: 1px solid rgba(227, 189, 113, 0.35);
+    color: #f7f2ea;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 999px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    pointer-events: none;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  @media (min-width: 640px) {
+    .whatsapp-btn-tooltip {
+      display: block;
+    }
+    .whatsapp-btn-wrapper:hover .whatsapp-btn-tooltip {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .whatsapp-btn-float {
+    position: relative;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background-color: #25D366;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-shadow: 0 8px 24px rgba(37, 211, 102, 0.45);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, box-shadow 0.25s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .whatsapp-btn-float:hover {
+    transform: scale(1.1);
+    background-color: #20bd5a;
+    box-shadow: 0 10px 30px rgba(37, 211, 102, 0.65);
+  }
+  .whatsapp-btn-float:active {
+    transform: scale(0.95);
+  }
+  .whatsapp-btn-pulse {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background-color: rgba(37, 211, 102, 0.45);
+    z-index: -1;
+    animation: wa-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    pointer-events: none;
+  }
+  @keyframes wa-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.22);
+      opacity: 0;
+    }
+  }
+  @media (max-width: 480px) {
+    .whatsapp-btn-wrapper {
+      bottom: 18px;
+      right: 18px;
+    }
+    .whatsapp-btn-float {
+      width: 52px;
+      height: 52px;
+    }
+    .whatsapp-btn-float svg {
+      width: 28px;
+      height: 28px;
+    }
+  }
 </style>
 <link rel="stylesheet" href="/estatico/portas.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1038,7 +1135,20 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     if (i === 6) spin();
     if (i === 8) portas();
     if (i === 9) bridge();
+    atualizarBtnWhatsApp(i);
   }
+  function atualizarBtnWhatsApp(etapaIndex){
+    const waWrap = document.getElementById('whatsappSuporteWrapper');
+    if (!waWrap) return;
+    const el = scr[etapaIndex];
+    const isOferta = (el && el.getAttribute('data-s') === '10') || etapaIndex === 10;
+    if (isOferta) {
+      waWrap.classList.add('visivel');
+    } else {
+      waWrap.classList.remove('visivel');
+    }
+  }
+  atualizarBtnWhatsApp(i);
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(i+1)));
   if (typeof window.fbq === 'function') {
     try { window.fbq('trackCustom', 'Quiz_Etapa_0', { etapa: 0, nome: 'Inicio' }); } catch(e) {}
@@ -1817,12 +1927,46 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
       window.location.href = CHECKOUT_URL;
     }
   });
+  const waBtn = document.getElementById('whatsappSuporteBtn');
+  if (waBtn) {
+    waBtn.addEventListener('click', function(){
+      try {
+        if (typeof A !== 'undefined' && A && typeof A.ev === 'function') {
+          A.ev('whatsapp_suporte_clique', {
+            origem: 'botao_flutuante_quiz',
+            tela: typeof i !== 'undefined' ? i : null
+          }, true);
+        }
+        if (typeof window.fbq === 'function') {
+          window.fbq('trackCustom', 'ClicouWhatsApp', { origem: 'botao_flutuante_quiz' });
+        }
+      } catch(err){}
+    });
+  }
   addEventListener('pagehide', ()=>{
     A.ev('saida', {tela:i, ms_na_tela: Date.now()-tTela, ms_acumulado: Date.now()-(A.tEntrada || tTela), motivo:'saiu'});
     A.flush(true);
   });
 })();
 </script>
+
+<!-- Botão Fixo de WhatsApp no Canto Inferior Direito -->
+<div class="whatsapp-btn-wrapper" id="whatsappSuporteWrapper">
+  <div class="whatsapp-btn-tooltip" id="whatsappTooltip">Dúvidas? Fale no WhatsApp</div>
+  <a
+    href="https://wa.me/554792331247?text=Gostaria%20de%20saber%20mais%20sobre%20o%20Bussola%20Astrologica"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="whatsapp-btn-float"
+    id="whatsappSuporteBtn"
+    aria-label="Fale conosco no WhatsApp"
+  >
+    <span class="whatsapp-btn-pulse" aria-hidden="true"></span>
+    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true">
+      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67M9.16 7.68C9 7.68 8.78 7.74 8.6 7.95C8.42 8.16 7.91 8.64 7.91 9.61C7.91 10.58 8.62 11.51 8.72 11.65C8.82 11.79 10.1 13.77 12.06 14.62C12.53 14.82 12.89 14.94 13.17 15.03C13.64 15.18 14.07 15.16 14.41 15.11C14.79 15.05 15.58 14.63 15.75 14.16C15.92 13.69 15.92 13.28 15.87 13.2C15.82 13.12 15.69 13.07 15.5 12.97C15.31 12.87 14.39 12.42 14.22 12.36C14.05 12.3 13.93 12.27 13.8 12.47C13.67 12.67 13.31 13.09 13.2 13.22C13.09 13.35 12.98 13.37 12.79 13.27C12.6 13.17 11.8 12.91 10.85 12.06C10.11 11.4 9.61 10.59 9.47 10.35C9.33 10.11 9.45 9.98 9.55 9.88C9.64 9.79 9.75 9.64 9.85 9.53C9.95 9.42 9.99 9.34 10.05 9.21C10.11 9.08 10.08 8.97 10.03 8.87C9.98 8.77 9.58 7.79 9.42 7.39C9.26 7 9.1 7.05 8.97 7.05H8.62L9.16 7.68Z"/>
+    </svg>
+  </a>
+</div>
 
 </body>
 </html>

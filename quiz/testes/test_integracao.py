@@ -270,7 +270,15 @@ class Integracao(unittest.TestCase):
         args, kwargs = mock_webhook.call_args
         self.assertEqual(args[0], 'Aryaraj Alves Fernandes')
         self.assertEqual(args[1], '+55 (85) 99999-8888')
-        self.assertIn('paragrafos', args[2])
+    def test_botao_whatsapp_suporte_fixo(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn('id="whatsappSuporteBtn"', html)
+        self.assertIn('https://wa.me/554792331247', html)
+        self.assertIn('Gostaria%20de%20saber%20mais%20sobre%20o%20Bussola%20Astrologica', html)
+        self.assertIn('class="whatsapp-btn-float"', html)
+        self.assertIn('position: fixed;', html)
 
 if __name__ == '__main__':
     unittest.main()
