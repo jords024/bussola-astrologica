@@ -756,8 +756,6 @@
     <details><summary>Quando eu recebo?</summary><p>Na hora. O pix confirma em segundos e cai tudo no seu e-mail.</p></details>
     <details><summary>E se eu não sei minha hora de nascimento?</summary><p>Serve do mesmo jeito. Fica mais preciso com a hora, mas o material ensina o que dá para fazer sem ela.</p></details>
   </div>
-
-  <p class="fine">protótipo · sem checkout conectado</p>
 </section>
 
 </div>
@@ -1471,10 +1469,24 @@
   const MS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   const D = new Date();
   if($('#today')) $('#today').textContent = `${D.getDate()} de ${MS[D.getMonth()]} de ${D.getFullYear()}`;
+  const CHECKOUT_URL = 'https://pay.hotmart.com/Q107238351O?checkoutMode=10&bid=1788742865072';
   $('#buy').addEventListener('click', function(){
     A.ev('oferta_clique', {botao:'principal', ms_na_tela: Date.now()-tTela}, true);
-    this.textContent = 'iria para o checkout';
-    setTimeout(()=>this.textContent = 'Quero as aulas e todos os materiais', 2000);
+    A.flush(true);
+    try {
+      const u = new URL(CHECKOUT_URL);
+      if (typeof S !== 'undefined' && S && S.nomeCompleto) {
+        u.searchParams.set('name', S.nomeCompleto);
+      }
+      const currentParams = new URLSearchParams(window.location.search);
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'src', 'sck'].forEach(p => {
+        const v = currentParams.get(p);
+        if (v) u.searchParams.set(p, v);
+      });
+      window.location.href = u.toString();
+    } catch(e) {
+      window.location.href = CHECKOUT_URL;
+    }
   });
   addEventListener('pagehide', ()=>{
     A.ev('saida', {tela:i, ms_na_tela: Date.now()-tTela, motivo:'saiu'});

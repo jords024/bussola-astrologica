@@ -132,5 +132,13 @@ class Integracao(unittest.TestCase):
         self.assertNotIn('Recomeçar o percurso', html)
         self.assertNotIn('id="again"', html)
 
+    def test_checkout_redirecionamento_hotmart(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn('https://pay.hotmart.com/Q107238351O?checkoutMode=10&bid=1788742865072', html)
+        self.assertNotIn('sem checkout conectado', html)
+        self.assertIn("A.ev('oferta_clique'", html)
+
 if __name__ == '__main__':
     unittest.main()
