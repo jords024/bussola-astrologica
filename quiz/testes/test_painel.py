@@ -127,8 +127,13 @@ class Endpoint(unittest.TestCase):
         self.assertEqual(self.c.post("/api/evento", content=b"x" * 20000).status_code, 204)
 
     def test_painel_exige_senha(self):
-        self.assertEqual(self.c.get("/painel").status_code, 401)
-        self.assertEqual(self.c.get("/painel", auth=("crassus", "errada")).status_code, 401)
+        with mock.patch.object(config, "PAINEL_SENHA", "senha_teste"):
+            self.assertEqual(self.c.get("/painel").status_code, 401)
+            self.assertEqual(self.c.get("/painel", auth=("crassus", "errada")).status_code, 401)
+
+    def test_painel_desativado_quando_sem_senha(self):
+        with mock.patch.object(config, "PAINEL_SENHA", ""):
+            self.assertEqual(self.c.get("/painel").status_code, 503)
 
     def test_dados_nao_sao_servidos(self):
         self.assertEqual(self.c.get("/dados/leituras/x.json").status_code, 404)
