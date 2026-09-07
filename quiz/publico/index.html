@@ -757,7 +757,6 @@
     <details><summary>E se eu não sei minha hora de nascimento?</summary><p>Serve do mesmo jeito. Fica mais preciso com a hora, mas o material ensina o que dá para fazer sem ela.</p></details>
   </div>
 
-  <button class="go ghost" id="again" style="max-width:220px;">Recomeçar o percurso</button>
   <p class="fine">protótipo · sem checkout conectado</p>
 </section>
 
@@ -1480,13 +1479,6 @@
   addEventListener('pagehide', ()=>{
     A.ev('saida', {tela:i, ms_na_tela: Date.now()-tTela, motivo:'saiu'});
     A.flush(true);
-  });
-
-  $('#again').addEventListener('click', ()=>{
-    A.ev('saida', {tela:i, motivo:'recomecou'}, true);
-    A.flush(true);
-    A.novoSid();          /* recomecar e uma visita nova, nao a mesma */
-    location.reload();
   });
 })();
 </script>

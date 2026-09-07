@@ -129,6 +129,8 @@ class Integracao(unittest.TestCase):
         undefined = used_vars - root_vars
         self.assertEqual(undefined, set(), f"Variáveis CSS não definidas: {undefined}")
         self.assertIn('z-index:100;', html)
+        self.assertNotIn('Recomeçar o percurso', html)
+        self.assertNotIn('id="again"', html)
 
 if __name__ == '__main__':
     unittest.main()
