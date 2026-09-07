@@ -212,6 +212,13 @@ a{color:var(--amber)}
 .aba-painel{display:none}
 .aba-painel.on{display:block;animation:fadein .2s ease}
 .tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px}
+.paginacao{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:16px 0 8px;padding:12px 0;border-top:1px solid var(--line)}
+.pag-info{font-size:12.5px;color:var(--sand2)}
+.pag-links{display:flex;align-items:center;gap:6px}
+.pag-btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border:1px solid var(--line);border-radius:6px;color:var(--sand);text-decoration:none;font-size:12px;min-width:32px;transition:all .15s ease}
+.pag-btn:hover{border-color:var(--amber);color:var(--amber);background:rgba(229,169,60,.08)}
+.pag-btn.on{border-color:var(--amber);background:var(--amber);color:#12100C;font-weight:700}
+.pag-btn.disabled{opacity:.35;pointer-events:none;cursor:default;color:var(--sand2)}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -229,9 +236,12 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "") -
     return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>'
 
 
-def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
+def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, int]:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
-    recorte = arquivos[pagina * 50:(pagina + 1) * 50]
+    total_arquivos = len(arquivos)
+    total_paginas = max(1, (total_arquivos + por_pagina - 1) // por_pagina)
+    pagina_ajustada = min(max(0, pagina), total_paginas - 1) if total_arquivos > 0 else 0
+    recorte = arquivos[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
 
     linhas = []
     for arq in recorte:
@@ -260,14 +270,78 @@ def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
         ])
     corpo = _tabela(["id", "chegou ao quiz (bsb)", "nome", "nascimento", "uf", "área", "cenário",
                      "casa", "hora nasc.", "tempo no quiz", "whatsapp"], linhas)
-    return corpo, len(arquivos)
+    return corpo, total_arquivos, total_paginas
+
+
+def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
+                     por_pagina: int = 20, param_nome: str = "pag_leituras",
+                     hash_tab: str = "") -> str:
+    if total_arquivos == 0:
+        return ""
+    total_paginas = max(1, (total_arquivos + por_pagina - 1) // por_pagina)
+    pagina = min(max(0, pagina), total_paginas - 1)
+
+    inicio = pagina * por_pagina + 1
+    fim = min((pagina + 1) * por_pagina, total_arquivos)
+    info = f"Mostrando <b>{inicio}–{fim}</b> de <b>{total_arquivos}</b> leituras · Página {pagina + 1} de {total_paginas}"
+
+    def make_url(p: int) -> str:
+        q = {k: v for k, v in params.items() if v is not None}
+        q[param_nome] = p
+        qs = "&".join(f"{k}={v}" for k, v in q.items())
+        sep = "&" if "?" in base_url else "?"
+        url = f"{base_url}{sep}{qs}" if qs else base_url
+        if hash_tab and not url.endswith(hash_tab):
+            url += hash_tab
+        return url
+
+    botoes = []
+    # Botão Anterior
+    if pagina > 0:
+        botoes.append(f'<a class="pag-btn" href="{make_url(pagina - 1)}">← Anterior</a>')
+    else:
+        botoes.append('<span class="pag-btn disabled">← Anterior</span>')
+
+    # Janela de até 5 páginas adjacentes
+    p_ini = max(0, pagina - 2)
+    p_fim = min(total_paginas, p_ini + 5)
+    if p_fim - p_ini < 5:
+        p_ini = max(0, p_fim - 5)
+
+    if p_ini > 0:
+        botoes.append(f'<a class="pag-btn" href="{make_url(0)}">1</a>')
+        if p_ini > 1:
+            botoes.append('<span class="pag-btn disabled">…</span>')
+
+    for p_idx in range(p_ini, p_fim):
+        if p_idx == pagina:
+            botoes.append(f'<span class="pag-btn on">{p_idx + 1}</span>')
+        else:
+            botoes.append(f'<a class="pag-btn" href="{make_url(p_idx)}">{p_idx + 1}</a>')
+
+    if p_fim < total_paginas:
+        if p_fim < total_paginas - 1:
+            botoes.append('<span class="pag-btn disabled">…</span>')
+        botoes.append(f'<a class="pag-btn" href="{make_url(total_paginas - 1)}">{total_paginas}</a>')
+
+    # Botão Próxima
+    if pagina < total_paginas - 1:
+        botoes.append(f'<a class="pag-btn" href="{make_url(pagina + 1)}">Próxima →</a>')
+    else:
+        botoes.append('<span class="pag-btn disabled">Próxima →</span>')
+
+    return (f'<div class="paginacao">'
+            f'<span class="pag-info">{info}</span>'
+            f'<div class="pag-links">{"".join(botoes)}</div>'
+            f'</div>')
 
 
 @router.get("/painel", response_class=HTMLResponse)
 def painel(request: Request, _=Depends(exigir_senha),
            de: Optional[str] = None, ate: Optional[str] = None,
            dias: int = Query(7, ge=1, le=365),
-           bots: int = 0, teste: int = 0):
+           bots: int = 0, teste: int = 0,
+           pag_leituras: int = Query(0, ge=0)):
     d1, d2 = _periodo(de, ate, dias)
     # acolchoa um dia de cada lado: sessao que comeca 23h57 e continua depois da
     # meia-noite tem que ser lida inteira, senao aparece cortada em duas
@@ -280,6 +354,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["bots"] = 1
         if teste:
             q["teste"] = 1
+        if pag_leituras:
+            q["pag_leituras"] = pag_leituras
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         on = " on" if kw.get("dias") == dias else ""
         return f'<a class="f{on}" href="/painel?{qs}">{rot}</a>'
@@ -357,11 +433,13 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ==================== ABA 2: LEITURAS ====================
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
-    corpo_leituras, total_leituras = _tabela_leituras(0)
-    p.append(f'<p class="sub">{total_leituras} leitura(s) no total · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
+    corpo_leituras, total_leituras, total_pags = _tabela_leituras(pag_leituras, por_pagina=20)
+    p_params = {"dias": dias, "bots": bots if bots else None, "teste": teste if teste else None}
+    barra_pag = _barra_paginacao(pag_leituras, total_leituras, "/painel", p_params,
+                                 por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras")
+    p.append(f'<p class="sub">{total_leituras} leitura(s) no total · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
     p.append(corpo_leituras)
-    if total_leituras > 50:
-        p.append('<p class="nota"><a href="/painel/leituras?pagina=1">ver próximas leituras antigas →</a></p>')
+    p.append(barra_pag)
     p.append('</section>')
 
     # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
@@ -462,18 +540,15 @@ def painel(request: Request, _=Depends(exigir_senha),
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
 def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
-    corpo, total_arquivos = _tabela_leituras(pagina)
-    nav = ""
-    if pagina:
-        nav += f'<a href="/painel/leituras?pagina={pagina-1}">← anteriores</a> '
-    if total_arquivos > (pagina + 1) * 50:
-        nav += f'<a href="/painel/leituras?pagina={pagina+1}">próximas →</a>'
+    corpo, total_arquivos, total_pags = _tabela_leituras(pagina, por_pagina=20)
+    barra_pag = _barra_paginacao(pagina, total_arquivos, "/painel/leituras", {},
+                                 por_pagina=20, param_nome="pagina")
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
-        f'<h1>Leituras</h1><p class="sub">{total_arquivos} no total · '
+        f'<h1>Leituras</h1><p class="sub">{total_arquivos} no total · mostrando 20 por página · '
         f'<a href="/painel#aba-leituras">voltar ao painel</a></p>{corpo}'
-        f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p>'
-        f'<p class="nota">{nav}</p></div>',
+        f'{barra_pag}'
+        f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>',
         headers=CABECALHOS)
 
 

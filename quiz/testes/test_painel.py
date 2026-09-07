@@ -373,6 +373,54 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.assertEqual(chegada2, "07/09/2026 10:00:00")
         self.assertEqual(gerada2, "07/09/2026 10:00:00")
 
+    def test_paginacao_leituras_20_por_pagina(self):
+        from api.painel import _tabela_leituras
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # Cria 25 leituras fictícias
+            for i in range(25):
+                arq = dir_leituras / f"20260907-12{i:02d}00-abcdef{i:02d}.json"
+                conteudo = {
+                    "nome_completo": f"Usuario Teste {i}",
+                    "nascimento": {"dia": 1, "mes": 1, "ano": 1990, "hora": 12, "minuto": 0},
+                    "cidade": {"nome": "Sao Paulo", "uf": "SP"},
+                    "quiz": {"area": "amor"},
+                    "tempo_quiz_ms": 60000,
+                    "veredito": {"tipo": "CAUSA_OCULTA", "casa_eleita_real": True, "casa_aberta": 7}
+                }
+                arq.write_text(json.dumps(conteudo), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # Página 0 (deve trazer 20 itens)
+                corpo_p0, total_p0, pags_p0 = _tabela_leituras(pagina=0, por_pagina=20)
+                self.assertEqual(total_p0, 25)
+                self.assertEqual(pags_p0, 2)
+                # O corpo da página 0 tem 20 linhas de dados (mais o cabeçalho)
+                self.assertEqual(corpo_p0.count("<tr>"), 21)
+
+                # Página 1 (deve trazer os 5 itens restantes)
+                corpo_p1, total_p1, pags_p1 = _tabela_leituras(pagina=1, por_pagina=20)
+                self.assertEqual(total_p1, 25)
+                self.assertEqual(pags_p1, 2)
+                self.assertEqual(corpo_p1.count("<tr>"), 6)
+
+    def test_barra_paginacao_html(self):
+        from api.painel import _barra_paginacao
+        # Teste com 25 itens, página 0
+        html_p0 = _barra_paginacao(0, 25, "/painel", {"dias": 7}, por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras")
+        self.assertIn("Mostrando <b>1–20</b> de <b>25</b> leituras", html_p0)
+        self.assertIn("Página 1 de 2", html_p0)
+        self.assertIn("class=\"pag-btn disabled\">← Anterior", html_p0)
+        self.assertIn("pag_leituras=1#aba-leituras", html_p0)
+        self.assertIn("Próxima →", html_p0)
+
+        # Teste na página 1 (última página)
+        html_p1 = _barra_paginacao(1, 25, "/painel", {"dias": 7}, por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras")
+        self.assertIn("Mostrando <b>21–25</b> de <b>25</b> leituras", html_p1)
+        self.assertIn("Página 2 de 2", html_p1)
+        self.assertIn("← Anterior", html_p1)
+        self.assertIn("pag_leituras=0#aba-leituras", html_p1)
+        self.assertIn("class=\"pag-btn disabled\">Próxima →", html_p1)
 
 
 if __name__ == "__main__":
