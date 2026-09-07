@@ -140,5 +140,15 @@ class Integracao(unittest.TestCase):
         self.assertNotIn('sem checkout conectado', html)
         self.assertIn("A.ev('oferta_clique'", html)
 
+    def test_limite_digitos_inputs_nascimento(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn('id="hh" placeholder="14" maxlength="2"', html)
+        self.assertIn('id="mi" placeholder="30" maxlength="2"', html)
+        self.assertIn('id="yy" placeholder="ano" maxlength="4"', html)
+        self.assertIn("slice(0, 2)", html)
+        self.assertIn("slice(0, 4)", html)
+
 if __name__ == '__main__':
     unittest.main()
