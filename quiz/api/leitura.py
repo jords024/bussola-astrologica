@@ -17,6 +17,7 @@ from servicos.heuristica import eleger
 from servicos.nomes import MES_PT, PLANETA_PT
 from servicos.regencia import regente_da_casa
 from servicos.veredito import AREA_CASA, CASA_NOME, Veredito, classificar
+from servicos.tempo_real import rastreador_presenca, ws_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -305,6 +306,36 @@ async def gerar(p: Pedido):
         "meta": resposta["meta"],
     })
 
+    # Atualiza presença em tempo real e transmite nova leitura via WebSocket
+    rastreador_presenca.vincular_leitura(leitura_id, p.cliente_id, p.nome_completo)
+    rastreador_presenca.registrar_atividade(
+        sid=p.cliente_id,
+        tela=7,
+        leitura_id=leitura_id,
+        nome=p.nome_completo
+    )
+    ws_manager.broadcast_sync({
+        "tipo": "nova_leitura",
+        "leitura_id": leitura_id,
+        "sid": p.cliente_id,
+        "dados": {
+            "id": leitura_id,
+            "nome_completo": p.nome_completo,
+            "whatsapp": p.whatsapp or "—",
+            "nascimento": p.nascimento.model_dump(),
+            "cidade": p.cidade.model_dump(),
+            "quiz": p.quiz.model_dump(),
+            "etapa_max": 7,
+            "rotulo_etapa": "Tela 7 (Leitura)",
+            "checkout": False,
+            "veredito": resposta["veredito"],
+            "precisao": precisao,
+            "tempo_quiz_ms": p.ms_ate_gerar,
+            "ao_vivo": True,
+        },
+        "total_ao_vivo": len(rastreador_presenca.obter_ativos(90.0))
+    })
+
     # Disparo assíncrono do webhook para ZapVoice (nome completo, número e mensagem da leitura)
     if p.whatsapp:
         asyncio.create_task(asyncio.to_thread(
@@ -326,6 +357,11 @@ async def contato(c: Contato):
     await asyncio.to_thread(_evento, "", "contato_enviado",
                             {"leitura_id": c.leitura_id, "ok": ok})
     if ok and c.whatsapp:
+        ws_manager.broadcast_sync({
+            "tipo": "contato_atualizado",
+            "leitura_id": c.leitura_id,
+            "whatsapp": c.whatsapp
+        })
         try:
             import json
             arq = registro.DIR_LEITURAS / f"{c.leitura_id}.json"

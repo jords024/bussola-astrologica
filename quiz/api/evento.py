@@ -14,6 +14,7 @@ import logging
 from fastapi import APIRouter, Request, Response
 
 from servicos import eventos, registro
+from servicos.tempo_real import rastreador_presenca, ws_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -41,14 +42,41 @@ async def receber(request: Request) -> Response:
         if linhas:
             await asyncio.to_thread(eventos.gravar, linhas)
             for lin in linhas:
+                sid = lin.get("sid", "")
+                aid = lin.get("aid", "")
+                evt = lin.get("evt")
                 props = lin.get("props") or {}
                 lid = props.get("leitura_id")
-                evt = lin.get("evt")
-                if lid:
-                    tela = props.get("para") if evt == "tela" else (10 if evt == "oferta_clique" else None)
-                    checkout = True if evt == "oferta_clique" else None
-                    if tela is not None or checkout is not None:
-                        await asyncio.to_thread(registro.atualizar_progresso, lid, tela, checkout)
+
+                tela = props.get("para") if evt == "tela" else (props.get("tela") if evt == "ping" else (10 if evt == "oferta_clique" else None))
+                checkout = True if evt == "oferta_clique" else None
+                oculto = True if (evt == "visibilidade" and props.get("estado") == "oculto") else False
+
+                if lid and (tela is not None or checkout is not None):
+                    await asyncio.to_thread(registro.atualizar_progresso, lid, tela, checkout)
+
+                sessao_atual = rastreador_presenca.registrar_atividade(
+                    sid=sid,
+                    aid=aid,
+                    tela=tela,
+                    leitura_id=lid,
+                    checkout=checkout,
+                    oculto=oculto
+                )
+
+                if evt in ("tela", "oferta_clique", "ping", "visibilidade"):
+                    ws_manager.broadcast_sync({
+                        "tipo": "checkout" if evt == "oferta_clique" else ("progresso" if evt in ("tela", "ping") else "presenca"),
+                        "sid": sid,
+                        "aid": aid,
+                        "leitura_id": sessao_atual.get("leitura_id") or lid,
+                        "tela": sessao_atual.get("tela", tela),
+                        "rotulo": sessao_atual.get("rotulo", f"Tela {tela}"),
+                        "checkout": sessao_atual.get("checkout", checkout or False),
+                        "ativo": sessao_atual.get("ativo", True),
+                        "ts": sessao_atual.get("ts"),
+                        "total_ao_vivo": len(rastreador_presenca.obter_ativos(90.0))
+                    })
     except Exception as e:
         # nada aqui pode escapar: o funil da pessoa nao depende disto
         logger.warning("evento descartado: %s", str(e)[:160])

@@ -19,17 +19,75 @@ from typing import Optional
 
 import pytz
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 import config
 from servicos import eventos, registro
 from servicos.agregador import MIN_PARA_PORCENTAGEM, agregar
+from servicos.tempo_real import rastreador_presenca, ws_manager, ETAPAS_ROTULOS
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 seguranca = HTTPBasic(auto_error=False)
+
+_TOKENS_WS: set[str] = set()
+
+
+def gerar_token_ws() -> str:
+    token = secrets.token_urlsafe(24)
+    _TOKENS_WS.add(token)
+    if len(_TOKENS_WS) > 300:
+        chaves = list(_TOKENS_WS)[:100]
+        for k in chaves:
+            _TOKENS_WS.discard(k)
+    return token
+
+
+def validar_token_ws(token: str) -> bool:
+    return bool(token and token in _TOKENS_WS)
+
+
+@router.websocket("/painel/ws")
+async def ws_painel(websocket: WebSocket, token: Optional[str] = None):
+    autorizado = False
+    if token and validar_token_ws(token):
+        autorizado = True
+    else:
+        auth_h = websocket.headers.get("authorization", "")
+        if auth_h.startswith("Basic "):
+            try:
+                import base64
+                u, p = base64.b64decode(auth_h[6:]).decode("utf-8").split(":", 1)
+                if secrets.compare_digest(u, config.PAINEL_USUARIO) and secrets.compare_digest(p, config.PAINEL_SENHA):
+                    autorizado = True
+            except Exception:
+                pass
+
+    if not autorizado:
+        await websocket.close(code=1008, reason="Não autorizado")
+        return
+
+    await ws_manager.conectar(websocket)
+    try:
+        ativos = rastreador_presenca.obter_ativos(90.0)
+        await websocket.send_json({
+            "tipo": "snapshot",
+            "ao_vivo": ativos,
+            "total_ao_vivo": len(ativos)
+        })
+        while True:
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning("Erro na conexão WebSocket do painel: %s", e)
+    finally:
+        await ws_manager.desconectar(websocket)
+
 
 CABECALHOS = {"Cache-Control": "no-store, no-cache, must-revalidate",
               "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer"}
@@ -297,6 +355,16 @@ a{color:var(--amber)}
 .btn-modal-confirmar{background:#C4564A;color:#FFF;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s ease}
 .btn-modal-confirmar:hover{background:#D96558}
 .btn-modal-confirmar:disabled{opacity:.5;cursor:not-allowed}
+.tag-ao-vivo{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;background:rgba(78,157,110,.2);color:#58B982;border:1px solid rgba(78,157,110,.45);margin-left:5px;animation:pulse-live 2s infinite}
+@keyframes pulse-live{0%{opacity:.85}50%{opacity:1;box-shadow:0 0 8px rgba(88,185,130,.4)}100%{opacity:.85}}
+.tr-flash{animation:tr-flash 2.5s ease}
+@keyframes tr-flash{0%{background:rgba(229,169,60,.38)}50%{background:rgba(229,169,60,.18)}100%{background:transparent}}
+.btn-filtro-leituras.vivo:hover{border-color:var(--green);color:#58B982;background:rgba(78,157,110,.08)}
+.btn-filtro-leituras.vivo.on{border-color:var(--green);background:rgba(78,157,110,.18);color:#58B982;font-weight:700}
+.btn-filtro-leituras.vivo.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
+.ws-status{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--sand2);margin-left:auto}
+.ws-status.conectado{color:#58B982;border-color:rgba(78,157,110,.4);background:rgba(78,157,110,.1)}
+.ws-status.desconectado{color:#E5A93C;border-color:rgba(229,169,60,.4);background:rgba(229,169,60,.1)}
 .painel-toast{position:fixed;bottom:24px;right:24px;background:#24201D;border:1px solid var(--amber);color:var(--sand);padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,.6);z-index:999999;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none}
 .painel-toast.on{opacity:1;transform:translateY(0);pointer-events:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
@@ -373,19 +441,26 @@ function toggleAcordeao(grupoId, btn){
     if(seta){ seta.textContent = "▼"; }
   }
 }
-function filtrarCheckoutClient(soChk, btn, evt){
+function filtrarTabelaClient(filtro, btn, evt){
   var tbody = document.getElementById("tbody-leituras");
   if(!tbody){ return true; }
-  var rows = tbody.querySelectorAll("tr.tr-pessoa[data-checkout]");
+  var rows = tbody.querySelectorAll("tr.tr-pessoa");
   var totalRows = rows.length;
   if(totalRows > 0 && totalRows <= 20){
     if(evt && evt.preventDefault){ evt.preventDefault(); }
     var visiveis = 0;
     rows.forEach(function(r){
       var chk = r.getAttribute("data-checkout") === "1";
+      var vivo = r.getAttribute("data-ao-vivo") === "1";
       var idGrupo = r.id.replace("row-pessoa-", "");
       var subRows = document.querySelectorAll(".grupo-" + idGrupo);
-      if(soChk === 1 && !chk){
+      var mostrar = true;
+      if(filtro === "checkout"){
+        mostrar = chk;
+      } else if(filtro === "ao_vivo"){
+        mostrar = vivo;
+      }
+      if(!mostrar){
         r.style.display = "none";
         subRows.forEach(function(sr){ sr.style.display = "none"; });
       } else {
@@ -394,21 +469,26 @@ function filtrarCheckoutClient(soChk, btn, evt){
       }
     });
     document.querySelectorAll(".btn-filtro-leituras").forEach(function(b){
-      var bSoChk = parseInt(b.getAttribute("data-so-checkout") || "0", 10);
-      b.classList.toggle("on", bSoChk === soChk);
+      var bFiltro = b.getAttribute("data-filtro") || (b.getAttribute("data-so-checkout") === "1" ? "checkout" : "todos");
+      b.classList.toggle("on", bFiltro === filtro);
     });
     var sub = document.getElementById("sub-leituras-info");
     if(sub){
-      var tipo = soChk === 1 ? "pessoas com checkout" : "pessoas no total";
-      sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + " · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
+      var tipo = "pessoas no total";
+      if(filtro === "checkout") tipo = "pessoas com checkout";
+      else if(filtro === "ao_vivo") tipo = "pessoas ativas navegando agora";
+      sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
     }
     try{
-      var href = btn.getAttribute("href");
+      var href = btn ? btn.getAttribute("href") : null;
       if(href){ history.replaceState(null, "", href); }
     }catch(e){}
     return false;
   }
   return true;
+}
+function filtrarCheckoutClient(soChk, btn, evt){
+  return filtrarTabelaClient(soChk === 1 ? "checkout" : "todos", btn, evt);
 }
 var _leituraParaExcluir = null;
 var _leituraEhSub = false;
@@ -548,12 +628,249 @@ function mostrarToast(msg){
   t.classList.add("on");
   setTimeout(function(){ t.classList.remove("on"); }, 3200);
 }
+
+var _ws = null;
+var _wsRetryTimer = null;
+
+function conectarWebSocketPainel(){
+  if(typeof WebSocket === "undefined") return;
+  if(_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
+  var loc = window.location;
+  var proto = loc.protocol === "https:" ? "wss:" : "ws:";
+  var url = proto + "//" + loc.host + "/painel/ws";
+  if(window._wsToken){
+    url += "?token=" + encodeURIComponent(window._wsToken);
+  }
+  try{
+    _ws = new WebSocket(url);
+  }catch(e){
+    atualizarStatusWS(false);
+    reagendarWS();
+    return;
+  }
+
+  _ws.onopen = function(){
+    atualizarStatusWS(true);
+    if(_ws._pingTimer) clearInterval(_ws._pingTimer);
+    _ws._pingTimer = setInterval(function(){
+      if(_ws && _ws.readyState === WebSocket.OPEN){
+        try{ _ws.send("ping"); }catch(e){}
+      }
+    }, 25000);
+  };
+
+  _ws.onmessage = function(evt){
+    try{
+      if(evt.data === "pong") return;
+      var msg = JSON.parse(evt.data);
+      processarMensagemTempoReal(msg);
+    }catch(e){}
+  };
+
+  _ws.onclose = function(){
+    atualizarStatusWS(false);
+    if(_ws && _ws._pingTimer) clearInterval(_ws._pingTimer);
+    _ws = null;
+    reagendarWS();
+  };
+
+  _ws.onerror = function(){
+    atualizarStatusWS(false);
+  };
+}
+
+function reagendarWS(){
+  if(_wsRetryTimer) clearTimeout(_wsRetryTimer);
+  _wsRetryTimer = setTimeout(conectarWebSocketPainel, 4000);
+}
+
+function atualizarStatusWS(conectado){
+  var el = document.getElementById("ws-status");
+  if(!el) return;
+  if(conectado){
+    el.className = "ws-status conectado";
+    el.textContent = "● Ao vivo conectado";
+    el.title = "WebSocket conectado: atualizações de leads em tempo real ativas";
+  }else{
+    el.className = "ws-status desconectado";
+    el.textContent = "○ Reconectando...";
+    el.title = "Tentando reconectar ao servidor para atualizações em tempo real";
+  }
+}
+
+function flashElemento(el){
+  if(!el) return;
+  el.classList.remove("tr-flash");
+  void el.offsetWidth;
+  el.classList.add("tr-flash");
+  setTimeout(function(){ el.classList.remove("tr-flash"); }, 2600);
+}
+
+function processarMensagemTempoReal(msg){
+  if(!msg || !msg.tipo) return;
+
+  var bVivo = document.getElementById("badge-count-vivo");
+  if(bVivo && msg.total_ao_vivo !== undefined){
+    bVivo.textContent = msg.total_ao_vivo;
+  }
+
+  if(msg.tipo === "snapshot"){
+    if(Array.isArray(msg.ao_vivo)){
+      var lidsAtivos = {};
+      var sidsAtivos = {};
+      msg.ao_vivo.forEach(function(item){
+        if(item.leitura_id) lidsAtivos[item.leitura_id] = item;
+        if(item.sid) sidsAtivos[item.sid] = item;
+      });
+      document.querySelectorAll("tr.tr-pessoa").forEach(function(row){
+        var id = row.id.replace("row-pessoa-", "");
+        var sid = row.getAttribute("data-sid") || "";
+        var atv = lidsAtivos[id] || sidsAtivos[sid];
+        if(atv && atv.ativo !== false){
+          row.setAttribute("data-ao-vivo", "1");
+          var liveTag = document.getElementById("live-tag-" + id);
+          if(liveTag){ liveTag.style.display = "inline-flex"; }
+          if(atv.rotulo){
+            var tagEtapa = document.getElementById("tag-etapa-" + id);
+            if(tagEtapa){
+              tagEtapa.textContent = atv.rotulo;
+              if(atv.tela === 10) tagEtapa.classList.add("oferta");
+            }
+          }
+          if(atv.checkout){
+            row.setAttribute("data-checkout", "1");
+            var tagChk = document.getElementById("tag-checkout-" + id);
+            if(tagChk){
+              tagChk.className = "tag-checkout sim";
+              tagChk.textContent = "✦ SIM";
+            }
+          }
+        }
+      });
+    }
+    return;
+  }
+
+  var lid = msg.leitura_id;
+  var sid = msg.sid;
+  var row = null;
+  if(lid){
+    row = document.getElementById("row-pessoa-" + lid) || document.getElementById("row-leitura-" + lid);
+  }
+  if(!row && sid){
+    row = document.querySelector('tr.tr-pessoa[data-sid="' + sid + '"]');
+  }
+
+  if(msg.tipo === "progresso" || msg.tipo === "checkout" || msg.tipo === "presenca"){
+    if(row){
+      var rowId = row.id.replace("row-pessoa-", "").replace("row-leitura-", "");
+      if(msg.rotulo){
+        var tagEtapa = document.getElementById("tag-etapa-" + rowId);
+        if(tagEtapa){
+          tagEtapa.textContent = msg.rotulo;
+          if(msg.tela === 10) tagEtapa.classList.add("oferta");
+        }
+      }
+      if(msg.checkout){
+        row.setAttribute("data-checkout", "1");
+        var tagChk = document.getElementById("tag-checkout-" + rowId);
+        if(tagChk){
+          tagChk.className = "tag-checkout sim";
+          tagChk.textContent = "✦ SIM";
+        }
+        var bChk = document.getElementById("badge-count-checkout");
+        if(bChk && !row._jaContadoChk){
+          row._jaContadoChk = true;
+          var cur = parseInt(bChk.textContent || "0", 10);
+          bChk.textContent = cur + 1;
+        }
+      }
+      var liveTag = document.getElementById("live-tag-" + rowId);
+      if(msg.ativo !== false){
+        row.setAttribute("data-ao-vivo", "1");
+        if(liveTag) liveTag.style.display = "inline-flex";
+      }else{
+        row.setAttribute("data-ao-vivo", "0");
+        if(liveTag) liveTag.style.display = "none";
+      }
+      flashElemento(row);
+    }
+  } else if(msg.tipo === "contato_atualizado"){
+    if(row && msg.whatsapp){
+      var tdWa = row.querySelector("td:nth-child(7)");
+      if(tdWa){
+        var limpo = (msg.whatsapp || "").replace(/\D/g, "");
+        var linkW = (limpo.length === 10 || limpo.length === 11) ? ("55" + limpo) : limpo;
+        tdWa.innerHTML = '<a href="https://wa.me/' + linkW + '" target="_blank" rel="noopener" style="color:var(--green);text-decoration:underline;">' + msg.whatsapp + '</a>';
+        flashElemento(row);
+      }
+    }
+  } else if(msg.tipo === "nova_leitura"){
+    var d = msg.dados || {};
+    var newLid = msg.leitura_id || d.id;
+    var existingRow = document.getElementById("row-pessoa-" + newLid);
+    if(!existingRow){
+      var bTodos = document.getElementById("badge-count-todos");
+      if(bTodos){
+        var curT = parseInt(bTodos.textContent || "0", 10);
+        bTodos.textContent = curT + 1;
+      }
+      var tbody = document.getElementById("tbody-leituras");
+      if(tbody){
+        var tr = document.createElement("tr");
+        tr.id = "row-pessoa-" + newLid;
+        tr.className = "tr-pessoa";
+        tr.setAttribute("data-checkout", "0");
+        tr.setAttribute("data-ao-vivo", "1");
+        if(msg.sid){ tr.setAttribute("data-sid", msg.sid); }
+
+        var agoraStr = new Date().toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
+        var waHtml = "—";
+        if(d.whatsapp && d.whatsapp !== "—"){
+          var waL = (d.whatsapp || "").replace(/\D/g, "");
+          var waLink = (waL.length === 10 || waL.length === 11) ? ("55" + waL) : waL;
+          waHtml = '<a href="https://wa.me/' + waLink + '" target="_blank" rel="noopener" style="color:var(--green);text-decoration:underline;">' + d.whatsapp + '</a>';
+        }
+        var veredito = d.veredito || {};
+        var nasc = d.nascimento || {};
+        var cid = d.cidade || {};
+        var nascStr = (nasc.dia && nasc.mes) ? (String(nasc.dia).padStart(2,"0") + "/" + String(nasc.mes).padStart(2,"0") + "/" + String(nasc.ano || "").slice(-2)) : "—";
+        var horaStr = nasc.hora !== undefined ? (String(nasc.hora).padStart(2,"0") + "h" + String(nasc.minuto || 0).padStart(2,"0")) : "desconhecida";
+
+        var nomeEsc = (d.nome_completo || "—").replace(/</g, "&lt;");
+        var nomeJs = nomeEsc.replace(/'/g, "\\'");
+
+        tr.innerHTML = '<td><a href="/painel/leitura/' + newLid + '">' + newLid.substring(0, 15) + '</a></td>'
+          + '<td><span style="white-space:nowrap;">' + agoraStr + '</span></td>'
+          + '<td><span style="white-space:nowrap;">' + agoraStr + '</span></td>'
+          + '<td><span class="tag-etapa" id="tag-etapa-' + newLid + '">Tela 7 (Leitura)</span> <span class="tag-ao-vivo" id="live-tag-' + newLid + '">🟢 Ao vivo</span></td>'
+          + '<td><span class="tag-checkout nao" id="tag-checkout-' + newLid + '">Não</span></td>'
+          + '<td>' + nomeEsc + '</td>'
+          + '<td>' + waHtml + '</td>'
+          + '<td>' + nascStr + '</td>'
+          + '<td>' + (cid.uf || cid.nome || "—") + '</td>'
+          + '<td>' + ((d.quiz && d.quiz.area) || "—") + '</td>'
+          + '<td>' + (veredito.tipo || "—") + '</td>'
+          + '<td>' + (veredito.casa_eleita_real ? ("Casa " + veredito.casa_aberta) : "—") + '</td>'
+          + '<td>' + horaStr + '</td>'
+          + '<td>' + (d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—') + '</td>'
+          + '<td><button type="button" class="btn-del" onclick="abrirModalExcluir(\'' + newLid + '\', \'' + nomeJs + '\', 1, \'[]\', false);" title="Excluir">🗑️ Excluir</button></td>';
+
+        tbody.insertBefore(tr, tbody.firstChild);
+        flashElemento(tr);
+        mostrarToast("Nova leitura recebida: " + (d.nome_completo || "Novo visitante"));
+      }
+    }
+  }
+}
+
 (function(){
   var hash=(location.hash||"").replace("#","");
   var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}
   var alvo=hash||salva;
   if(alvo&&document.getElementById(alvo)){abrirAba(alvo);}
   iniciarArrastoScroll();
+  conectarWebSocketPainel();
 })();
 """
 
@@ -837,8 +1154,17 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
     return _contagens_leituras_dados(dados)
 
 
+class ResultadoTabela(tuple):
+    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0):
+        return super().__new__(cls, (corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral))
+
+    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0):
+        self.total_ao_vivo = total_ao_vivo
+
+
 def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
-                     so_checkout: bool = False) -> tuple[str, int, int, int, int, int]:
+                     so_checkout: bool = False,
+                     so_ao_vivo: bool = False) -> tuple[str, int, int, int, int, int]:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
 
     todos_dados: list[tuple[str, dict]] = []
@@ -862,7 +1188,25 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
     total_pessoas_geral = len(todos_grupos)
     total_pessoas_checkout = sum(1 for g in todos_grupos if g["teve_checkout"])
 
-    if so_checkout:
+    # Identifica quem está ativo no momento (últimos 90 segundos)
+    ativos = rastreador_presenca.obter_ativos(90.0)
+    ids_ao_vivo = {str(a["leitura_id"]).strip() for a in ativos if a.get("leitura_id")}
+    sids_ao_vivo = {str(a["sid"]).strip() for a in ativos if a.get("sid")}
+
+    for g in todos_grupos:
+        cid = str(g["d_principal"].get("cliente_id") or "").strip()
+        g_cids = {cid} if cid else set()
+        for _, sub_d in g["outras_leituras"]:
+            sc = str(sub_d.get("cliente_id") or "").strip()
+            if sc:
+                g_cids.add(sc)
+        g["ao_vivo"] = bool(set(g["todos_ids"]) & ids_ao_vivo or g_cids & sids_ao_vivo)
+
+    total_pessoas_ao_vivo = sum(1 for g in todos_grupos if g["ao_vivo"])
+
+    if so_ao_vivo:
+        grupos_filtrados = [g for g in todos_grupos if g["ao_vivo"]]
+    elif so_checkout:
         grupos_filtrados = [g for g in todos_grupos if g["teve_checkout"]]
     else:
         grupos_filtrados = todos_grupos
@@ -886,8 +1230,9 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         chegada_bsb, gerada_bsb = f_chegada_bsb(d, stem)
         rotulo_etapa = g["rotulo_etapa"]
         etapa_cls = "tag-etapa oferta" if g["max_tela"] == 10 else "tag-etapa"
-        tag_etapa = f'<span class="{etapa_cls}">{html.escape(rotulo_etapa)}</span>'
-        tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if g["teve_checkout"] else '<span class="tag-checkout nao">Não</span>'
+        tag_live = f'<span class="tag-ao-vivo" id="live-tag-{stem}">🟢 Ao vivo</span>' if g["ao_vivo"] else f'<span class="tag-ao-vivo" id="live-tag-{stem}" style="display:none;">🟢 Ao vivo</span>'
+        tag_etapa = f'<span class="{etapa_cls}" id="tag-etapa-{stem}">{html.escape(rotulo_etapa)}</span> {tag_live}'
+        tag_chk = f'<span class="tag-checkout sim" id="tag-checkout-{stem}">✦ SIM</span>' if g["teve_checkout"] else f'<span class="tag-checkout nao" id="tag-checkout-{stem}">Não</span>'
 
         btn_acordeao = ""
         if g["total_envios"] > 1:
@@ -908,7 +1253,8 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             f'title="Excluir dados desta pessoa">🗑️ Excluir</button>'
         )
 
-        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}"')
+        cid_str = html.escape(str(g["d_principal"].get("cliente_id") or ""))
+        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-sid="{cid_str}"')
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
@@ -935,8 +1281,11 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             sub_prog = progresso_map.get(sub_stem, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
             sub_rotulo_etapa = sub_prog["rotulo"]
             sub_etapa_cls = "tag-etapa oferta" if sub_prog["max_tela"] == 10 else "tag-etapa"
-            sub_tag_etapa = f'<span class="{sub_etapa_cls}">{html.escape(sub_rotulo_etapa)}</span>'
-            sub_tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if sub_prog["checkout"] else '<span class="tag-checkout nao">Não</span>'
+            sub_cid_str = html.escape(str(sub_d.get("cliente_id") or ""))
+            sub_ao_vivo = (sub_stem in ids_ao_vivo or (sub_cid_str and sub_cid_str in sids_ao_vivo))
+            sub_tag_live = f'<span class="tag-ao-vivo" id="live-tag-{sub_stem}">🟢 Ao vivo</span>' if sub_ao_vivo else f'<span class="tag-ao-vivo" id="live-tag-{sub_stem}" style="display:none;">🟢 Ao vivo</span>'
+            sub_tag_etapa = f'<span class="{sub_etapa_cls}" id="tag-etapa-{sub_stem}">{html.escape(sub_rotulo_etapa)}</span> {sub_tag_live}'
+            sub_tag_chk = f'<span class="tag-checkout sim" id="tag-checkout-{sub_stem}">✦ SIM</span>' if sub_prog["checkout"] else f'<span class="tag-checkout nao" id="tag-checkout-{sub_stem}">Não</span>'
 
             btn_del_sub = (
                 f'<button type="button" class="btn-del" '
@@ -944,7 +1293,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 f'title="Excluir apenas esta tentativa anterior">🗑️</button>'
             )
 
-            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}"')
+            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-sid="{sub_cid_str}"')
             linhas.append([
                 f'<span style="padding-left:14px;"><a href="/painel/leitura/{html.escape(sub_stem)}" style="color:var(--sand2);">↳ {html.escape(sub_stem[:15])}</a></span>',
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_chegada_bsb)}</span>',
@@ -963,7 +1312,9 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 btn_del_sub,
             ])
 
-    if not linhas and so_checkout:
+    if not linhas and so_ao_vivo:
+        corpo = '<p class="vazio">Nenhum visitante ativo navegando nas telas neste momento.</p>'
+    elif not linhas and so_checkout:
         corpo = '<p class="vazio">Nenhum visitante foi ao checkout neste período.</p>'
     elif not linhas:
         corpo = '<p class="vazio">Nenhuma leitura encontrada.</p>'
@@ -973,7 +1324,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
         ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras")
 
-    return corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral
+    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo)
 
 
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
@@ -1046,7 +1397,8 @@ def painel(request: Request, _=Depends(exigir_senha),
            dias: int = Query(7, ge=1, le=365),
            bots: int = 0, teste: int = 0,
            pag_leituras: int = Query(0, ge=0),
-           so_checkout: int = 0):
+           so_checkout: int = 0,
+           so_ao_vivo: int = 0):
     dias_int = dias.default if hasattr(dias, "default") else int(dias)
     pag_leituras_int = pag_leituras.default if hasattr(pag_leituras, "default") else int(pag_leituras)
     d1, d2 = _periodo(de, ate, dias_int)
@@ -1065,6 +1417,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["pag_leituras"] = pag_leituras
         if so_checkout:
             q["so_checkout"] = 1
+        if so_ao_vivo:
+            q["so_ao_vivo"] = 1
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         on = " on" if kw.get("dias") == dias_int else ""
         return f'<a class="f{on}" href="/painel?{qs}">{rot}</a>'
@@ -1156,31 +1510,52 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ==================== ABA 2: LEITURAS ====================
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
-    corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = _tabela_leituras(
-        pag_leituras_int, por_pagina=20, so_checkout=bool(so_checkout)
+    res_leituras = _tabela_leituras(
+        pag_leituras_int, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo)
     )
+    corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
+    total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
 
-    def link_filtro_leituras(so_chk: int) -> str:
+    def link_filtro_leituras(modo: str) -> str:
         q = {"dias": dias_int}
         if bots:
             q["bots"] = 1
         if teste:
             q["teste"] = 1
-        if so_chk:
+        if modo == "checkout":
             q["so_checkout"] = 1
+        elif modo == "ao_vivo":
+            q["so_ao_vivo"] = 1
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         url = f"/painel?{qs}#aba-leituras"
-        cls_chk = " chk" if so_chk else ""
-        cls_on = " on" if (bool(so_chk) == bool(so_checkout)) else ""
-        rotulo = "✦ Só quem foi pro checkout" if so_chk else "Todas as leituras"
-        cnt = total_chk if so_chk else total_geral
-        return (f'<a href="{url}" class="btn-filtro-leituras{cls_chk}{cls_on}" '
-                f'data-so-checkout="{so_chk}" onclick="return filtrarCheckoutClient({so_chk}, this, event);">'
-                f'{rotulo} <span class="badge-count">{cnt}</span></a>')
+        if modo == "checkout":
+            cls = " chk"
+            on = " on" if so_checkout else ""
+            rotulo = "✦ Só quem foi pro checkout"
+            badge_id = "badge-count-checkout"
+            cnt = total_chk
+        elif modo == "ao_vivo":
+            cls = " vivo"
+            on = " on" if so_ao_vivo else ""
+            rotulo = "🟢 Ao vivo agora"
+            badge_id = "badge-count-vivo"
+            cnt = total_ao_vivo
+        else:
+            cls = ""
+            on = " on" if (not so_checkout and not so_ao_vivo) else ""
+            rotulo = "Todas as leituras"
+            badge_id = "badge-count-todos"
+            cnt = total_geral
+
+        return (f'<a href="{url}" class="btn-filtro-leituras{cls}{on}" '
+                f'data-filtro="{modo}" onclick="return filtrarTabelaClient(\'{modo}\', this, event);">'
+                f'{rotulo} <span id="{badge_id}" class="badge-count">{cnt}</span></a>')
 
     p.append('<div class="filtros-leituras">'
-             + link_filtro_leituras(0)
-             + link_filtro_leituras(1)
+             + link_filtro_leituras("todos")
+             + link_filtro_leituras("checkout")
+             + link_filtro_leituras("ao_vivo")
+             + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
              + '</div>')
 
     p_params = {
@@ -1188,12 +1563,25 @@ def painel(request: Request, _=Depends(exigir_senha),
         "bots": bots if bots else None,
         "teste": teste if teste else None,
         "so_checkout": 1 if so_checkout else None,
+        "so_ao_vivo": 1 if so_ao_vivo else None,
     }
-    rotulo_pag = "pessoas com checkout" if so_checkout else "pessoas únicas"
+    if so_ao_vivo:
+        rotulo_pag = "pessoas ativas ao vivo"
+    elif so_checkout:
+        rotulo_pag = "pessoas com checkout"
+    else:
+        rotulo_pag = "pessoas únicas"
+
     barra_pag = _barra_paginacao(pag_leituras_int, total_pessoas, "/painel", p_params,
                                  por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras",
                                  rotulo_item=rotulo_pag)
-    sub_tipo = "com checkout" if so_checkout else "no total"
+    if so_ao_vivo:
+        sub_tipo = "ativas navegando agora"
+    elif so_checkout:
+        sub_tipo = "com checkout"
+    else:
+        sub_tipo = "no total"
+
     txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
     txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
     p.append(f'<p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo} ({txt_envios} no total) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
@@ -1284,43 +1672,84 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append('</section>')
 
     p.append(_modal_confirmar_exclusao())
+    token_ws = gerar_token_ws()
+    p.append(f'<script>window._wsToken = "{token_ws}";</script>')
     p.append(f'<script>{JS_PAINEL}</script>')
     p.append("</div>")
     return HTMLResponse("".join(p), headers=CABECALHOS)
 
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
-def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0), so_checkout: int = 0):
-    corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = _tabela_leituras(
-        pagina, por_pagina=20, so_checkout=bool(so_checkout)
+def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
+          so_checkout: int = 0, so_ao_vivo: int = 0):
+    res_leituras = _tabela_leituras(
+        pagina, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo)
     )
-    p_params = {"so_checkout": 1 if so_checkout else None}
-    rotulo_pag = "pessoas com checkout" if so_checkout else "pessoas únicas"
+    corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
+    total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
+
+    p_params = {
+        "so_checkout": 1 if so_checkout else None,
+        "so_ao_vivo": 1 if so_ao_vivo else None,
+    }
+    if so_ao_vivo:
+        rotulo_pag = "pessoas ativas ao vivo"
+    elif so_checkout:
+        rotulo_pag = "pessoas com checkout"
+    else:
+        rotulo_pag = "pessoas únicas"
+
     barra_pag = _barra_paginacao(pagina, total_pessoas, "/painel/leituras", p_params,
                                  por_pagina=20, param_nome="pagina", rotulo_item=rotulo_pag)
 
-    def link_filtro_lista(so_chk: int) -> str:
+    def link_filtro_lista(modo: str) -> str:
         q = {}
-        if so_chk:
+        if modo == "checkout":
             q["so_checkout"] = 1
+        elif modo == "ao_vivo":
+            q["so_ao_vivo"] = 1
         qs = ("?" + "&".join(f"{k}={v}" for k, v in q.items())) if q else ""
         url = f"/painel/leituras{qs}"
-        cls_chk = " chk" if so_chk else ""
-        cls_on = " on" if (bool(so_chk) == bool(so_checkout)) else ""
-        rotulo = "✦ Só quem foi pro checkout" if so_chk else "Todas as leituras"
-        cnt = total_chk if so_chk else total_geral
-        return (f'<a href="{url}" class="btn-filtro-leituras{cls_chk}{cls_on}" '
-                f'data-so-checkout="{so_chk}" onclick="return filtrarCheckoutClient({so_chk}, this, event);">'
-                f'{rotulo} <span class="badge-count">{cnt}</span></a>')
+        if modo == "checkout":
+            cls = " chk"
+            on = " on" if so_checkout else ""
+            rotulo = "✦ Só quem foi pro checkout"
+            badge_id = "badge-count-checkout"
+            cnt = total_chk
+        elif modo == "ao_vivo":
+            cls = " vivo"
+            on = " on" if so_ao_vivo else ""
+            rotulo = "🟢 Ao vivo agora"
+            badge_id = "badge-count-vivo"
+            cnt = total_ao_vivo
+        else:
+            cls = ""
+            on = " on" if (not so_checkout and not so_ao_vivo) else ""
+            rotulo = "Todas as leituras"
+            badge_id = "badge-count-todos"
+            cnt = total_geral
+
+        return (f'<a href="{url}" class="btn-filtro-leituras{cls}{on}" '
+                f'data-filtro="{modo}" onclick="return filtrarTabelaClient(\'{modo}\', this, event);">'
+                f'{rotulo} <span id="{badge_id}" class="badge-count">{cnt}</span></a>')
 
     botoes_filtro = ('<div class="filtros-leituras">'
-                     + link_filtro_lista(0)
-                     + link_filtro_lista(1)
+                     + link_filtro_lista("todos")
+                     + link_filtro_lista("checkout")
+                     + link_filtro_lista("ao_vivo")
+                     + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
                      + '</div>')
 
-    sub_tipo = "com checkout" if so_checkout else "no total"
+    if so_ao_vivo:
+        sub_tipo = "ativas navegando agora"
+    elif so_checkout:
+        sub_tipo = "com checkout"
+    else:
+        sub_tipo = "no total"
+
     txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
     txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
+    token_ws = gerar_token_ws()
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
         f'<h1>Leituras</h1><p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo} ({txt_envios} no total) · mostrando 20 por página · '
@@ -1330,6 +1759,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0), so_checkout: in
         f'{barra_pag}'
         f'{_modal_confirmar_exclusao()}'
         f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>'
+        f'<script>window._wsToken = "{token_ws}";</script>'
         f'<script>{JS_PAINEL}</script>',
         headers=CABECALHOS)
 

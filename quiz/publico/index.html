@@ -979,6 +979,27 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   let i = 0;
   const S = {area:null,mirror:null,brk:null,nome:'',signo:'',whatsapp:''};
 
+  /* Heartbeat de presença ativa: a cada 20s enquanto a aba estiver visível */
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && A.sid) {
+      const p = { tela: i };
+      if (S.leitura && S.leitura.leitura_id) p.leitura_id = S.leitura.leitura_id;
+      A.ev('ping', p, false);
+    }
+  }, 20000);
+
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      const p = { estado: 'oculto', tela: i };
+      if (S.leitura && S.leitura.leitura_id) p.leitura_id = S.leitura.leitura_id;
+      A.ev('visibilidade', p, true);
+    } else if (document.visibilityState === 'visible') {
+      const p = { estado: 'visivel', tela: i };
+      if (S.leitura && S.leitura.leitura_id) p.leitura_id = S.leitura.leitura_id;
+      A.ev('ping', p, true);
+    }
+  });
+
   let tTela = Date.now();
   function go(n){
     const de = i;            /* capturado ANTES da reatribuicao logo abaixo */

@@ -917,6 +917,66 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         resp_lista = lista(_="crassus")
         self.assertIn("iniciarArrastoScroll", resp_lista.body.decode("utf-8"))
 
+    def test_filtro_ao_vivo_e_tempo_real(self):
+        """Verifica o filtro de contatos ao vivo agora e elementos WebSocket no painel."""
+        from api.painel import _tabela_leituras, painel, lista
+        from servicos.tempo_real import rastreador_presenca
+        from starlette.requests import Request
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            lid1 = "20260907-160000-aaaa0001"
+            lid2 = "20260907-160500-bbbb0002"
+
+            (dir_leituras / f"{lid1}.json").write_text(json.dumps({
+                "nome_completo": "Contato Ao Vivo",
+                "whatsapp": "11988880001",
+                "cliente_id": "sid-ao-vivo-1",
+            }), encoding="utf-8")
+
+            (dir_leituras / f"{lid2}.json").write_text(json.dumps({
+                "nome_completo": "Contato Offline",
+                "whatsapp": "11988880002",
+                "cliente_id": "sid-offline-2",
+            }), encoding="utf-8")
+
+            # Simula que o visitante 1 está ativo agora vendo a tela 8
+            rastreador_presenca.registrar_atividade(sid="sid-ao-vivo-1", leitura_id=lid1, tela=8)
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Tabela com so_ao_vivo=False deve trazer ambos
+                res_all = _tabela_leituras(pagina=0, so_ao_vivo=False)
+                corpo_all, tot_all, pags_all, unicos_all, chk_all, geral_all = res_all
+                self.assertEqual(unicos_all, 2)
+                self.assertEqual(res_all.total_ao_vivo, 1)
+
+                # Verifica que a tag ao vivo aparece para o contato 1
+                self.assertIn(f'id="live-tag-{lid1}">🟢 Ao vivo</span>', corpo_all)
+
+                # 2. Tabela com so_ao_vivo=True deve trazer apenas o contato ao vivo
+                res_vivo = _tabela_leituras(pagina=0, so_ao_vivo=True)
+                corpo_vivo, tot_v, pags_v, unicos_v, chk_v, geral_v = res_vivo
+                self.assertEqual(unicos_v, 1)
+                self.assertIn(lid1[:15], corpo_vivo)
+                self.assertNotIn(lid2[:15], corpo_vivo)
+
+                # 3. Verifica se /painel renderiza o filtro "Ao vivo agora", ws-status e window._wsToken
+                req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+                resp_painel = painel(req, _="crassus")
+                html_p = resp_painel.body.decode("utf-8")
+                self.assertIn("🟢 Ao vivo agora", html_p)
+                self.assertIn('id="badge-count-vivo"', html_p)
+                self.assertIn('id="ws-status"', html_p)
+                self.assertIn("window._wsToken =", html_p)
+
+                # 4. Verifica se /painel/leituras também renderiza o filtro e token
+                resp_l = lista(_="crassus", so_ao_vivo=1)
+                html_l = resp_l.body.decode("utf-8")
+                self.assertIn("🟢 Ao vivo agora", html_l)
+                self.assertIn('id="badge-count-vivo"', html_l)
+                self.assertIn('id="ws-status"', html_l)
+                self.assertIn("window._wsToken =", html_l)
+
 
 if __name__ == "__main__":
     unittest.main()
