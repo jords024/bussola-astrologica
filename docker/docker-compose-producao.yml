@@ -35,14 +35,14 @@ services:
           cpus: "1"
           memory: 1024M
       labels:
-        # Habilita o Traefik para o serviço
+        # Habilita o Traefik
         - traefik.enable=true
         
-        # Define a rede que o Traefik deve utilizar para se comunicar com o container
+        # Define a rede do Swarm para o Traefik
         - traefik.docker.network=network_swarm_public
         
-        # Configura o Domínio / Roteamento HTTP(S) da Landing Page
-        - traefik.http.routers.landing_crassus.rule=Host(`crassusastrologo.com.br`) || Host(`www.crassusastrologo.com.br`)
+        # Configura o Domínio / Roteamento HTTP(S)
+        - traefik.http.routers.landing_crassus.rule=Host(`pgbussola.crassusastrologo.com.br`)
         
         # Define o ponto de entrada HTTPS e Certificado SSL Let's Encrypt
         - traefik.http.routers.landing_crassus.entrypoints=websecure
@@ -57,7 +57,7 @@ services:
   # Serviço do Quiz Astrológico (FastAPI, Cálculos Kerykeion & Leitura IA)
   # ============================================================================
   quiz_crassus:
-    image: aryalvesfernandes/quiz-crassus:1.0.0
+    image: aryalvesfernandes/quiz-crassus:1.2.1
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
 
     networks:
@@ -95,14 +95,14 @@ services:
           cpus: "1"
           memory: 1024M
       labels:
-        # Habilita o Traefik para o serviço
+        # Habilita o Traefik
         - traefik.enable=true
 
-        # Define a rede que o Traefik deve utilizar para se comunicar com o container
+        # Define a rede do Swarm para o Traefik
         - traefik.docker.network=network_swarm_public
 
         # Configura o Domínio / Roteamento HTTP(S) do Quiz
-        - traefik.http.routers.quiz_crassus.rule=Host(`quiz.crassusastrologo.com.br`)
+        - traefik.http.routers.quiz_crassus.rule=Host(`crassusastrologo.com.br`)
 
         # Ponto de entrada HTTPS e Certificado SSL Let's Encrypt
         - traefik.http.routers.quiz_crassus.entrypoints=websecure
