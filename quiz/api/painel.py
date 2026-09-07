@@ -14,8 +14,10 @@ import logging
 import re
 import secrets
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
+
+import pytz
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -110,6 +112,48 @@ def f_wa(w: Optional[str]) -> str:
     return html.escape(w_str)
 
 
+TZ_BRASILIA = pytz.timezone("America/Sao_Paulo")
+
+
+def f_chegada_bsb(d: dict, arq_stem: str) -> tuple[str, str]:
+    """Retorna (chegou_em_bsb, gerado_em_bsb) formatados no horário de Brasília (UTC-3)."""
+    if d.get("chegou_em_bsb") and d.get("gravado_em_bsb"):
+        return str(d["chegou_em_bsb"]), str(d["gravado_em_bsb"])
+
+    dt_gerada_utc = None
+    gravado_em = d.get("gravado_em")
+    if gravado_em:
+        try:
+            dt_gerada_utc = datetime.fromisoformat(gravado_em)
+            if dt_gerada_utc.tzinfo is None:
+                dt_gerada_utc = dt_gerada_utc.replace(tzinfo=timezone.utc)
+            else:
+                dt_gerada_utc = dt_gerada_utc.astimezone(timezone.utc)
+        except Exception:
+            pass
+
+    if not dt_gerada_utc and len(arq_stem) >= 15:
+        try:
+            dt_gerada_utc = datetime.strptime(arq_stem[:15], "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+
+    if not dt_gerada_utc:
+        dt_gerada_utc = datetime.now(timezone.utc)
+
+    dt_gerada_bsb = dt_gerada_utc.astimezone(TZ_BRASILIA)
+    tempo_quiz_ms = d.get("tempo_quiz_ms")
+    if tempo_quiz_ms and tempo_quiz_ms > 0:
+        dt_chegada_bsb = dt_gerada_bsb - timedelta(milliseconds=tempo_quiz_ms)
+    else:
+        dt_chegada_bsb = dt_gerada_bsb
+
+    return (
+        dt_chegada_bsb.strftime("%d/%m/%Y %H:%M:%S"),
+        dt_gerada_bsb.strftime("%d/%m/%Y %H:%M:%S")
+    )
+
+
 # --------------------------------------------------------------------- helpers
 def _periodo(de: Optional[str], ate: Optional[str], dias: int) -> tuple[date, date]:
     hoje = date.today()
@@ -167,6 +211,7 @@ a{color:var(--amber)}
 .aba-btn.on{color:var(--amber);border-bottom-color:var(--amber);background:rgba(229,169,60,.08)}
 .aba-painel{display:none}
 .aba-painel.on{display:block;animation:fadein .2s ease}
+.tbl-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -181,7 +226,7 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "") -
         tds = "".join(f'<td class="{"n" if h.startswith("#") else ""}">{c}</td>'
                       for h, c in zip(cabecalhos, l))
         tr += f"<tr>{tds}</tr>"
-    return f'<table class="{classes}"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table>'
+    return f'<div class="tbl-wrap"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>'
 
 
 def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
@@ -199,8 +244,10 @@ def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
         v, pr = d.get("veredito") or {}, d.get("precisao") or {}
         nasc = d.get("nascimento") or {}
         cid = d.get("cidade") or {}
+        chegada_bsb, gerada_bsb = f_chegada_bsb(d, arq.stem)
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(arq.stem)}">{html.escape(arq.stem[:15])}</a>',
+            f'<span style="white-space:nowrap;" title="Gerada às {html.escape(gerada_bsb)} (BSB)">{html.escape(chegada_bsb)}</span>',
             html.escape(d.get("nome_completo") or "—"),
             f_data(nasc),
             html.escape(cid.get("uf") or cid.get("nome") or "—"),
@@ -211,8 +258,8 @@ def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
             f_tempo(d.get("tempo_quiz_ms")),
             f_wa(d.get("whatsapp")),
         ])
-    corpo = _tabela(["id / gerada em", "nome", "nascimento", "uf", "área", "cenário",
-                     "casa", "hora", "tempo no quiz", "whatsapp"], linhas)
+    corpo = _tabela(["id", "chegou ao quiz (bsb)", "nome", "nascimento", "uf", "área", "cenário",
+                     "casa", "hora nasc.", "tempo no quiz", "whatsapp"], linhas)
     return corpo, len(arquivos)
 
 
@@ -443,11 +490,14 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     cid = d.get("cidade") or {}
     pr = d.get("precisao") or {}
 
+    chegada_bsb, gerada_bsb = f_chegada_bsb(d, leitura_id)
     h_str = f_hora(n, pr)
     uf_str = f' ({html.escape(cid.get("uf"))})' if cid.get("uf") else ''
     t_quiz_str = f' · tempo no quiz: {f_tempo(d.get("tempo_quiz_ms"))}' if d.get("tempo_quiz_ms") else ''
     ident = (f'{html.escape(d.get("nome_completo") or "—")} · '
-             f'{f_data(n)} {h_str} · '
+             f'chegou ao quiz: <b style="color:var(--amber);">{html.escape(chegada_bsb)} (BSB)</b> · '
+             f'gerada em: {html.escape(gerada_bsb)} (BSB) · '
+             f'{f_data(n)} ({h_str}) · '
              f'{html.escape(cid.get("nome") or "—")}{uf_str} · '
              f'{f_wa(d.get("whatsapp"))}'
              f'{t_quiz_str}')

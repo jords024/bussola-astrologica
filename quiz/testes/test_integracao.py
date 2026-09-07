@@ -255,6 +255,8 @@ class Integracao(unittest.TestCase):
         self.assertTrue(arq_lead.exists())
         lead_conteudo = json.loads(arq_lead.read_text(encoding='utf-8'))
         self.assertEqual(lead_conteudo.get('whatsapp'), "+55 (11) 98765-4321")
+        self.assertIn('gravado_em_bsb', lead_conteudo)
+        self.assertIn('chegou_em_bsb', lead_conteudo)
 
     @patch('servicos.webhook.disparar_webhook_leitura')
     def test_webhook_disparado_na_leitura(self, mock_webhook):

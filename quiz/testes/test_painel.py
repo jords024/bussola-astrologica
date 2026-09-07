@@ -320,6 +320,9 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("tempo no quiz", txt_lista)
                 self.assertIn("1m 35s", txt_lista)
 
+                # Data e horário de chegada no quiz em horário de Brasília
+                self.assertIn("chegou ao quiz (bsb)", txt_lista)
+
                 # Teste do detalhe da leitura
                 resp_detalhe = self.c.get(f"/painel/leitura/{leitura_id}", auth=("crassus", "senha_teste"))
                 self.assertEqual(resp_detalhe.status_code, 200)
@@ -331,6 +334,8 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("85999998888", txt_detalhe)
                 self.assertIn("https://wa.me/5585999998888", txt_detalhe)
                 self.assertIn("tempo no quiz: 1m 35s", txt_detalhe)
+                self.assertIn("chegou ao quiz", txt_detalhe)
+                self.assertIn("(BSB)", txt_detalhe)
 
     def test_f_wa_link(self):
         from api.painel import f_wa
@@ -349,6 +354,24 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         link_pt = f_wa("+351 912 345 678")
         self.assertIn('href="https://wa.me/351912345678"', link_pt)
         self.assertIn('+351 912 345 678', link_pt)
+
+    def test_f_chegada_bsb_calculo_correto(self):
+        from api.painel import f_chegada_bsb
+        # 2026-09-07 13:26:22 UTC = 10:26:22 BSB.
+        # Com tempo_quiz_ms = 197000 ms (3m 17s), chegada = 10:23:05 BSB.
+        d = {
+            "gravado_em": "2026-09-07T13:26:22",
+            "tempo_quiz_ms": 197000
+        }
+        chegada, gerada = f_chegada_bsb(d, "20260907-132622")
+        self.assertEqual(chegada, "07/09/2026 10:23:05")
+        self.assertEqual(gerada, "07/09/2026 10:26:22")
+
+        # Teste quando tempo_quiz_ms é ausente ou zero
+        d2 = {"gravado_em": "2026-09-07T13:00:00"}
+        chegada2, gerada2 = f_chegada_bsb(d2, "20260907-130000")
+        self.assertEqual(chegada2, "07/09/2026 10:00:00")
+        self.assertEqual(gerada2, "07/09/2026 10:00:00")
 
 
 

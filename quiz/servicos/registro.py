@@ -67,7 +67,8 @@ def gravar_cache(chave: str, carta: dict) -> None:
 
 
 def novo_id() -> str:
-    return f"{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}"
+    from datetime import timezone
+    return f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}"
 
 
 def gravar_lead(leitura_id: str, dados: dict) -> None:
@@ -77,8 +78,21 @@ def gravar_lead(leitura_id: str, dados: dict) -> None:
     quem completou o percurso.
     """
     try:
-        dados = dict(dados, gravado_em=datetime.now().isoformat(timespec="seconds"),
-                     pesos_v=PESOS_V)
+        from datetime import timezone, timedelta
+        import pytz
+        agora_utc = datetime.now(timezone.utc)
+        tz_bsb = pytz.timezone("America/Sao_Paulo")
+        agora_bsb = agora_utc.astimezone(tz_bsb)
+        tempo_quiz_ms = dados.get("tempo_quiz_ms") or 0
+        chegou_bsb = (agora_utc - timedelta(milliseconds=tempo_quiz_ms)).astimezone(tz_bsb)
+
+        dados = dict(
+            dados,
+            gravado_em=agora_utc.isoformat(timespec="seconds"),
+            gravado_em_bsb=agora_bsb.strftime("%d/%m/%Y %H:%M:%S"),
+            chegou_em_bsb=chegou_bsb.strftime("%d/%m/%Y %H:%M:%S"),
+            pesos_v=PESOS_V,
+        )
         (DIR_LEITURAS / f"{leitura_id}.json").write_text(
             json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
     except Exception as e:
