@@ -521,7 +521,7 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "",
 
 def _modal_confirmar_exclusao() -> str:
     return (
-        '<div id="modal-excluir-backdrop" class="modal-backdrop" onclick="if(event.target===this) fecharModalExcluir();">'
+        '<div id="modal-excluir-backdrop" class="modal-backdrop">'
         '  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-del-titulo">'
         '    <div class="modal-icone">⚠️</div>'
         '    <h3 id="modal-del-titulo" class="modal-titulo">Confirmar Exclusão</h3>'

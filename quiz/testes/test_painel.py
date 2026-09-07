@@ -799,6 +799,9 @@ class LeiturasPainelSemMascara(unittest.TestCase):
 
                 # Verifica se o popup modal centralizado está presente no HTML
                 self.assertIn('id="modal-excluir-backdrop"', html_resp)
+                # Garante que o backdrop não fecha o popup ao clicar fora (sem onclick no backdrop)
+                self.assertIn('<div id="modal-excluir-backdrop" class="modal-backdrop">', html_resp)
+                self.assertNotIn('onclick="if(event.target===this) fecharModalExcluir();"', html_resp)
                 self.assertIn("Confirmar Exclusão", html_resp)
                 self.assertIn("btn-modal-cancelar", html_resp)
                 self.assertIn("btn-modal-confirmar", html_resp)
