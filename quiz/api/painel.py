@@ -920,8 +920,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             "—" if f["queda"] in (None, 0) else f'−{f["queda"]}',
             str(f["parou_aqui"]),
         ])
-    p.append(_tabela(["etapa / tela", "", "#pessoas", "#sessões", "tempo na tela", "cronômetro", "#% do topo", "#queda", "#pararam aqui"], linhas))
-    p.append('<p class="nota"><b>#Pessoas:</b> visitantes únicos que alcançaram a tela. '
+    p.append(_tabela(["etapa / tela", "", "#pessoas únicas", "#sessões", "tempo na tela", "cronômetro", "#% do topo", "#queda", "#pararam aqui"], linhas))
+    p.append('<p class="nota"><b>#Pessoas únicas:</b> visitantes únicos que alcançaram a tela. '
              '<b>#Sessões:</b> total de acessos contabilizados. '
              '<b>Tempo na tela:</b> mediana do tempo de permanência nesta etapa específica. '
              '<b>Cronômetro:</b> tempo acumulado desde o momento em que o visitante entrou na página até atingir a tela. '

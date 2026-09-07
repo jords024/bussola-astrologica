@@ -666,6 +666,17 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.assertEqual(r["formulario"]["chegaram_pessoas"], 1)
         self.assertEqual(r["formulario"]["enviaram_pessoas"], 1)
 
+        # Testa renderização no HTML do painel
+        from api.painel import painel
+        from starlette.requests import Request
+        with mock.patch("servicos.eventos.ler_dias", return_value=d):
+            req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+            resp = painel(req, _="crassus")
+            html = resp.body.decode("utf-8")
+            self.assertIn("pessoas únicas", html)
+            self.assertIn("sessões", html)
+            self.assertIn("Funil por tela", html)
+
     def test_detalhe_leitura_exibe_progresso_e_checkout(self):
         from api.painel import detalhe
         with TemporaryDirectory() as tmpdir:

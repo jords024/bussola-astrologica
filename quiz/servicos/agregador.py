@@ -80,6 +80,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         s = ses.get(sid)
         if s is None:
             s = ses[sid] = {
+                "sid": sid,
                 "telas": set(), "primeiro": None, "ultimo": None,
                 "area": None, "modo_hora": None, "ultimo_campo": None,
                 "campos": set(), "form_envio": False, "form_erros": [],
@@ -90,8 +91,10 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
                 "tempo_checkout": None,
                 "aid": str(ev.get("aid") or "").strip(),
             }
-        elif not s.get("aid") and ev.get("aid"):
-            s["aid"] = str(ev.get("aid") or "").strip()
+        elif not s.get("aid"):
+            novo_aid = str(ev.get("aid") or (ev.get("props") or {}).get("aid") or (ev.get("props") or {}).get("cliente_id") or "").strip()
+            if novo_aid:
+                s["aid"] = novo_aid
         t = _ts(ev)
         if t:
             if s["primeiro"] is None or t < s["primeiro"]:
