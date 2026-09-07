@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 import pytz
 
-from servicos import astro, eventos, fatos as mod_fatos, llm, registro, mandala
+from servicos import astro, eventos, fatos as mod_fatos, llm, registro, mandala, webhook
 from servicos.heuristica import eleger
 from servicos.nomes import MES_PT, PLANETA_PT
 from servicos.regencia import regente_da_casa
@@ -305,6 +305,17 @@ async def gerar(p: Pedido):
         "meta": resposta["meta"],
     })
 
+    # Disparo assíncrono do webhook para ZapVoice (nome completo, número e mensagem da leitura)
+    if p.whatsapp:
+        asyncio.create_task(asyncio.to_thread(
+            webhook.disparar_webhook_leitura,
+            p.nome_completo,
+            p.whatsapp,
+            resposta["carta"],
+            leitura_id,
+            {"casa_aberta": veredito.casa_aberta, "area": p.quiz.area},
+        ))
+
     return resposta
 
 
@@ -314,4 +325,19 @@ async def contato(c: Contato):
     # so o fato, nunca o numero
     await asyncio.to_thread(_evento, "", "contato_enviado",
                             {"leitura_id": c.leitura_id, "ok": ok})
+    if ok and c.whatsapp:
+        try:
+            import json
+            arq = registro.DIR_LEITURAS / f"{c.leitura_id}.json"
+            if arq.exists():
+                d = json.loads(arq.read_text(encoding="utf-8"))
+                asyncio.create_task(asyncio.to_thread(
+                    webhook.disparar_webhook_leitura,
+                    d.get("nome_completo", ""),
+                    c.whatsapp,
+                    d.get("carta", {}),
+                    c.leitura_id,
+                ))
+        except Exception:
+            pass
     return {"ok": ok}

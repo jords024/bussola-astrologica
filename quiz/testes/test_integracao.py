@@ -237,6 +237,20 @@ class Integracao(unittest.TestCase):
         lead_conteudo = json.loads(arq_lead.read_text(encoding='utf-8'))
         self.assertEqual(lead_conteudo.get('whatsapp'), "+55 (11) 98765-4321")
 
+    @patch('servicos.webhook.disparar_webhook_leitura')
+    def test_webhook_disparado_na_leitura(self, mock_webhook):
+        dados = pedido()
+        dados['nome_completo'] = 'Aryaraj Alves Fernandes'
+        dados['whatsapp'] = '+55 (85) 99999-8888'
+        with patch.object(llm, 'OPENAI_API_KEY', ''):
+            response = self.client.post('/api/leitura', json=dados)
+        self.assertEqual(response.status_code, 200)
+        mock_webhook.assert_called_once()
+        args, kwargs = mock_webhook.call_args
+        self.assertEqual(args[0], 'Aryaraj Alves Fernandes')
+        self.assertEqual(args[1], '+55 (85) 99999-8888')
+        self.assertIn('paragrafos', args[2])
+
 if __name__ == '__main__':
     unittest.main()
 

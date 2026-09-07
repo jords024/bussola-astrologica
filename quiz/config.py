@@ -37,6 +37,12 @@ PAINEL_USUARIO = os.environ.get("PAINEL_USUARIO", "crassus").strip()
 EVENTOS_RETENCAO_DIAS = int(os.environ.get("EVENTOS_RETENCAO_DIAS", "180"))
 LEITURAS_RETENCAO_DIAS = int(os.environ.get("LEITURAS_RETENCAO_DIAS", "180"))
 
+# ---- webhook ----
+WEBHOOK_HOTMART_URL = os.environ.get(
+    "WEBHOOK_HOTMART_URL",
+    "https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart",
+).strip()
+
 # ---- caminhos ----
 # O projeto vive dentro do OneDrive. Pasta sincronizada trava arquivo durante a
 # sincronizacao, e no Windows isso vira PermissionError no open() - com gravacao
