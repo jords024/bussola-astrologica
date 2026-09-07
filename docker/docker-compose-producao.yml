@@ -61,7 +61,7 @@ services:
   # Serviço do Quiz Astrológico (FastAPI, Cálculos Kerykeion & Leitura IA)
   # ============================================================================
   quiz_crassus:
-    image: aryalvesfernandes/quiz-crassus:1.2.4
+    image: aryalvesfernandes/quiz-crassus:1.2.5
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
 
     networks:
