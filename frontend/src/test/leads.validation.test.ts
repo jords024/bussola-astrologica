@@ -31,4 +31,32 @@ describe("Lead Validation & Cleaning", () => {
     const formatted = getBrasiliaDateTime(fixedUtcDate);
     expect(formatted).toBe("29/08/2026, 17:30:00");
   });
+
+  it("should validate and format WhatsApp numbers with DDI and DDD correctly", () => {
+    const formatarBR = (v: string) => {
+      const d = v.replace(/\D/g, "").slice(0, 11);
+      if (!d) return "";
+      if (d.length <= 2) return `(${d}`;
+      if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+      if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    };
+
+    expect(formatarBR("11987654321")).toBe("(11) 98765-4321");
+    expect(formatarBR("85999998888")).toBe("(85) 99999-8888");
+    expect(formatarBR("1133334444")).toBe("(11) 3333-4444");
+
+    const validarTel = (ddi: string, tel: string) => {
+      const digitos = tel.replace(/\D/g, "");
+      if (!digitos) return false;
+      if (ddi === "+55" && digitos.length < 10) return false;
+      if (digitos.length < 7) return false;
+      return true;
+    };
+
+    expect(validarTel("+55", "11987654321")).toBe(true);
+    expect(validarTel("+55", "119876")).toBe(false); // Incompleto sem número completo
+    expect(validarTel("+351", "912345678")).toBe(true); // Portugal
+    expect(validarTel("+1", "5550000000")).toBe(true); // EUA
+  });
 });

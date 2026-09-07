@@ -98,6 +98,18 @@ def f_tempo(ms: Optional[float]) -> str:
     return f"{m}m {s:0>2}s" if s else f"{m}m"
 
 
+def f_wa(w: Optional[str]) -> str:
+    """Formata número de WhatsApp com link direto wa.me se disponível."""
+    if not w or w.strip() in ("", "—", "-"):
+        return "—"
+    w_str = w.strip()
+    digitos = re.sub(r"\D", "", w_str)
+    if len(digitos) >= 8:
+        link_digitos = f"55{digitos}" if len(digitos) in (10, 11) and not w_str.startswith("+") else digitos
+        return f'<a href="https://wa.me/{link_digitos}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:underline;">{html.escape(w_str)}</a>'
+    return html.escape(w_str)
+
+
 # --------------------------------------------------------------------- helpers
 def _periodo(de: Optional[str], ate: Optional[str], dias: int) -> tuple[date, date]:
     hoje = date.today()
@@ -197,7 +209,7 @@ def _tabela_leituras(pagina: int = 0) -> tuple[str, int]:
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
             f_tempo(d.get("tempo_quiz_ms")),
-            html.escape(d.get("whatsapp") or "—"),
+            f_wa(d.get("whatsapp")),
         ])
     corpo = _tabela(["id / gerada em", "nome", "nascimento", "uf", "área", "cenário",
                      "casa", "hora", "tempo no quiz", "whatsapp"], linhas)
@@ -437,7 +449,7 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     ident = (f'{html.escape(d.get("nome_completo") or "—")} · '
              f'{f_data(n)} {h_str} · '
              f'{html.escape(cid.get("nome") or "—")}{uf_str} · '
-             f'{html.escape(d.get("whatsapp") or "—")}'
+             f'{f_wa(d.get("whatsapp"))}'
              f'{t_quiz_str}')
 
     ps = "".join(f"<p>{html.escape(x)}</p>" for x in (c.get("paragrafos") or []))

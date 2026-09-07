@@ -78,6 +78,7 @@ class Cidade(BaseModel):
 class Pedido(BaseModel):
     cliente_id: str = ""
     nome_completo: str = Field(min_length=1, max_length=120)
+    whatsapp: Optional[str] = None
     quiz: Quiz
     nascimento: Nascimento
     cidade: Cidade
@@ -292,6 +293,7 @@ async def gerar(p: Pedido):
     await asyncio.to_thread(registro.gravar_lead, leitura_id, {
         "cliente_id": p.cliente_id,
         "nome_completo": p.nome_completo,
+        "whatsapp": p.whatsapp,
         "nascimento": p.nascimento.model_dump(),
         "cidade": p.cidade.model_dump(),
         "quiz": p.quiz.model_dump(),

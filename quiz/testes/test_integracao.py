@@ -205,5 +205,37 @@ class Integracao(unittest.TestCase):
         self.assertIn("window.fbq('track', 'ViewContent'", html)
         self.assertIn("window.fbq('track', 'InitiateCheckout'", html)
 
+    def test_coleta_whatsapp_frontend(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        # Campo de WhatsApp, DDI e bandeiras presentes na tela 5
+        self.assertIn('id="tel"', html)
+        self.assertIn('id="ddi"', html)
+        self.assertIn('🇧🇷 +55', html)
+        self.assertIn('🇵🇹 +351', html)
+        self.assertIn('🇺🇸 +1', html)
+        self.assertIn('duo-tel', html)
+        # Funções de formatação e validação no script
+        self.assertIn('formatarTelBR', html)
+        self.assertIn('aplicarMascaraTel', html)
+        self.assertIn('whatsapp:S.whatsapp', html)
+        self.assertIn('phonenumber', html)
+
+    def test_whatsapp_persistido_no_lead(self):
+        import json
+        dados = pedido()
+        dados['whatsapp'] = "+55 (11) 98765-4321"
+        with patch.object(llm, 'OPENAI_API_KEY', ''):
+            response = self.client.post('/api/leitura', json=dados)
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        leitura_id = result['leitura_id']
+        arq_lead = registro.DIR_LEITURAS / f"{leitura_id}.json"
+        self.assertTrue(arq_lead.exists())
+        lead_conteudo = json.loads(arq_lead.read_text(encoding='utf-8'))
+        self.assertEqual(lead_conteudo.get('whatsapp'), "+55 (11) 98765-4321")
+
 if __name__ == '__main__':
     unittest.main()
+

@@ -169,6 +169,12 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   .fg input::placeholder{color:rgba(242,239,233,.28);}
   .fg input:focus,.fg select:focus{outline:none;border-color:var(--amber);background:var(--card-2);}
   .trio{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:7px;}
+  .duo-tel{display:grid;grid-template-columns:130px 1fr;gap:8px;align-items:center;}
+  .duo-tel select{padding:14px 10px;cursor:pointer;}
+  .duo-tel option{background:#1A1815;color:var(--sand);}
+  @media (max-width:360px){
+    .duo-tel{grid-template-columns:110px 1fr;}
+  }
   .hint{font-size:11.5px;color:var(--sand3);margin-top:6px;line-height:1.5;}
 
   /* hora */
@@ -518,6 +524,38 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
       <label for="nm">Seu nome completo</label>
       <input type="text" id="nm" placeholder="nome e sobrenome" autocomplete="name">
       <p class="hint">Completo, como está na certidão. Na leitura eu te chamo só pelo primeiro.</p>
+    </div>
+
+    <div class="fg">
+      <label for="tel">Seu WhatsApp</label>
+      <div class="duo-tel">
+        <select id="ddi" aria-label="Código do país (DDI)">
+          <option value="+55" selected>🇧🇷 +55</option>
+          <option value="+351">🇵🇹 +351</option>
+          <option value="+1">🇺🇸 +1</option>
+          <option value="+244">🇦🇴 +244</option>
+          <option value="+258">🇲🇿 +258</option>
+          <option value="+34">🇪🇸 +34</option>
+          <option value="+44">🇬🇧 +44</option>
+          <option value="+33">🇫🇷 +33</option>
+          <option value="+49">🇩🇪 +49</option>
+          <option value="+39">🇮🇹 +39</option>
+          <option value="+41">🇨🇭 +41</option>
+          <option value="+81">🇯🇵 +81</option>
+          <option value="+54">🇦🇷 +54</option>
+          <option value="+598">🇺🇾 +598</option>
+          <option value="+595">🇵🇾 +595</option>
+          <option value="+56">🇨🇱 +56</option>
+          <option value="+52">🇲🇽 +52</option>
+          <option value="+57">🇨🇴 +57</option>
+          <option value="+591">🇧🇴 +591</option>
+          <option value="+51">🇵🇪 +51</option>
+          <option value="+353">🇮🇪 +353</option>
+          <option value="+61">🇦🇺 +61</option>
+        </select>
+        <input type="tel" id="tel" placeholder="(11) 98765-4321" inputmode="tel" autocomplete="tel">
+      </div>
+      <p class="hint">Com DDD e número completo. Para envio do resultado da sua leitura.</p>
     </div>
 
     <div class="fg"><label>Data de nascimento</label>
@@ -893,7 +931,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   const $ = s => document.querySelector(s);
   const scr = [...document.querySelectorAll('.scr')];
   let i = 0;
-  const S = {area:null,mirror:null,brk:null,nome:'',signo:''};
+  const S = {area:null,mirror:null,brk:null,nome:'',signo:'',whatsapp:''};
 
   let tTela = Date.now();
   function go(n){
@@ -1046,6 +1084,43 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     'brk','o que isso costuma significar');
 
   /* ---- dados ---- */
+  const telInput = $('#tel'), ddiSelect = $('#ddi');
+  function formatarTelBR(v) {
+    const d = v.replace(/\D/g, '').slice(0, 11);
+    if (!d) return '';
+    if (d.length <= 2) return `(${d}`;
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  }
+  function aplicarMascaraTel() {
+    if (!telInput) return;
+    if (ddiSelect && ddiSelect.value === '+55') {
+      telInput.value = formatarTelBR(telInput.value);
+    } else {
+      telInput.value = telInput.value.replace(/[^\d\s-]/g, '').slice(0, 16);
+    }
+  }
+  if (telInput) {
+    telInput.addEventListener('input', aplicarMascaraTel);
+  }
+  if (ddiSelect) {
+    ddiSelect.addEventListener('change', () => {
+      if (telInput) {
+        if (ddiSelect.value === '+55') {
+          telInput.placeholder = '(11) 98765-4321';
+        } else if (ddiSelect.value === '+351') {
+          telInput.placeholder = '912 345 678';
+        } else if (ddiSelect.value === '+1') {
+          telInput.placeholder = '(555) 000-0000';
+        } else {
+          telInput.placeholder = 'Número completo';
+        }
+        aplicarMascaraTel();
+      }
+    });
+  }
+
   const dd = $('#dd'), mm = $('#mm');
   let a = '<option value="" selected disabled>dia</option>';
   for (let d=1; d<=31; d++) a += `<option>${d}</option>`; dd.innerHTML = a;
@@ -1227,7 +1302,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   /* Um listener delegado para os sete campos, em vez de codigo por input.
      Diz em qual campo a tela 5 trava, que e a pergunta que mais importa. */
   (function(){
-    const CAMPO = {nm:'nome', dd:'data', mm:'data', yy:'data',
+    const CAMPO = {nm:'nome', tel:'whatsapp', ddi:'whatsapp', dd:'data', mm:'data', yy:'data',
                    hh:'hora', mi:'hora', cid:'cidade'};
     const visto = new Set();
     const tela5 = document.querySelector('.scr[data-s="5"]');
@@ -1251,6 +1326,19 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     S.nome = S.nomeCompleto.split(' ')[0] || '';
     if (!S.nomeCompleto) faltando.push('seu nome completo');
     else if (S.nomeCompleto.split(' ').length < 2) faltando.push('o sobrenome também');
+
+    const telVal = ($('#tel') ? $('#tel').value : '').trim();
+    const ddiVal = ($('#ddi') ? $('#ddi').value : '+55').trim();
+    const telDigitos = telVal.replace(/\D/g, '');
+    if (!telVal) {
+      faltando.push('seu WhatsApp completo com DDD');
+    } else if (ddiVal === '+55' && telDigitos.length < 10) {
+      faltando.push('o DDD e o número completo do seu WhatsApp (ex: 11 98765-4321)');
+    } else if (telDigitos.length < 7) {
+      faltando.push('um número de WhatsApp válido');
+    } else {
+      S.whatsapp = `${ddiVal} ${telVal}`;
+    }
     if (!dd.value || !mm.value || !$('#yy').value) faltando.push('a data completa');
     else {
       const y = Number($('#yy').value), m = Number(mm.value), d = Number(dd.value);
@@ -1321,6 +1409,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   function pedido(){
     return {
       nome_completo:S.nomeCompleto,
+      whatsapp:S.whatsapp || '',
       cliente_id: A.sid,
       ms_ate_gerar: Date.now() - (A.tEntrada || tTela),
       quiz:{area:S.area, espelho:S.mirror,
@@ -1559,6 +1648,10 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
       const u = new URL(CHECKOUT_URL);
       if (typeof S !== 'undefined' && S && S.nomeCompleto) {
         u.searchParams.set('name', S.nomeCompleto);
+      }
+      if (typeof S !== 'undefined' && S && S.whatsapp) {
+        const telNums = S.whatsapp.replace(/\D/g, '');
+        if (telNums) u.searchParams.set('phonenumber', telNums);
       }
       const currentParams = new URLSearchParams(window.location.search);
       ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'src', 'sck'].forEach(p => {

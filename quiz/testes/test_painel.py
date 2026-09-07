@@ -329,7 +329,27 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("09/03/1998", txt_detalhe)
                 self.assertIn("18h35", txt_detalhe)
                 self.assertIn("85999998888", txt_detalhe)
+                self.assertIn("https://wa.me/5585999998888", txt_detalhe)
                 self.assertIn("tempo no quiz: 1m 35s", txt_detalhe)
+
+    def test_f_wa_link(self):
+        from api.painel import f_wa
+        self.assertEqual(f_wa(None), "—")
+        self.assertEqual(f_wa(""), "—")
+        self.assertEqual(f_wa("—"), "—")
+        # Número brasileiro sem DDI recebe 55 no wa.me
+        link_br = f_wa("11987654321")
+        self.assertIn('href="https://wa.me/5511987654321"', link_br)
+        self.assertIn('11987654321', link_br)
+        # Número com DDI +55 e máscara
+        link_br_formatado = f_wa("+55 (11) 98765-4321")
+        self.assertIn('href="https://wa.me/5511987654321"', link_br_formatado)
+        self.assertIn('+55 (11) 98765-4321', link_br_formatado)
+        # Número internacional (Portugal)
+        link_pt = f_wa("+351 912 345 678")
+        self.assertIn('href="https://wa.me/351912345678"', link_pt)
+        self.assertIn('+351 912 345 678', link_pt)
+
 
 
 if __name__ == "__main__":
