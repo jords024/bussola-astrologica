@@ -17,9 +17,32 @@ import json
 import logging
 import uuid
 from datetime import date, datetime
+from pathlib import Path
 from typing import Optional
 
-from config import DIR_CACHE, DIR_LEITURAS
+import config
+_DEFAULT_DIR_CACHE = config.DIR_CACHE
+_DEFAULT_DIR_LEITURAS = config.DIR_LEITURAS
+DIR_CACHE = _DEFAULT_DIR_CACHE
+DIR_LEITURAS = _DEFAULT_DIR_LEITURAS
+
+
+def _dir_leituras() -> Path:
+    if config.DIR_LEITURAS != _DEFAULT_DIR_LEITURAS:
+        return config.DIR_LEITURAS
+    if DIR_LEITURAS != _DEFAULT_DIR_LEITURAS:
+        return DIR_LEITURAS
+    return config.DIR_LEITURAS
+
+
+def _dir_cache() -> Path:
+    if config.DIR_CACHE != _DEFAULT_DIR_CACHE:
+        return config.DIR_CACHE
+    if DIR_CACHE != _DEFAULT_DIR_CACHE:
+        return DIR_CACHE
+    return config.DIR_CACHE
+
+
 from .pesos import PESOS_V
 
 logger = logging.getLogger(__name__)
@@ -48,7 +71,7 @@ def chave_cache(veredito, fatos: dict, quiz: dict, hoje: date) -> str:
 
 
 def ler_cache(chave: str) -> Optional[dict]:
-    caminho = DIR_CACHE / f"{chave}.json"
+    caminho = _dir_cache() / f"{chave}.json"
     if not caminho.exists():
         return None
     try:
@@ -60,7 +83,7 @@ def ler_cache(chave: str) -> Optional[dict]:
 
 def gravar_cache(chave: str, carta: dict) -> None:
     try:
-        (DIR_CACHE / f"{chave}.json").write_text(
+        (_dir_cache() / f"{chave}.json").write_text(
             json.dumps(carta, ensure_ascii=False, indent=1), encoding="utf-8")
     except Exception as e:
         logger.warning("falha ao gravar cache: %s", e)
@@ -112,7 +135,7 @@ def gravar_lead(leitura_id: str, dados: dict) -> None:
             etapa_nome=dados.get("etapa_nome", ETAPAS_ROTULOS.get(etapa_inicial, f"Tela {etapa_inicial}")),
             checkout=dados.get("checkout", False),
         )
-        (DIR_LEITURAS / f"{leitura_id}.json").write_text(
+        (_dir_leituras() / f"{leitura_id}.json").write_text(
             json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
     except Exception as e:
         logger.error("FALHA AO GRAVAR LEAD %s: %s", leitura_id, e)
@@ -123,7 +146,7 @@ def atualizar_progresso(leitura_id: str, tela: Optional[int] = None, checkout: O
     import re
     if not leitura_id or not re.fullmatch(r"\d{8}-\d{6}-[a-f0-9]{8}", leitura_id):
         return False
-    caminho = DIR_LEITURAS / f"{leitura_id}.json"
+    caminho = _dir_leituras() / f"{leitura_id}.json"
     if not caminho.exists():
         return False
     try:
@@ -152,7 +175,7 @@ def anexar_contato(leitura_id: str, whatsapp: str) -> bool:
     if not re.fullmatch(r"\d{8}-\d{6}-[a-f0-9]{8}", leitura_id):
         return False
     """O WhatsApp chega depois, no fim da carta. Enriquece o lead já gravado."""
-    caminho = DIR_LEITURAS / f"{leitura_id}.json"
+    caminho = _dir_leituras() / f"{leitura_id}.json"
     if not caminho.exists():
         return False
     try:
@@ -164,3 +187,29 @@ def anexar_contato(leitura_id: str, whatsapp: str) -> bool:
     except Exception as e:
         logger.error("falha ao anexar contato em %s: %s", leitura_id, e)
         return False
+
+
+def atualizar_status_compra(leitura_id: str, comprou: bool, valor: Optional[float] = None) -> bool:
+    """Atualiza o status de compra de uma leitura e salva no JSON correspondente."""
+    import re
+    if not re.fullmatch(r"\d{8}-\d{6}-[a-f0-9]{8}", leitura_id):
+        return False
+    caminho = _dir_leituras() / f"{leitura_id}.json"
+    if not caminho.exists():
+        return False
+    try:
+        d = json.loads(caminho.read_text(encoding="utf-8"))
+        d["comprou"] = bool(comprou)
+        if comprou:
+            d["comprado_em"] = datetime.now().isoformat(timespec="seconds")
+            if valor is not None:
+                d["valor_compra"] = valor
+        else:
+            d.pop("comprado_em", None)
+            d.pop("valor_compra", None)
+        caminho.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.error("falha ao atualizar status de compra em %s: %s", leitura_id, e)
+        return False
+

@@ -365,12 +365,20 @@ a{color:var(--amber)}
 .ws-status{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--sand2);margin-left:auto}
 .ws-status.conectado{color:#58B982;border-color:rgba(78,157,110,.4);background:rgba(78,157,110,.1)}
 .ws-status.desconectado{color:#E5A93C;border-color:rgba(229,169,60,.4);background:rgba(229,169,60,.1)}
+.btn-compra{background:rgba(255,255,255,.05);color:var(--sand2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.btn-compra:hover{background:rgba(229,169,60,.12);border-color:var(--amber);color:var(--amber)}
+.btn-compra.comprou{background:rgba(78,157,110,.2);color:#58B982;border:1px solid rgba(78,157,110,.5);font-weight:700}
+.btn-compra.comprou:hover{background:rgba(78,157,110,.3);border-color:#58B982;color:#FFF}
+.tag-comprou{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;background:rgba(78,157,110,.22);color:#58B982;border:1px solid rgba(78,157,110,.5);margin-left:6px;vertical-align:middle}
+.btn-filtro-leituras.comprou:hover{border-color:var(--green);color:#58B982;background:rgba(78,157,110,.08)}
+.btn-filtro-leituras.comprou.on{border-color:var(--green);background:rgba(78,157,110,.18);color:#58B982;font-weight:700}
+.btn-filtro-leituras.comprou.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
 .painel-toast{position:fixed;bottom:24px;right:24px;background:#24201D;border:1px solid var(--amber);color:var(--sand);padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,.6);z-index:999999;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none}
 .painel-toast.on{opacity:1;transform:translateY(0);pointer-events:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
-JS_PAINEL = """
+JS_PAINEL = r"""
 var _activeWrap = null;
 var _startX = 0;
 var _scrollLeft = 0;
@@ -452,6 +460,7 @@ function filtrarTabelaClient(filtro, btn, evt){
     rows.forEach(function(r){
       var chk = r.getAttribute("data-checkout") === "1";
       var vivo = r.getAttribute("data-ao-vivo") === "1";
+      var comprou = r.getAttribute("data-comprou") === "1";
       var idGrupo = r.id.replace("row-pessoa-", "");
       var subRows = document.querySelectorAll(".grupo-" + idGrupo);
       var mostrar = true;
@@ -459,6 +468,8 @@ function filtrarTabelaClient(filtro, btn, evt){
         mostrar = chk;
       } else if(filtro === "ao_vivo"){
         mostrar = vivo;
+      } else if(filtro === "comprou"){
+        mostrar = comprou;
       }
       if(!mostrar){
         r.style.display = "none";
@@ -477,6 +488,7 @@ function filtrarTabelaClient(filtro, btn, evt){
       var tipo = "pessoas no total";
       if(filtro === "checkout") tipo = "pessoas com checkout";
       else if(filtro === "ao_vivo") tipo = "pessoas ativas navegando agora";
+      else if(filtro === "comprou") tipo = "pessoas que compraram o produto";
       sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
     }
     try{
@@ -489,6 +501,78 @@ function filtrarTabelaClient(filtro, btn, evt){
 }
 function filtrarCheckoutClient(soChk, btn, evt){
   return filtrarTabelaClient(soChk === 1 ? "checkout" : "todos", btn, evt);
+}
+
+function alternarCompra(id, btn){
+  if(!id) return;
+  var elBtn = btn || document.getElementById("btn-compra-" + id);
+  var estaComprou = elBtn ? elBtn.classList.contains("comprou") : false;
+  var novoStatus = !estaComprou;
+
+  if(estaComprou){
+    if(!confirm("Deseja desmarcar a compra deste contato?")) return;
+  }
+
+  if(elBtn){
+    elBtn.disabled = true;
+    elBtn._textoOriginal = elBtn.textContent;
+    elBtn.textContent = "...";
+  }
+
+  fetch("/painel/leitura/" + encodeURIComponent(id) + "/status-compra?comprou=" + (novoStatus ? "true" : "false"), {
+    method: "POST",
+    headers: { "Accept": "application/json" }
+  }).then(function(res){
+    if(!res.ok){
+      return res.json().then(function(j){ throw new Error(j.detail || ("Erro " + res.status)); })
+             .catch(function(e){ throw new Error(e.message || ("Erro " + res.status)); });
+    }
+    return res.json();
+  }).then(function(data){
+    if(elBtn) elBtn.disabled = false;
+    aplicarStatusCompraNoDOM(id, novoStatus, data.total_comprou);
+    mostrarToast(novoStatus ? "Contato marcado como comprou!" : "Status de compra desmarcado.");
+  }).catch(function(err){
+    if(elBtn){
+      elBtn.disabled = false;
+      elBtn.textContent = elBtn._textoOriginal || (estaComprou ? "✅ Comprou" : "💰 Comprou");
+    }
+    alert("Erro ao alterar status de compra: " + err.message);
+  });
+}
+
+function aplicarStatusCompraNoDOM(id, comprou, totalComprou){
+  var row = document.getElementById("row-pessoa-" + id) || document.getElementById("row-leitura-" + id);
+  if(row){
+    row.setAttribute("data-comprou", comprou ? "1" : "0");
+    var btn = document.getElementById("btn-compra-" + id) || row.querySelector(".btn-compra");
+    if(btn){
+      btn.classList.toggle("comprou", comprou);
+      btn.textContent = comprou ? "✅ Comprou" : "💰 Comprou";
+      btn.title = comprou ? "Compra confirmada. Clique para desmarcar." : "Clique para marcar que este contato comprou o produto.";
+    }
+    var tag = document.getElementById("tag-comprou-" + id);
+    if(tag){
+      tag.style.display = comprou ? "inline-flex" : "none";
+    }
+    flashElemento(row);
+  }
+
+  var btnDetalhe = document.getElementById("btn-compra-" + id);
+  if(btnDetalhe && !row){
+    btnDetalhe.classList.toggle("comprou", comprou);
+    btnDetalhe.textContent = comprou ? "✅ Comprou" : "💰 Marcar Compra";
+  }
+
+  var bComprou = document.getElementById("badge-count-comprou");
+  if(bComprou){
+    if(totalComprou !== undefined && totalComprou !== null){
+      bComprou.textContent = totalComprou;
+    } else {
+      var cur = parseInt(bComprou.textContent || "0", 10);
+      bComprou.textContent = Math.max(0, cur + (comprou ? 1 : -1));
+    }
+  }
 }
 var _leituraParaExcluir = null;
 var _leituraEhSub = false;
@@ -708,6 +792,11 @@ function flashElemento(el){
 
 function processarMensagemTempoReal(msg){
   if(!msg || !msg.tipo) return;
+
+  if(msg.tipo === "status_compra"){
+    aplicarStatusCompraNoDOM(msg.leitura_id, msg.comprou, msg.total_comprou);
+    return;
+  }
 
   var bVivo = document.getElementById("badge-count-vivo");
   if(bVivo && msg.total_ao_vivo !== undefined){
@@ -1094,6 +1183,7 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
         d_principal = mapa_dados[principal_stem]
 
         teve_checkout = any(progresso_map.get(s, {}).get("checkout") for s in stems_ordenados)
+        comprou = any(bool(mapa_dados[s].get("comprou")) for s in stems_ordenados)
         max_tela = max((progresso_map.get(s, {}).get("max_tela", 7) for s in stems_ordenados), default=7)
         rotulo_etapa = registro.ETAPAS_ROTULOS.get(max_tela, f"Tela {max_tela}")
 
@@ -1124,6 +1214,7 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
             "nascimento": d_principal.get("nascimento") or {},
             "cidade": d_principal.get("cidade") or {},
             "teve_checkout": teve_checkout,
+            "comprou": comprou,
             "max_tela": max_tela,
             "rotulo_etapa": rotulo_etapa,
             "total_envios": len(stems_ordenados),
@@ -1155,16 +1246,18 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
 
 
 class ResultadoTabela(tuple):
-    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0):
+    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0):
         return super().__new__(cls, (corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral))
 
-    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0):
+    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0):
         self.total_ao_vivo = total_ao_vivo
+        self.total_comprou = total_comprou
 
 
 def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                      so_checkout: bool = False,
-                     so_ao_vivo: bool = False) -> tuple[str, int, int, int, int, int]:
+                     so_ao_vivo: bool = False,
+                     so_comprou: bool = False) -> tuple[str, int, int, int, int, int]:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
 
     todos_dados: list[tuple[str, dict]] = []
@@ -1203,8 +1296,11 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         g["ao_vivo"] = bool(set(g["todos_ids"]) & ids_ao_vivo or g_cids & sids_ao_vivo)
 
     total_pessoas_ao_vivo = sum(1 for g in todos_grupos if g["ao_vivo"])
+    total_pessoas_comprou = sum(1 for g in todos_grupos if g.get("comprou"))
 
-    if so_ao_vivo:
+    if so_comprou:
+        grupos_filtrados = [g for g in todos_grupos if g.get("comprou")]
+    elif so_ao_vivo:
         grupos_filtrados = [g for g in todos_grupos if g["ao_vivo"]]
     elif so_checkout:
         grupos_filtrados = [g for g in todos_grupos if g["teve_checkout"]]
@@ -1243,7 +1339,9 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 f'<span class="seta">▶</span> <span class="tag-rep" title="Preencheu o formulário {g["total_envios"]} vezes">{g["total_envios"]}x</span></button>'
             )
 
-        nome_cell = html.escape(g["nome_completo"]) + btn_acordeao
+        g_comprou = bool(g.get("comprou"))
+        tag_comprou = f'<span class="tag-comprou" id="tag-comprou-{stem}">✅ Comprou</span>' if g_comprou else f'<span class="tag-comprou" id="tag-comprou-{stem}" style="display:none;">✅ Comprou</span>'
+        nome_cell = html.escape(g["nome_completo"]) + tag_comprou + btn_acordeao
 
         todos_ids_json = html.escape(json.dumps(g["todos_ids"])).replace("'", "&#39;")
         nome_js = html.escape(g["nome_completo"]).replace("'", "\\'")
@@ -1253,8 +1351,18 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             f'title="Excluir dados desta pessoa">🗑️ Excluir</button>'
         )
 
+        btn_compra_cls = "btn-compra comprou" if g_comprou else "btn-compra"
+        btn_compra_txt = "✅ Comprou" if g_comprou else "💰 Comprou"
+        btn_compra_title = "Compra confirmada. Clique para desmarcar." if g_comprou else "Clique para marcar que este contato comprou o produto."
+        btn_compra_principal = (
+            f'<button type="button" id="btn-compra-{stem}" class="{btn_compra_cls}" '
+            f'onclick="alternarCompra(\'{html.escape(stem)}\', this);" '
+            f'title="{btn_compra_title}">{btn_compra_txt}</button>'
+        )
+        acoes_principal = f'<div style="display:flex;gap:5px;align-items:center;">{btn_compra_principal}{btn_del_principal}</div>'
+
         cid_str = html.escape(str(g["d_principal"].get("cliente_id") or ""))
-        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-sid="{cid_str}"')
+        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-sid="{cid_str}"')
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
@@ -1270,7 +1378,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
             f_tempo(d.get("tempo_quiz_ms")),
-            btn_del_principal,
+            acoes_principal,
         ])
 
         # Sub-linhas para tentativas anteriores do acordeão
@@ -1287,13 +1395,23 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             sub_tag_etapa = f'<span class="{sub_etapa_cls}" id="tag-etapa-{sub_stem}">{html.escape(sub_rotulo_etapa)}</span> {sub_tag_live}'
             sub_tag_chk = f'<span class="tag-checkout sim" id="tag-checkout-{sub_stem}">✦ SIM</span>' if sub_prog["checkout"] else f'<span class="tag-checkout nao" id="tag-checkout-{sub_stem}">Não</span>'
 
+            sub_comprou = bool(sub_d.get("comprou"))
+            btn_compra_sub_cls = "btn-compra comprou" if sub_comprou else "btn-compra"
+            btn_compra_sub_txt = "✅" if sub_comprou else "💰"
+            btn_compra_sub = (
+                f'<button type="button" id="btn-compra-{sub_stem}" class="{btn_compra_sub_cls}" '
+                f'onclick="alternarCompra(\'{html.escape(sub_stem)}\', this);" '
+                f'title="Marcar/desmarcar compra">{btn_compra_sub_txt}</button>'
+            )
+
             btn_del_sub = (
                 f'<button type="button" class="btn-del" '
                 f'onclick="abrirModalExcluir(\'{html.escape(sub_stem)}\', \'{nome_js}\', 1, \'[]\', true);" '
                 f'title="Excluir apenas esta tentativa anterior">🗑️</button>'
             )
+            acoes_sub = f'<div style="display:flex;gap:4px;align-items:center;">{btn_compra_sub}{btn_del_sub}</div>'
 
-            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-sid="{sub_cid_str}"')
+            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-sid="{sub_cid_str}"')
             linhas.append([
                 f'<span style="padding-left:14px;"><a href="/painel/leitura/{html.escape(sub_stem)}" style="color:var(--sand2);">↳ {html.escape(sub_stem[:15])}</a></span>',
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_chegada_bsb)}</span>',
@@ -1309,10 +1427,12 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 "—" if not sub_v.get("casa_eleita_real") else f'Casa {sub_v.get("casa_aberta")}',
                 f_hora(sub_nasc, sub_pr),
                 f_tempo(sub_d.get("tempo_quiz_ms")),
-                btn_del_sub,
+                acoes_sub,
             ])
 
-    if not linhas and so_ao_vivo:
+    if not linhas and so_comprou:
+        corpo = '<p class="vazio">Nenhum comprador registrado até o momento.</p>'
+    elif not linhas and so_ao_vivo:
         corpo = '<p class="vazio">Nenhum visitante ativo navegando nas telas neste momento.</p>'
     elif not linhas and so_checkout:
         corpo = '<p class="vazio">Nenhum visitante foi ao checkout neste período.</p>'
@@ -1324,7 +1444,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
         ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras")
 
-    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo)
+    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou)
 
 
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
@@ -1398,7 +1518,8 @@ def painel(request: Request, _=Depends(exigir_senha),
            bots: int = 0, teste: int = 0,
            pag_leituras: int = Query(0, ge=0),
            so_checkout: int = 0,
-           so_ao_vivo: int = 0):
+           so_ao_vivo: int = 0,
+           so_comprou: int = 0):
     dias_int = dias.default if hasattr(dias, "default") else int(dias)
     pag_leituras_int = pag_leituras.default if hasattr(pag_leituras, "default") else int(pag_leituras)
     d1, d2 = _periodo(de, ate, dias_int)
@@ -1419,6 +1540,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_checkout"] = 1
         if so_ao_vivo:
             q["so_ao_vivo"] = 1
+        if so_comprou:
+            q["so_comprou"] = 1
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         on = " on" if kw.get("dias") == dias_int else ""
         return f'<a class="f{on}" href="/painel?{qs}">{rot}</a>'
@@ -1511,10 +1634,11 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
     res_leituras = _tabela_leituras(
-        pag_leituras_int, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo)
+        pag_leituras_int, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo), so_comprou=bool(so_comprou)
     )
     corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
     total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
+    total_comprou = getattr(res_leituras, "total_comprou", 0)
 
     def link_filtro_leituras(modo: str) -> str:
         q = {"dias": dias_int}
@@ -1526,6 +1650,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_checkout"] = 1
         elif modo == "ao_vivo":
             q["so_ao_vivo"] = 1
+        elif modo == "comprou":
+            q["so_comprou"] = 1
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         url = f"/painel?{qs}#aba-leituras"
         if modo == "checkout":
@@ -1540,9 +1666,15 @@ def painel(request: Request, _=Depends(exigir_senha),
             rotulo = "🟢 Ao vivo agora"
             badge_id = "badge-count-vivo"
             cnt = total_ao_vivo
+        elif modo == "comprou":
+            cls = " comprou"
+            on = " on" if so_comprou else ""
+            rotulo = "💰 Só quem comprou"
+            badge_id = "badge-count-comprou"
+            cnt = total_comprou
         else:
             cls = ""
-            on = " on" if (not so_checkout and not so_ao_vivo) else ""
+            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
             cnt = total_geral
@@ -1555,6 +1687,7 @@ def painel(request: Request, _=Depends(exigir_senha),
              + link_filtro_leituras("todos")
              + link_filtro_leituras("checkout")
              + link_filtro_leituras("ao_vivo")
+             + link_filtro_leituras("comprou")
              + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
              + '</div>')
 
@@ -1564,8 +1697,11 @@ def painel(request: Request, _=Depends(exigir_senha),
         "teste": teste if teste else None,
         "so_checkout": 1 if so_checkout else None,
         "so_ao_vivo": 1 if so_ao_vivo else None,
+        "so_comprou": 1 if so_comprou else None,
     }
-    if so_ao_vivo:
+    if so_comprou:
+        rotulo_pag = "compradores"
+    elif so_ao_vivo:
         rotulo_pag = "pessoas ativas ao vivo"
     elif so_checkout:
         rotulo_pag = "pessoas com checkout"
@@ -1575,7 +1711,9 @@ def painel(request: Request, _=Depends(exigir_senha),
     barra_pag = _barra_paginacao(pag_leituras_int, total_pessoas, "/painel", p_params,
                                  por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras",
                                  rotulo_item=rotulo_pag)
-    if so_ao_vivo:
+    if so_comprou:
+        sub_tipo = "que compraram o produto"
+    elif so_ao_vivo:
         sub_tipo = "ativas navegando agora"
     elif so_checkout:
         sub_tipo = "com checkout"
@@ -1681,18 +1819,22 @@ def painel(request: Request, _=Depends(exigir_senha),
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
 def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
-          so_checkout: int = 0, so_ao_vivo: int = 0):
+          so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0):
     res_leituras = _tabela_leituras(
-        pagina, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo)
+        pagina, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo), so_comprou=bool(so_comprou)
     )
     corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
     total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
+    total_comprou = getattr(res_leituras, "total_comprou", 0)
 
     p_params = {
         "so_checkout": 1 if so_checkout else None,
         "so_ao_vivo": 1 if so_ao_vivo else None,
+        "so_comprou": 1 if so_comprou else None,
     }
-    if so_ao_vivo:
+    if so_comprou:
+        rotulo_pag = "pessoas que compraram"
+    elif so_ao_vivo:
         rotulo_pag = "pessoas ativas ao vivo"
     elif so_checkout:
         rotulo_pag = "pessoas com checkout"
@@ -1708,6 +1850,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
             q["so_checkout"] = 1
         elif modo == "ao_vivo":
             q["so_ao_vivo"] = 1
+        elif modo == "comprou":
+            q["so_comprou"] = 1
         qs = ("?" + "&".join(f"{k}={v}" for k, v in q.items())) if q else ""
         url = f"/painel/leituras{qs}"
         if modo == "checkout":
@@ -1722,9 +1866,15 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
             rotulo = "🟢 Ao vivo agora"
             badge_id = "badge-count-vivo"
             cnt = total_ao_vivo
+        elif modo == "comprou":
+            cls = " comprou"
+            on = " on" if so_comprou else ""
+            rotulo = "💰 Só quem comprou"
+            badge_id = "badge-count-comprou"
+            cnt = total_comprou
         else:
             cls = ""
-            on = " on" if (not so_checkout and not so_ao_vivo) else ""
+            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
             cnt = total_geral
@@ -1737,10 +1887,13 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
                      + link_filtro_lista("todos")
                      + link_filtro_lista("checkout")
                      + link_filtro_lista("ao_vivo")
+                     + link_filtro_lista("comprou")
                      + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
                      + '</div>')
 
-    if so_ao_vivo:
+    if so_comprou:
+        sub_tipo = "que compraram o produto"
+    elif so_ao_vivo:
         sub_tipo = "ativas navegando agora"
     elif so_checkout:
         sub_tipo = "com checkout"
@@ -1791,7 +1944,13 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
 
     nome_puro = d.get("nome_completo") or "—"
     nome_js = html.escape(nome_puro).replace("'", "\\'")
-    btn_del = (f'<button type="button" class="btn-del" style="margin-left:8px;" '
+    comprou = bool(d.get("comprou"))
+    btn_compra_cls = "btn-compra comprou" if comprou else "btn-compra"
+    btn_compra_txt = "✅ Comprou" if comprou else "💰 Marcar Compra"
+    btn_compra = (f'<button type="button" id="btn-compra-{html.escape(leitura_id)}" class="{btn_compra_cls}" style="margin-left:8px;" '
+                  f'onclick="alternarCompra(\'{html.escape(leitura_id)}\', this);" '
+                  f'title="Marcar ou desmarcar se comprou o produto">{btn_compra_txt}</button>')
+    btn_del = (f'<button type="button" class="btn-del" style="margin-left:6px;" '
                f'onclick="abrirModalExcluir(\'{html.escape(leitura_id)}\', \'{nome_js}\');">'
                f'🗑️ Excluir Leitura</button>')
 
@@ -1810,7 +1969,7 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>{html.escape(leitura_id)}</title><div class=w>"
         f'<h1>{html.escape(leitura_id)}</h1><p class="sub">{ident} · '
-        f'<a href="/painel#aba-leituras">voltar ao painel</a> {btn_del}</p>'
+        f'<a href="/painel#aba-leituras">voltar ao painel</a> {btn_compra} {btn_del}</p>'
         f'<h2>{html.escape(c.get("selo",""))}</h2>'
         f'<p><b>{html.escape(c.get("titulo",""))}</b></p>'
         f'<p style="color:var(--amber)">{html.escape(c.get("destaque",""))}</p>'
@@ -1892,4 +2051,43 @@ def deletar_leitura(leitura_id: str, modo: str = Query("individual"), _=Depends(
         "removidos": [leitura_id],
         "mensagem": "Leitura excluída com sucesso"
     }
+
+
+@router.post("/painel/leitura/{leitura_id}/status-compra")
+def alterar_status_compra(leitura_id: str, comprou: bool = Query(...), _=Depends(exigir_senha)):
+    """Atualiza o status de compra (comprou: true/false) de uma leitura e notifica via WebSocket."""
+    if not re.fullmatch(r"[0-9]{8}-[0-9]{6}-[0-9a-f]{8}", leitura_id):
+        raise HTTPException(400, "identificador de leitura inválido")
+
+    sucesso = registro.atualizar_status_compra(leitura_id, comprou)
+    if not sucesso:
+        raise HTTPException(404, "leitura não encontrada")
+
+    # Calcula o total atualizado de compradores únicos
+    arquivos = list(config.DIR_LEITURAS.glob("*.json"))
+    todos_dados: list[tuple[str, dict]] = []
+    for arq in arquivos:
+        try:
+            todos_dados.append((arq.stem, json.loads(arq.read_text(encoding="utf-8"))))
+        except Exception:
+            continue
+    grupos = _agrupar_leituras_por_pessoa(todos_dados, {})
+    total_comprou = sum(1 for g in grupos if g.get("comprou"))
+
+    # Notifica clientes conectados no WebSocket
+    ws_manager.broadcast_sync({
+        "tipo": "status_compra",
+        "leitura_id": leitura_id,
+        "comprou": comprou,
+        "total_comprou": total_comprou,
+    })
+
+    logger.info("Status de compra atualizado para leitura %s: comprou=%s", leitura_id, comprou)
+    return {
+        "ok": True,
+        "leitura_id": leitura_id,
+        "comprou": comprou,
+        "total_comprou": total_comprou,
+    }
+
 

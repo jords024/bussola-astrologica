@@ -977,9 +977,113 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn('id="ws-status"', html_l)
                 self.assertIn("window._wsToken =", html_l)
 
+    def test_status_compra_e_filtro(self):
+        """Verifica marcação de compra, persistência, websocket, filtro no painel e endpoint."""
+        from api.painel import _tabela_leituras, painel, lista, detalhe, router
+        from servicos import registro
+        from starlette.requests import Request
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        import base64
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            lid1 = "20260907-170000-aaaa0001"
+            lid2 = "20260907-170500-bbbb0002"
+
+            (dir_leituras / f"{lid1}.json").write_text(json.dumps({
+                "nome_completo": "Cliente Comprador",
+                "whatsapp": "11999990001",
+                "comprou": False,
+            }), encoding="utf-8")
+
+            (dir_leituras / f"{lid2}.json").write_text(json.dumps({
+                "nome_completo": "Visitante Sem Compra",
+                "whatsapp": "11999990002",
+                "comprou": False,
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Testar serviço registro.atualizar_status_compra
+                ok = registro.atualizar_status_compra(lid1, True)
+                self.assertTrue(ok)
+                dados1 = json.loads((dir_leituras / f"{lid1}.json").read_text(encoding="utf-8"))
+                self.assertTrue(dados1.get("comprou"))
+                self.assertTrue("comprado_em" in dados1)
+
+                # 2. Testar _tabela_leituras sem filtro de compra
+                res_todas = _tabela_leituras(pagina=0, so_comprou=False)
+                corpo_todas, tot_t, pags_t, unicos_t, chk_t, geral_t = res_todas
+                self.assertEqual(unicos_t, 2)
+                self.assertEqual(res_todas.total_comprou, 1)
+                # Verifica se o cliente 1 tem tag-comprou e data-comprou="1"
+                self.assertIn(f'id="tag-comprou-{lid1}">✅ Comprou</span>', corpo_todas)
+                self.assertIn(f'id="btn-compra-{lid1}" class="btn-compra comprou"', corpo_todas)
+                self.assertIn('data-comprou="1"', corpo_todas)
+
+                # 3. Testar _tabela_leituras com so_comprou=True
+                res_compra = _tabela_leituras(pagina=0, so_comprou=True)
+                corpo_compra, tot_c, pags_c, unicos_c, chk_c, geral_c = res_compra
+                self.assertEqual(unicos_c, 1)
+                self.assertIn(lid1[:15], corpo_compra)
+                self.assertNotIn(lid2[:15], corpo_compra)
+
+                # 4. Testar renderização de /painel com filtro comprou
+                req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+                resp_painel = painel(req, _="crassus")
+                html_p = resp_painel.body.decode("utf-8")
+                self.assertIn("💰 Só quem comprou", html_p)
+                self.assertIn('id="badge-count-comprou"', html_p)
+                self.assertIn("alternarCompra", html_p)
+                self.assertIn("aplicarStatusCompraNoDOM", html_p)
+
+                # 5. Testar renderização de /painel/leituras com filtro comprou
+                resp_l = lista(_="crassus", so_comprou=1)
+                html_l = resp_l.body.decode("utf-8")
+                self.assertIn("💰 Só quem comprou", html_l)
+                self.assertIn('id="badge-count-comprou"', html_l)
+
+                # 6. Testar renderização do botão no detalhe
+                resp_det = detalhe(lid1, _="crassus")
+                html_det = resp_det.body.decode("utf-8")
+                self.assertIn(f'id="btn-compra-{lid1}"', html_det)
+                self.assertIn("✅ Comprou", html_det)
+
+                # 7. Testar endpoint HTTP POST /painel/leitura/{id}/status-compra
+                app = FastAPI()
+                app.include_router(router)
+                client = TestClient(app)
+
+                # Desmarcar compra
+                resp_post = client.post(
+                    f"/painel/leitura/{lid1}/status-compra?comprou=false",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(resp_post.status_code, 200)
+                data = resp_post.json()
+                self.assertTrue(data["ok"])
+                self.assertFalse(data["comprou"])
+                self.assertEqual(data["total_comprou"], 0)
+
+                # Verificar arquivo persistido
+                dados1_after = json.loads((dir_leituras / f"{lid1}.json").read_text(encoding="utf-8"))
+                self.assertFalse(dados1_after.get("comprou"))
+
+                # Marcar novamente como comprou
+                resp_post2 = client.post(
+                    f"/painel/leitura/{lid1}/status-compra?comprou=true",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(resp_post2.status_code, 200)
+                data2 = resp_post2.json()
+                self.assertTrue(data2["ok"])
+                self.assertTrue(data2["comprou"])
+                self.assertEqual(data2["total_comprou"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
 
