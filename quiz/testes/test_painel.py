@@ -1088,6 +1088,52 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertTrue(data2["comprou"])
                 self.assertEqual(data2["total_comprou"], 1)
 
+    def test_modal_confirmacao_compra(self):
+        """Verifica se o popup modal de confirmação de compra está presente no HTML, CSS e JS do painel."""
+        from api.painel import ESTILO, JS_PAINEL, _modal_confirmar_compra, painel, lista, detalhe
+        from starlette.requests import Request
+
+        # 1. Estrutura do modal
+        modal_html = _modal_confirmar_compra()
+        self.assertIn('id="modal-compra-backdrop"', modal_html)
+        self.assertIn('id="modal-compra-card"', modal_html)
+        self.assertIn('id="modal-compra-icone"', modal_html)
+        self.assertIn('id="modal-compra-titulo"', modal_html)
+        self.assertIn('id="modal-compra-nome"', modal_html)
+        self.assertIn('id="modal-compra-id"', modal_html)
+        self.assertIn('id="modal-compra-desc"', modal_html)
+        self.assertIn('id="modal-compra-erro"', modal_html)
+        self.assertIn('id="btn-modal-confirmar-compra"', modal_html)
+        self.assertIn('onclick="fecharModalCompra()"', modal_html)
+        self.assertIn('onclick="executarConfirmacaoCompra()"', modal_html)
+        self.assertIn('class="modal-fechar-btn"', modal_html)
+
+        # 2. Estilos CSS
+        self.assertIn(".modal-card-compra", ESTILO)
+        self.assertIn(".modal-card-compra.desmarcar", ESTILO)
+        self.assertIn(".modal-icone-wrap", ESTILO)
+        self.assertIn(".modal-info-box", ESTILO)
+        self.assertIn(".btn-modal-confirmar-compra", ESTILO)
+        self.assertIn(".btn-modal-confirmar-compra.desmarcar", ESTILO)
+
+        # 3. Funções JavaScript
+        self.assertIn("function abrirModalCompra(", JS_PAINEL)
+        self.assertIn("function fecharModalCompra(", JS_PAINEL)
+        self.assertIn("function executarConfirmacaoCompra(", JS_PAINEL)
+        self.assertIn("fecharModalCompra()", JS_PAINEL)
+
+        # 4. Presença do modal nas páginas do painel
+        req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+        resp_p = painel(req, _="crassus")
+        html_p = resp_p.body.decode("utf-8")
+        self.assertIn('id="modal-compra-backdrop"', html_p)
+        self.assertIn('abrirModalCompra', html_p)
+
+        resp_l = lista(_="crassus")
+        html_l = resp_l.body.decode("utf-8")
+        self.assertIn('id="modal-compra-backdrop"', html_l)
+        self.assertIn('abrirModalCompra', html_l)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -374,6 +374,19 @@ a{color:var(--amber)}
 .btn-filtro-leituras.comprou:hover{border-color:var(--green);color:#58B982;background:rgba(78,157,110,.08)}
 .btn-filtro-leituras.comprou.on{border-color:var(--green);background:rgba(78,157,110,.18);color:#58B982;font-weight:700}
 .btn-filtro-leituras.comprou.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
+.modal-card-compra{border-color:rgba(78,157,110,.4);max-width:460px;background:linear-gradient(180deg,#1F1C19 0%,#151412 100%);position:relative}
+.modal-card-compra.desmarcar{border-color:rgba(229,169,60,.4)}
+.modal-icone-wrap{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:30px;background:rgba(78,157,110,.14);border:1px solid rgba(78,157,110,.35);box-shadow:0 0 20px rgba(78,157,110,.15)}
+.modal-card-compra.desmarcar .modal-icone-wrap{background:rgba(229,169,60,.14);border-color:rgba(229,169,60,.35);box-shadow:0 0 20px rgba(229,169,60,.15)}
+.modal-fechar-btn{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--sand2);font-size:16px;cursor:pointer;padding:4px 8px;border-radius:4px;line-height:1;transition:all .15s ease}
+.modal-fechar-btn:hover{color:var(--sand);background:rgba(255,255,255,.08)}
+.modal-info-box{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:14px 0 16px;text-align:center}
+.modal-subtexto{font-size:12.5px;color:var(--sand2);margin-top:6px;line-height:1.5}
+.btn-modal-confirmar-compra{background:linear-gradient(135deg,#3E9166 0%,#2E724F 100%);color:#FFF;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s ease;box-shadow:0 4px 14px rgba(62,145,102,.35)}
+.btn-modal-confirmar-compra:hover{background:linear-gradient(135deg,#4E9D6E 0%,#35825A 100%);box-shadow:0 6px 18px rgba(62,145,102,.5)}
+.btn-modal-confirmar-compra:disabled{opacity:.5;cursor:not-allowed}
+.btn-modal-confirmar-compra.desmarcar{background:linear-gradient(135deg,#C4564A 0%,#A33C31 100%);box-shadow:0 4px 14px rgba(196,86,74,.35)}
+.btn-modal-confirmar-compra.desmarcar:hover{background:linear-gradient(135deg,#D96558 0%,#B84A3E 100%);box-shadow:0 6px 18px rgba(196,86,74,.5)}
 .painel-toast{position:fixed;bottom:24px;right:24px;background:#24201D;border:1px solid var(--amber);color:var(--sand);padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,.6);z-index:999999;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none}
 .painel-toast.on{opacity:1;transform:translateY(0);pointer-events:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
@@ -532,20 +545,111 @@ function filtrarCheckoutClient(soChk, btn, evt){
   return filtrarTabelaClient(soChk === 1 ? "checkout" : "todos", btn, evt);
 }
 
-function alternarCompra(id, btn){
-  if(!id) return;
-  var elBtn = btn || document.getElementById("btn-compra-" + id);
-  var estaComprou = elBtn ? elBtn.classList.contains("comprou") : false;
-  var novoStatus = !estaComprou;
+var _leituraCompraAlvo = null;
+var _novoStatusCompra = false;
+var _btnCompraAlvo = null;
 
-  if(estaComprou){
-    if(!confirm("Deseja desmarcar a compra deste contato?")) return;
+function abrirModalCompra(id, nome, btnOuStatus, btnExtra){
+  if(!id) return;
+  _leituraCompraAlvo = id;
+
+  var btn = null;
+  if(btnOuStatus && typeof btnOuStatus === "object" && btnOuStatus.nodeType){
+    btn = btnOuStatus;
+  } else if(btnExtra && typeof btnExtra === "object" && btnExtra.nodeType){
+    btn = btnExtra;
+  }
+  _btnCompraAlvo = btn || document.getElementById("btn-compra-" + id);
+
+  var estaComprou = false;
+  if(_btnCompraAlvo){
+    estaComprou = _btnCompraAlvo.classList.contains("comprou");
+  } else {
+    var r = document.getElementById("row-pessoa-" + id) || document.getElementById("row-leitura-" + id);
+    if(r){
+      estaComprou = (r.getAttribute("data-comprou") === "1");
+    } else if(typeof btnOuStatus === "boolean" || typeof btnOuStatus === "number"){
+      estaComprou = !!btnOuStatus;
+    }
   }
 
-  if(elBtn){
-    elBtn.disabled = true;
-    elBtn._textoOriginal = elBtn.textContent;
-    elBtn.textContent = "...";
+  _novoStatusCompra = !estaComprou;
+
+  if(!nome){
+    var rPessoa = document.getElementById("row-pessoa-" + id);
+    if(rPessoa){
+      var tdNome = rPessoa.querySelector("td:nth-child(6)");
+      if(tdNome){
+        nome = tdNome.childNodes[0] ? tdNome.childNodes[0].textContent.trim() : tdNome.textContent.trim();
+      }
+    }
+  }
+
+  var elCard = document.getElementById("modal-compra-card");
+  var elIcone = document.getElementById("modal-compra-icone");
+  var elTitulo = document.getElementById("modal-compra-titulo");
+  var elPergunta = document.getElementById("modal-compra-pergunta");
+  var elNome = document.getElementById("modal-compra-nome");
+  var elId = document.getElementById("modal-compra-id");
+  var elDesc = document.getElementById("modal-compra-desc");
+  var elErro = document.getElementById("modal-compra-erro");
+  var btnConfirmar = document.getElementById("btn-modal-confirmar-compra");
+
+  if(elNome) elNome.textContent = nome || "Contato (" + id + ")";
+  if(elId) elId.textContent = "ID: " + id;
+  if(elErro){ elErro.style.display = "none"; elErro.textContent = ""; }
+
+  if(_novoStatusCompra){
+    if(elCard) elCard.classList.remove("desmarcar");
+    if(elIcone) elIcone.textContent = "💰";
+    if(elTitulo) elTitulo.textContent = "Confirmar Compra do Produto";
+    if(elPergunta) elPergunta.textContent = "Deseja marcar que este contato comprou o produto?";
+    if(elDesc) elDesc.textContent = "Ao confirmar, o contato receberá o selo ✅ Comprou e será contabilizado no filtro de compradores.";
+    if(btnConfirmar){
+      btnConfirmar.className = "btn-modal-confirmar-compra";
+      btnConfirmar.textContent = "Sim, Marcar Compra";
+      btnConfirmar.disabled = false;
+    }
+  } else {
+    if(elCard) elCard.classList.add("desmarcar");
+    if(elIcone) elIcone.textContent = "↩️";
+    if(elTitulo) elTitulo.textContent = "Desmarcar Compra";
+    if(elPergunta) elPergunta.textContent = "Deseja realmente desmarcar a compra deste contato?";
+    if(elDesc) elDesc.textContent = "O selo ✅ Comprou será removido deste contato e as métricas do painel serão atualizadas.";
+    if(btnConfirmar){
+      btnConfirmar.className = "btn-modal-confirmar-compra desmarcar";
+      btnConfirmar.textContent = "Sim, Desmarcar";
+      btnConfirmar.disabled = false;
+    }
+  }
+
+  var modal = document.getElementById("modal-compra-backdrop");
+  if(modal){ modal.classList.add("on"); }
+}
+
+function fecharModalCompra(){
+  _leituraCompraAlvo = null;
+  _btnCompraAlvo = null;
+  var modal = document.getElementById("modal-compra-backdrop");
+  if(modal){ modal.classList.remove("on"); }
+}
+
+function executarConfirmacaoCompra(){
+  if(!_leituraCompraAlvo) return;
+  var id = _leituraCompraAlvo;
+  var novoStatus = _novoStatusCompra;
+  var btnConfirmar = document.getElementById("btn-modal-confirmar-compra");
+  var elErro = document.getElementById("modal-compra-erro");
+  var elBtnOrig = _btnCompraAlvo || document.getElementById("btn-compra-" + id);
+
+  if(btnConfirmar){
+    btnConfirmar.disabled = true;
+    btnConfirmar.textContent = "Salvando...";
+  }
+  if(elBtnOrig){
+    elBtnOrig.disabled = true;
+    elBtnOrig._textoOriginal = elBtnOrig.textContent;
+    elBtnOrig.textContent = "...";
   }
 
   fetch("/painel/leitura/" + encodeURIComponent(id) + "/status-compra?comprou=" + (novoStatus ? "true" : "false"), {
@@ -558,16 +662,30 @@ function alternarCompra(id, btn){
     }
     return res.json();
   }).then(function(data){
-    if(elBtn) elBtn.disabled = false;
+    if(elBtnOrig) elBtnOrig.disabled = false;
+    fecharModalCompra();
     aplicarStatusCompraNoDOM(id, novoStatus, data.total_comprou);
     mostrarToast(novoStatus ? "Contato marcado como comprou!" : "Status de compra desmarcado.");
   }).catch(function(err){
-    if(elBtn){
-      elBtn.disabled = false;
-      elBtn.textContent = elBtn._textoOriginal || (estaComprou ? "✅ Comprou" : "💰 Comprou");
+    if(btnConfirmar){
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = novoStatus ? "Sim, Marcar Compra" : "Sim, Desmarcar";
     }
-    alert("Erro ao alterar status de compra: " + err.message);
+    if(elBtnOrig){
+      elBtnOrig.disabled = false;
+      elBtnOrig.textContent = elBtnOrig._textoOriginal || (novoStatus ? "💰 Comprou" : "✅ Comprou");
+    }
+    if(elErro){
+      elErro.textContent = "Erro ao salvar: " + err.message;
+      elErro.style.display = "block";
+    } else {
+      alert("Erro ao alterar status de compra: " + err.message);
+    }
   });
+}
+
+function alternarCompra(id, btn, nome){
+  abrirModalCompra(id, nome, undefined, btn);
 }
 
 function aplicarStatusCompraNoDOM(id, comprou, totalComprou){
@@ -646,7 +764,10 @@ function fecharModalExcluir(){
   if(modal){ modal.classList.remove("on"); }
 }
 document.addEventListener("keydown", function(e){
-  if(e.key === "Escape"){ fecharModalExcluir(); }
+  if(e.key === "Escape"){
+    fecharModalExcluir();
+    fecharModalCompra();
+  }
 });
 function executarExclusao(){
   if(!_leituraParaExcluir) return;
@@ -1036,6 +1157,34 @@ def _modal_confirmar_exclusao() -> str:
     )
 
 
+def _modal_confirmar_compra() -> str:
+    return (
+        '<div id="modal-compra-backdrop" class="modal-backdrop">'
+        '  <div id="modal-compra-card" class="modal-card modal-card-compra" role="dialog" aria-modal="true" aria-labelledby="modal-compra-titulo">'
+        '    <button type="button" class="modal-fechar-btn" onclick="fecharModalCompra()" title="Fechar">✕</button>'
+        '    <div id="modal-compra-icone-wrap" class="modal-icone-wrap">'
+        '      <span id="modal-compra-icone">💰</span>'
+        '    </div>'
+        '    <h3 id="modal-compra-titulo" class="modal-titulo">Confirmar Compra do Produto</h3>'
+        '    <p class="modal-texto">'
+        '      <span id="modal-compra-pergunta">Deseja marcar que este contato comprou o produto?</span>'
+        '      <br><b id="modal-compra-nome" style="color:var(--amber);font-size:15px;display:inline-block;margin-top:6px;">—</b>'
+        '    </p>'
+        '    <div class="modal-info-box">'
+        '      <span id="modal-compra-id" class="modal-id">ID: —</span>'
+        '      <div id="modal-compra-desc" class="modal-subtexto">Ao confirmar, o contato receberá o selo ✅ Comprou e será contabilizado no filtro de compradores.</div>'
+        '    </div>'
+        '    <div id="modal-compra-erro" class="modal-erro" style="display:none;"></div>'
+        '    <div class="modal-acoes">'
+        '      <button type="button" class="btn-modal-cancelar" onclick="fecharModalCompra()">Cancelar</button>'
+        '      <button type="button" id="btn-modal-confirmar-compra" class="btn-modal-confirmar-compra" onclick="executarConfirmacaoCompra()">Sim, Marcar Compra</button>'
+        '    </div>'
+        '  </div>'
+        '</div>'
+    )
+
+
+
 def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
     """Mapeia cada leitura para (max_tela, rotulo, checkout).
 
@@ -1387,7 +1536,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         btn_compra_title = "Compra confirmada. Clique para desmarcar." if g_comprou else "Clique para marcar que este contato comprou o produto."
         btn_compra_principal = (
             f'<button type="button" id="btn-compra-{stem}" class="{btn_compra_cls}" '
-            f'onclick="alternarCompra(\'{html.escape(stem)}\', this);" '
+            f'onclick="abrirModalCompra(\'{html.escape(stem)}\', \'{nome_js}\', {1 if g_comprou else 0}, this);" '
             f'title="{btn_compra_title}">{btn_compra_txt}</button>'
         )
         acoes_principal = f'<div style="display:flex;gap:5px;align-items:center;">{btn_compra_principal}{btn_del_principal}</div>'
@@ -1431,8 +1580,8 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             btn_compra_sub_txt = "✅" if sub_comprou else "💰"
             btn_compra_sub = (
                 f'<button type="button" id="btn-compra-{sub_stem}" class="{btn_compra_sub_cls}" '
-                f'onclick="alternarCompra(\'{html.escape(sub_stem)}\', this);" '
-                f'title="Marcar/desmarcar compra">{btn_compra_sub_txt}</button>'
+                f'onclick="abrirModalCompra(\'{html.escape(sub_stem)}\', \'{nome_js}\', {1 if sub_comprou else 0}, this);" '
+                f'title="Marcar ou desmarcar compra">{btn_compra_sub_txt}</button>'
             )
 
             btn_del_sub = (
@@ -1841,6 +1990,7 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append('</section>')
 
     p.append(_modal_confirmar_exclusao())
+    p.append(_modal_confirmar_compra())
     token_ws = gerar_token_ws()
     p.append(f'<script>window._wsToken = "{token_ws}";</script>')
     p.append(f'<script>{JS_PAINEL}</script>')
@@ -1942,6 +2092,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         f'{corpo}'
         f'{barra_pag}'
         f'{_modal_confirmar_exclusao()}'
+        f'{_modal_confirmar_compra()}'
         f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>'
         f'<script>window._wsToken = "{token_ws}";</script>'
         f'<script>{JS_PAINEL}</script>',
@@ -1979,7 +2130,7 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     btn_compra_cls = "btn-compra comprou" if comprou else "btn-compra"
     btn_compra_txt = "✅ Comprou" if comprou else "💰 Marcar Compra"
     btn_compra = (f'<button type="button" id="btn-compra-{html.escape(leitura_id)}" class="{btn_compra_cls}" style="margin-left:8px;" '
-                  f'onclick="alternarCompra(\'{html.escape(leitura_id)}\', this);" '
+                  f'onclick="abrirModalCompra(\'{html.escape(leitura_id)}\', \'{nome_js}\', {1 if comprou else 0}, this);" '
                   f'title="Marcar ou desmarcar se comprou o produto">{btn_compra_txt}</button>')
     btn_del = (f'<button type="button" class="btn-del" style="margin-left:6px;" '
                f'onclick="abrirModalExcluir(\'{html.escape(leitura_id)}\', \'{nome_js}\');">'
@@ -2012,6 +2163,7 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
         f'<h2>meta</h2><pre class="nota">'
         f'{html.escape(json.dumps(d.get("meta"), ensure_ascii=False, indent=1))}</pre>'
         f'{_modal_confirmar_exclusao()}'
+        f'{_modal_confirmar_compra()}'
         f'<script>{JS_PAINEL}</script></div>',
         headers=CABECALHOS)
 
