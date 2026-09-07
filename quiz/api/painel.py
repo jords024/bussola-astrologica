@@ -267,14 +267,24 @@ a{color:var(--amber)}
 .btn-filtro-leituras.chk.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
 .btn-del{background:rgba(196,86,74,.12);color:#E57373;border:1px solid rgba(196,86,74,.35);border-radius:6px;padding:3px 9px;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .btn-del:hover{background:rgba(196,86,74,.3);border-color:#E57373;color:#FFF}
+.btn-acordeao{background:rgba(229,169,60,.12);color:var(--amber);border:1px solid rgba(229,169,60,.35);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;margin-left:6px;vertical-align:middle;transition:all .15s ease}
+.btn-acordeao:hover{background:rgba(229,169,60,.22);border-color:var(--amber)}
+.btn-acordeao.aberto{background:rgba(229,169,60,.28);border-color:var(--amber);color:#FFF}
+.btn-acordeao .seta{display:inline-block;transition:transform .18s ease;font-size:8.5px}
+.btn-acordeao.aberto .seta{transform:rotate(90deg)}
+.tr-subleitura{background:rgba(255,255,255,.02);border-left:3px solid rgba(229,169,60,.4)}
+.tr-subleitura td{padding:6px 12px;font-size:12px;color:var(--sand2);border-bottom:1px dashed rgba(255,255,255,.06)}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease}
 .modal-backdrop.on{opacity:1;pointer-events:auto}
-.modal-card{background:#1B1917;border:1px solid rgba(196,86,74,.5);border-radius:14px;padding:26px 24px;max-width:440px;width:90%;box-shadow:0 20px 45px rgba(0,0,0,.85);text-align:center;transform:translateY(10px) scale(.98);transition:transform .2s ease}
+.modal-card{background:#1B1917;border:1px solid rgba(196,86,74,.5);border-radius:14px;padding:26px 24px;max-width:460px;width:90%;box-shadow:0 20px 45px rgba(0,0,0,.85);text-align:center;transform:translateY(10px) scale(.98);transition:transform .2s ease}
 .modal-backdrop.on .modal-card{transform:translateY(0) scale(1)}
 .modal-icone{font-size:36px;margin-bottom:12px;line-height:1}
 .modal-titulo{font-size:18px;font-weight:700;color:var(--sand);margin:0 0 8px}
-.modal-texto{font-size:13.5px;color:var(--sand2);margin:0 0 16px;line-height:1.55}
+.modal-texto{font-size:13.5px;color:var(--sand2);margin:0 0 12px;line-height:1.55}
 .modal-id{display:inline-block;font-size:11.5px;font-family:monospace;background:rgba(255,255,255,.05);padding:2px 7px;border-radius:4px;color:var(--amber);margin-top:4px}
+.modal-opcoes-excluir{text-align:left;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:12.5px}
+.modal-opcoes-excluir label{display:flex;align-items:center;gap:8px;margin:7px 0;cursor:pointer;color:var(--sand)}
+.modal-opcoes-excluir input[type="radio"]{accent-color:var(--amber);cursor:pointer}
 .modal-aviso{display:block;margin-top:10px;font-size:12px;color:#E57373;font-weight:600}
 .modal-erro{background:rgba(196,86,74,.18);border:1px solid rgba(196,86,74,.4);color:#FFA49E;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;text-align:left}
 .modal-acoes{display:flex;gap:10px;justify-content:center;margin-top:20px}
@@ -294,18 +304,36 @@ function abrirAba(id){
   document.querySelectorAll(".aba-painel").forEach(function(s){s.classList.toggle("on",s.id===id);});
   try{history.replaceState(null,"","#"+id);localStorage.setItem("painel_aba_ativa",id);}catch(e){}
 }
+function toggleAcordeao(grupoId, btn){
+  var subRows = document.querySelectorAll(".grupo-" + grupoId);
+  var estaAberto = btn.classList.contains("aberto");
+  if(estaAberto){
+    subRows.forEach(function(r){ r.style.display = "none"; });
+    btn.classList.remove("aberto");
+    var seta = btn.querySelector(".seta");
+    if(seta){ seta.textContent = "▶"; }
+  } else {
+    subRows.forEach(function(r){ r.style.display = ""; });
+    btn.classList.add("aberto");
+    var seta = btn.querySelector(".seta");
+    if(seta){ seta.textContent = "▼"; }
+  }
+}
 function filtrarCheckoutClient(soChk, btn, evt){
   var tbody = document.getElementById("tbody-leituras");
   if(!tbody){ return true; }
-  var rows = tbody.querySelectorAll("tr[data-checkout]");
+  var rows = tbody.querySelectorAll("tr.tr-pessoa[data-checkout]");
   var totalRows = rows.length;
   if(totalRows > 0 && totalRows <= 20){
     if(evt && evt.preventDefault){ evt.preventDefault(); }
     var visiveis = 0;
     rows.forEach(function(r){
       var chk = r.getAttribute("data-checkout") === "1";
+      var idGrupo = r.id.replace("row-pessoa-", "");
+      var subRows = document.querySelectorAll(".grupo-" + idGrupo);
       if(soChk === 1 && !chk){
         r.style.display = "none";
+        subRows.forEach(function(sr){ sr.style.display = "none"; });
       } else {
         r.style.display = "";
         visiveis++;
@@ -317,7 +345,7 @@ function filtrarCheckoutClient(soChk, btn, evt){
     });
     var sub = document.getElementById("sub-leituras-info");
     if(sub){
-      var tipo = soChk === 1 ? "leituras com checkout" : "leituras no total";
+      var tipo = soChk === 1 ? "pessoas com checkout" : "pessoas no total";
       sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + " · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
     }
     try{
@@ -329,16 +357,39 @@ function filtrarCheckoutClient(soChk, btn, evt){
   return true;
 }
 var _leituraParaExcluir = null;
-function abrirModalExcluir(id, nome){
+var _leituraEhSub = false;
+var _grupoTodosIds = [];
+function abrirModalExcluir(id, nome, totalEnvios, todosIdsJson, ehSub){
   _leituraParaExcluir = id;
+  _leituraEhSub = !!ehSub;
+  try{
+    _grupoTodosIds = todosIdsJson ? JSON.parse(todosIdsJson) : [id];
+  }catch(e){
+    _grupoTodosIds = [id];
+  }
   var elNome = document.getElementById("modal-del-nome");
   var elId = document.getElementById("modal-del-id");
   var elErro = document.getElementById("modal-del-erro");
   var btnConf = document.getElementById("btn-modal-confirmar");
+  var opcoes = document.getElementById("modal-del-opcoes");
+  var spanTotal = document.getElementById("modal-del-total-envios");
+  var spanCurto = document.getElementById("modal-del-id-curto");
+
   if(elNome) elNome.textContent = nome || "Sem nome";
   if(elId) elId.textContent = "ID: " + id;
   if(elErro){ elErro.style.display = "none"; elErro.textContent = ""; }
   if(btnConf){ btnConf.disabled = false; btnConf.textContent = "Sim, Excluir"; }
+
+  if(!_leituraEhSub && totalEnvios && totalEnvios > 1 && opcoes){
+    opcoes.style.display = "block";
+    if(spanTotal) spanTotal.textContent = totalEnvios;
+    if(spanCurto) spanCurto.textContent = id.substring(0, 15);
+    var radios = document.getElementsByName("modo_exclusao");
+    if(radios.length > 0) radios[0].checked = true;
+  } else if(opcoes){
+    opcoes.style.display = "none";
+  }
+
   var modal = document.getElementById("modal-excluir-backdrop");
   if(modal){ modal.classList.add("on"); }
 }
@@ -356,7 +407,17 @@ function executarExclusao(){
   var btnConf = document.getElementById("btn-modal-confirmar");
   var elErro = document.getElementById("modal-del-erro");
   if(btnConf){ btnConf.disabled = true; btnConf.textContent = "Excluindo..."; }
-  fetch("/painel/leitura/" + encodeURIComponent(id) + "/deletar", {
+
+  var modo = "individual";
+  var opcoes = document.getElementById("modal-del-opcoes");
+  if(!_leituraEhSub && opcoes && opcoes.style.display !== "none"){
+    var radios = document.getElementsByName("modo_exclusao");
+    for(var i = 0; i < radios.length; i++){
+      if(radios[i].checked){ modo = radios[i].value; break; }
+    }
+  }
+
+  fetch("/painel/leitura/" + encodeURIComponent(id) + "/deletar?modo=" + encodeURIComponent(modo), {
     method: "POST",
     headers: { "Accept": "application/json" }
   }).then(function(res){
@@ -371,19 +432,32 @@ function executarExclusao(){
       window.location.href = "/painel#aba-leituras";
       return;
     }
-    var row = document.getElementById("row-leitura-" + id);
-    var foiChk = false;
-    if(row){
-      foiChk = row.getAttribute("data-checkout") === "1";
-      row.style.transition = "opacity 0.25s ease, transform 0.25s ease";
-      row.style.opacity = "0";
-      row.style.transform = "translateX(20px)";
-      setTimeout(function(){
-        if(row.parentNode) row.parentNode.removeChild(row);
-      }, 260);
+
+    if(modo === "todos"){
+      var mainRow = document.getElementById("row-pessoa-" + id);
+      var subRows = document.querySelectorAll(".grupo-" + id);
+      if(mainRow){
+        mainRow.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+        mainRow.style.opacity = "0";
+        mainRow.style.transform = "translateX(20px)";
+        setTimeout(function(){ if(mainRow.parentNode) mainRow.parentNode.removeChild(mainRow); }, 260);
+      }
+      subRows.forEach(function(sr){
+        sr.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+        sr.style.opacity = "0";
+        setTimeout(function(){ if(sr.parentNode) sr.parentNode.removeChild(sr); }, 260);
+      });
+      atualizarAposExclusaoGrupo(data.removidos ? data.removidos.length : 1, true);
+    } else {
+      var row = document.getElementById("row-leitura-" + id) || document.getElementById("row-pessoa-" + id);
+      if(row){
+        row.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+        row.style.opacity = "0";
+        setTimeout(function(){ if(row.parentNode) row.parentNode.removeChild(row); }, 260);
+      }
+      atualizarAposExclusaoGrupo(1, !_leituraEhSub);
     }
-    atualizarAposExclusao(foiChk);
-    mostrarToast("Registro de leitura excluído com sucesso!");
+    mostrarToast("Registro(s) excluído(s) com sucesso!");
   }).catch(function(err){
     if(btnConf){ btnConf.disabled = false; btnConf.textContent = "Sim, Excluir"; }
     if(elErro){
@@ -392,22 +466,17 @@ function executarExclusao(){
     }
   });
 }
-function atualizarAposExclusao(foiChk){
+function atualizarAposExclusaoGrupo(qtdRemovida, ehPessoaInteira){
   var badges = document.querySelectorAll(".btn-filtro-leituras .badge-count");
   if(badges.length >= 2){
     var bTodos = badges[0];
-    var bChk = badges[1];
-    var nTodos = Math.max(0, parseInt(bTodos.textContent || "0", 10) - 1);
+    var nTodos = Math.max(0, parseInt(bTodos.textContent || "0", 10) - (ehPessoaInteira ? 1 : 0));
     bTodos.textContent = nTodos;
-    if(foiChk){
-      var nChk = Math.max(0, parseInt(bChk.textContent || "0", 10) - 1);
-      bChk.textContent = nChk;
-    }
   }
   var sub = document.getElementById("sub-leituras-info");
   if(sub){
     var b = sub.querySelector("b");
-    if(b){
+    if(b && ehPessoaInteira){
       var cur = Math.max(0, parseInt(b.textContent || "0", 10) - 1);
       b.textContent = cur;
     }
@@ -457,10 +526,14 @@ def _modal_confirmar_exclusao() -> str:
         '    <div class="modal-icone">⚠️</div>'
         '    <h3 id="modal-del-titulo" class="modal-titulo">Confirmar Exclusão</h3>'
         '    <p class="modal-texto">'
-        '      Deseja realmente excluir permanentemente os dados de <b id="modal-del-nome">—</b>?'
+        '      Deseja realmente excluir dados de <b id="modal-del-nome">—</b>?'
         '      <br><span id="modal-del-id" class="modal-id">ID: —</span>'
-        '      <span class="modal-aviso">Esta ação é irreversível e removerá o registro e mapa astrológico do sistema.</span>'
         '    </p>'
+        '    <div id="modal-del-opcoes" class="modal-opcoes-excluir" style="display:none;">'
+        '      <label><input type="radio" name="modo_exclusao" value="todos" checked> <span>Excluir <b>todos os <span id="modal-del-total-envios"></span> envios</b> desta pessoa</span></label>'
+        '      <label><input type="radio" name="modo_exclusao" value="individual"> <span>Excluir apenas o <b>envio mais recente</b> (<span id="modal-del-id-curto"></span>)</span></label>'
+        '    </div>'
+        '    <span class="modal-aviso">Esta ação é irreversível e removerá os dados selecionados do sistema.</span>'
         '    <div id="modal-del-erro" class="modal-erro" style="display:none;"></div>'
         '    <div class="modal-acoes">'
         '      <button type="button" class="btn-modal-cancelar" onclick="fecharModalExcluir()">Cancelar</button>'
@@ -584,15 +657,13 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
     return progresso
 
 
-def _contagens_leituras_dados(dados: list[tuple[str, dict]]) -> tuple[dict[str, int], int]:
-    """Agrupa leituras da mesma pessoa por WhatsApp, ID do visitante ou (nome, data de nascimento).
-
-    Retorna:
-      - mapa stem -> total_de_submissoes_daquela_pessoa
-      - total de pessoas únicas
-    """
+def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
+                                 progresso_map: dict[str, dict]) -> list[dict]:
+    """Agrupa submissões da mesma pessoa em grupos ordenados cronologicamente."""
     leads = []
-    for stem, d in dados:
+    mapa_dados = {}
+    for stem, d in todos_dados:
+        mapa_dados[stem] = d
         if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
             continue
         nome = " ".join((d.get("nome_completo") or "").strip().lower().split())
@@ -613,7 +684,7 @@ def _contagens_leituras_dados(dados: list[tuple[str, dict]]) -> tuple[dict[str, 
 
     n_leads = len(leads)
     if n_leads == 0:
-        return {}, 0
+        return []
 
     parent = list(range(n_leads))
 
@@ -644,13 +715,61 @@ def _contagens_leituras_dados(dados: list[tuple[str, dict]]) -> tuple[dict[str, 
         r = find(i)
         clusters.setdefault(r, []).append(leads[i]["stem"])
 
-    mapa_contagens: dict[str, int] = {}
+    grupos: list[dict] = []
     for stems in clusters.values():
-        qtd = len(stems)
-        for s in stems:
-            mapa_contagens[s] = qtd
+        stems_ordenados = sorted(stems, reverse=True)
+        principal_stem = stems_ordenados[0]
+        d_principal = mapa_dados[principal_stem]
 
-    return mapa_contagens, len(clusters)
+        teve_checkout = any(progresso_map.get(s, {}).get("checkout") for s in stems_ordenados)
+        max_tela = max((progresso_map.get(s, {}).get("max_tela", 7) for s in stems_ordenados), default=7)
+        rotulo_etapa = registro.ETAPAS_ROTULOS.get(max_tela, f"Tela {max_tela}")
+
+        # WhatsApp consolidado
+        wa_consolidado = d_principal.get("whatsapp")
+        if not wa_consolidado or wa_consolidado == "—":
+            for s in stems_ordenados[1:]:
+                w_alt = mapa_dados[s].get("whatsapp")
+                if w_alt and w_alt != "—":
+                    wa_consolidado = w_alt
+                    break
+
+        # Nome consolidado
+        nome_consolidado = d_principal.get("nome_completo") or "—"
+        if nome_consolidado in ("—", ""):
+            for s in stems_ordenados[1:]:
+                n_alt = mapa_dados[s].get("nome_completo")
+                if n_alt and n_alt not in ("—", ""):
+                    nome_consolidado = n_alt
+                    break
+
+        grupos.append({
+            "id_grupo": principal_stem,
+            "stem_principal": principal_stem,
+            "d_principal": d_principal,
+            "nome_completo": nome_consolidado,
+            "whatsapp": wa_consolidado,
+            "nascimento": d_principal.get("nascimento") or {},
+            "cidade": d_principal.get("cidade") or {},
+            "teve_checkout": teve_checkout,
+            "max_tela": max_tela,
+            "rotulo_etapa": rotulo_etapa,
+            "total_envios": len(stems_ordenados),
+            "todos_ids": stems_ordenados,
+            "outras_leituras": [(s, mapa_dados[s]) for s in stems_ordenados[1:]],
+        })
+
+    grupos.sort(key=lambda g: g["stem_principal"], reverse=True)
+    return grupos
+
+
+def _contagens_leituras_dados(dados: list[tuple[str, dict]]) -> tuple[dict[str, int], int]:
+    grupos = _agrupar_leituras_por_pessoa(dados, {})
+    mapa_contagens = {}
+    for g in grupos:
+        for s in g["todos_ids"]:
+            mapa_contagens[s] = g["total_envios"]
+    return mapa_contagens, len(grupos)
 
 
 def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
@@ -677,59 +796,72 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             continue          # fixtures da suite de testes
         todos_dados.append((arq.stem, d))
 
-    total_geral = len(todos_dados)
+    total_leituras_geral = len(todos_dados)
 
     # Identifica progresso e checkout de todas as leituras
     progresso_map = obter_progresso_leituras(todos_dados)
-    total_checkout = sum(1 for stem, _ in todos_dados if progresso_map.get(stem, {}).get("checkout"))
+    total_leituras_checkout = sum(1 for stem, _ in todos_dados if progresso_map.get(stem, {}).get("checkout"))
 
-    # Mapeia submissões por pessoa usando todos os envios para badge Nx
-    contagens_map, _ = _contagens_leituras_dados(todos_dados)
+    # Agrupa por pessoa única
+    todos_grupos = _agrupar_leituras_por_pessoa(todos_dados, progresso_map)
+    total_pessoas_geral = len(todos_grupos)
+    total_pessoas_checkout = sum(1 for g in todos_grupos if g["teve_checkout"])
 
     if so_checkout:
-        dados_filtrados = [(stem, d) for stem, d in todos_dados if progresso_map.get(stem, {}).get("checkout")]
+        grupos_filtrados = [g for g in todos_grupos if g["teve_checkout"]]
     else:
-        dados_filtrados = todos_dados
+        grupos_filtrados = todos_grupos
 
-    total_exibidos = len(dados_filtrados)
-    _, total_pessoas_exibidas = _contagens_leituras_dados(dados_filtrados)
+    total_pessoas_exibidas = len(grupos_filtrados)
+    total_leituras_exibidas = sum(g["total_envios"] for g in grupos_filtrados)
 
-    total_paginas = max(1, (total_exibidos + por_pagina - 1) // por_pagina)
+    total_paginas = max(1, (total_pessoas_exibidas + por_pagina - 1) // por_pagina)
     pagina_int = pagina.default if hasattr(pagina, "default") else int(pagina)
-    pagina_ajustada = min(max(0, pagina_int), total_paginas - 1) if total_exibidos > 0 else 0
-    recorte = dados_filtrados[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
+    pagina_ajustada = min(max(0, pagina_int), total_paginas - 1) if total_pessoas_exibidas > 0 else 0
+    recorte_grupos = grupos_filtrados[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
 
     linhas = []
     tr_attrs = []
-    for stem, d in recorte:
+    for g in recorte_grupos:
+        stem = g["stem_principal"]
+        d = g["d_principal"]
         v, pr = d.get("veredito") or {}, d.get("precisao") or {}
-        nasc = d.get("nascimento") or {}
-        cid = d.get("cidade") or {}
+        nasc = g["nascimento"]
+        cid = g["cidade"]
         chegada_bsb, gerada_bsb = f_chegada_bsb(d, stem)
-        prog = progresso_map.get(stem, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
-        rotulo_etapa = prog["rotulo"]
-        etapa_cls = "tag-etapa oferta" if prog["max_tela"] == 10 else "tag-etapa"
+        rotulo_etapa = g["rotulo_etapa"]
+        etapa_cls = "tag-etapa oferta" if g["max_tela"] == 10 else "tag-etapa"
         tag_etapa = f'<span class="{etapa_cls}">{html.escape(rotulo_etapa)}</span>'
-        tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if prog["checkout"] else '<span class="tag-checkout nao">Não</span>'
+        tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if g["teve_checkout"] else '<span class="tag-checkout nao">Não</span>'
 
-        qtd_submissoes = contagens_map.get(stem, 1)
-        tag_rep = f' <span class="tag-rep" title="Preencheu o formulário {qtd_submissoes} vezes">{qtd_submissoes}x</span>' if qtd_submissoes > 1 else ''
-        nome_completo = html.escape(d.get("nome_completo") or "—") + tag_rep
+        btn_acordeao = ""
+        if g["total_envios"] > 1:
+            btn_acordeao = (
+                f' <button type="button" class="btn-acordeao" '
+                f'onclick="toggleAcordeao(\'{html.escape(g["id_grupo"])}\', this);" '
+                f'title="Ver todas as {g["total_envios"]} tentativas desta pessoa">'
+                f'<span class="seta">▶</span> <span class="tag-rep" title="Preencheu o formulário {g["total_envios"]} vezes">{g["total_envios"]}x</span></button>'
+            )
 
-        tr_attrs.append(f'id="row-leitura-{stem}" data-checkout="{"1" if prog.get("checkout") else "0"}"')
-        nome_puro = d.get("nome_completo") or "—"
-        nome_js = html.escape(nome_puro).replace("'", "\\'")
-        btn_del = (f'<button type="button" class="btn-del" '
-                   f'onclick="abrirModalExcluir(\'{html.escape(stem)}\', \'{nome_js}\');" '
-                   f'title="Excluir dados desta leitura">🗑️ Excluir</button>')
+        nome_cell = html.escape(g["nome_completo"]) + btn_acordeao
+
+        todos_ids_json = html.escape(json.dumps(g["todos_ids"])).replace("'", "&#39;")
+        nome_js = html.escape(g["nome_completo"]).replace("'", "\\'")
+        btn_del_principal = (
+            f'<button type="button" class="btn-del" '
+            f'onclick="abrirModalExcluir(\'{html.escape(stem)}\', \'{nome_js}\', {g["total_envios"]}, \'{todos_ids_json}\', false);" '
+            f'title="Excluir dados desta pessoa">🗑️ Excluir</button>'
+        )
+
+        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}"')
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
             f'<span style="white-space:nowrap;">{html.escape(gerada_bsb)}</span>',
             tag_etapa,
             tag_chk,
-            nome_completo,
-            f_wa(d.get("whatsapp")),
+            nome_cell,
+            f_wa(g["whatsapp"]),
             f_data(nasc),
             html.escape(cid.get("uf") or cid.get("nome") or "—"),
             html.escape(str((d.get("quiz") or {}).get("area") or "—")),
@@ -737,18 +869,56 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
             f_tempo(d.get("tempo_quiz_ms")),
-            btn_del,
+            btn_del_principal,
         ])
+
+        # Sub-linhas para tentativas anteriores do acordeão
+        for sub_stem, sub_d in g["outras_leituras"]:
+            sub_v, sub_pr = sub_d.get("veredito") or {}, sub_d.get("precisao") or {}
+            sub_nasc = sub_d.get("nascimento") or {}
+            sub_chegada_bsb, sub_gerada_bsb = f_chegada_bsb(sub_d, sub_stem)
+            sub_prog = progresso_map.get(sub_stem, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
+            sub_rotulo_etapa = sub_prog["rotulo"]
+            sub_etapa_cls = "tag-etapa oferta" if sub_prog["max_tela"] == 10 else "tag-etapa"
+            sub_tag_etapa = f'<span class="{sub_etapa_cls}">{html.escape(sub_rotulo_etapa)}</span>'
+            sub_tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if sub_prog["checkout"] else '<span class="tag-checkout nao">Não</span>'
+
+            btn_del_sub = (
+                f'<button type="button" class="btn-del" '
+                f'onclick="abrirModalExcluir(\'{html.escape(sub_stem)}\', \'{nome_js}\', 1, \'[]\', true);" '
+                f'title="Excluir apenas esta tentativa anterior">🗑️</button>'
+            )
+
+            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}"')
+            linhas.append([
+                f'<span style="padding-left:14px;"><a href="/painel/leitura/{html.escape(sub_stem)}" style="color:var(--sand2);">↳ {html.escape(sub_stem[:15])}</a></span>',
+                f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_chegada_bsb)}</span>',
+                f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_gerada_bsb)}</span>',
+                sub_tag_etapa,
+                sub_tag_chk,
+                '<span style="color:var(--sand2);font-size:11.5px;padding-left:8px;">↳ tentativa anterior</span>',
+                f_wa(sub_d.get("whatsapp")),
+                f_data(sub_nasc),
+                "—",
+                html.escape(str((sub_d.get("quiz") or {}).get("area") or "—")),
+                html.escape(str(sub_v.get("tipo") or "—")),
+                "—" if not sub_v.get("casa_eleita_real") else f'Casa {sub_v.get("casa_aberta")}',
+                f_hora(sub_nasc, sub_pr),
+                f_tempo(sub_d.get("tempo_quiz_ms")),
+                btn_del_sub,
+            ])
 
     if not linhas and so_checkout:
         corpo = '<p class="vazio">Nenhum visitante foi ao checkout neste período.</p>'
+    elif not linhas:
+        corpo = '<p class="vazio">Nenhuma leitura encontrada.</p>'
     else:
         corpo = _tabela([
             "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
             "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
         ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras")
 
-    return corpo, total_exibidos, total_paginas, total_pessoas_exibidas, total_checkout, total_geral
+    return corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral
 
 
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
@@ -964,13 +1134,14 @@ def painel(request: Request, _=Depends(exigir_senha),
         "teste": teste if teste else None,
         "so_checkout": 1 if so_checkout else None,
     }
-    rotulo_pag = "leituras com checkout" if so_checkout else "leituras"
-    barra_pag = _barra_paginacao(pag_leituras_int, total_exibidos, "/painel", p_params,
+    rotulo_pag = "pessoas com checkout" if so_checkout else "pessoas únicas"
+    barra_pag = _barra_paginacao(pag_leituras_int, total_pessoas, "/painel", p_params,
                                  por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras",
                                  rotulo_item=rotulo_pag)
     sub_tipo = "com checkout" if so_checkout else "no total"
     txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
-    p.append(f'<p class="sub" id="sub-leituras-info"><b>{total_exibidos}</b> leituras {sub_tipo} ({txt_pessoas}) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
+    txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
+    p.append(f'<p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo} ({txt_envios} no total) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
     p.append(corpo_leituras)
     p.append(barra_pag)
     p.append('</section>')
@@ -1069,8 +1240,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0), so_checkout: in
         pagina, por_pagina=20, so_checkout=bool(so_checkout)
     )
     p_params = {"so_checkout": 1 if so_checkout else None}
-    rotulo_pag = "leituras com checkout" if so_checkout else "leituras"
-    barra_pag = _barra_paginacao(pagina, total_exibidos, "/painel/leituras", p_params,
+    rotulo_pag = "pessoas com checkout" if so_checkout else "pessoas únicas"
+    barra_pag = _barra_paginacao(pagina, total_pessoas, "/painel/leituras", p_params,
                                  por_pagina=20, param_nome="pagina", rotulo_item=rotulo_pag)
 
     def link_filtro_lista(so_chk: int) -> str:
@@ -1094,9 +1265,10 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0), so_checkout: in
 
     sub_tipo = "com checkout" if so_checkout else "no total"
     txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
+    txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
-        f'<h1>Leituras</h1><p class="sub" id="sub-leituras-info"><b>{total_exibidos}</b> leituras {sub_tipo} ({txt_pessoas}) · mostrando 20 por página · '
+        f'<h1>Leituras</h1><p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo} ({txt_envios} no total) · mostrando 20 por página · '
         f'<a href="/painel#aba-leituras">voltar ao painel</a></p>'
         f'{botoes_filtro}'
         f'{corpo}'
@@ -1170,10 +1342,55 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
 
 
 @router.post("/painel/leitura/{leitura_id}/deletar")
-def deletar_leitura(leitura_id: str, _=Depends(exigir_senha)):
-    """Exclui permanentemente o arquivo de uma leitura individual."""
+def deletar_leitura(leitura_id: str, modo: str = Query("individual"), _=Depends(exigir_senha)):
+    """Exclui permanentemente o arquivo de uma leitura individual ou todos os envios de uma pessoa."""
     if not re.fullmatch(r"[0-9]{8}-[0-9]{6}-[0-9a-f]{8}", leitura_id):
         raise HTTPException(400, "identificador de leitura inválido")
+
+    if modo == "todos":
+        # Carrega todas as leituras e agrupa para encontrar todos os IDs associados a essa pessoa
+        arquivos = list(config.DIR_LEITURAS.glob("*.json"))
+        todos_dados: list[tuple[str, dict]] = []
+        for arq in arquivos:
+            try:
+                todos_dados.append((arq.stem, json.loads(arq.read_text(encoding="utf-8"))))
+            except Exception:
+                continue
+
+        grupos = _agrupar_leituras_por_pessoa(todos_dados, {})
+        ids_para_excluir = [leitura_id]
+        for g in grupos:
+            if leitura_id in g["todos_ids"]:
+                ids_para_excluir = g["todos_ids"]
+                break
+
+        removidos = []
+        erros = []
+        for lid in ids_para_excluir:
+            arq = config.DIR_LEITURAS / f"{lid}.json"
+            if arq.exists():
+                try:
+                    arq.unlink()
+                    removidos.append(lid)
+                except Exception as e:
+                    logger.error("Erro ao excluir arquivo de leitura %s: %s", lid, e)
+                    erros.append(lid)
+
+        if not removidos and erros:
+            raise HTTPException(500, f"falha ao excluir leituras: {erros}")
+        if not removidos:
+            raise HTTPException(404, "nenhuma leitura encontrada para exclusão")
+
+        logger.info("Grupo de leituras %s excluído com sucesso (%d arquivos removidos).", leitura_id, len(removidos))
+        return {
+            "ok": True,
+            "leitura_id": leitura_id,
+            "modo": "todos",
+            "removidos": removidos,
+            "mensagem": f"{len(removidos)} envio(s) excluído(s) com sucesso"
+        }
+
+    # modo == "individual"
     arq = config.DIR_LEITURAS / f"{leitura_id}.json"
     if not arq.exists():
         raise HTTPException(404, "leitura não encontrada")
@@ -1183,4 +1400,11 @@ def deletar_leitura(leitura_id: str, _=Depends(exigir_senha)):
     except Exception as e:
         logger.error("Erro ao excluir arquivo de leitura %s: %s", leitura_id, e)
         raise HTTPException(500, f"falha ao excluir leitura: {e}")
-    return {"ok": True, "leitura_id": leitura_id, "mensagem": "Leitura excluída com sucesso"}
+    return {
+        "ok": True,
+        "leitura_id": leitura_id,
+        "modo": "individual",
+        "removidos": [leitura_id],
+        "mensagem": "Leitura excluída com sucesso"
+    }
+

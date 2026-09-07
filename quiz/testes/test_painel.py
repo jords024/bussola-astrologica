@@ -543,7 +543,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("Ana Pereira", corpo)
 
     def test_deduplicacao_leituras_e_badge_repeticao(self):
-        """Verifica se envios repetidos da mesma pessoa exibem a tag Nx e contam como 1 única pessoa."""
+        """Verifica se envios repetidos da mesma pessoa exibem o botão de acordeão e contam como 1 única pessoa."""
         from api.painel import _tabela_leituras, _contagens_leituras
         with TemporaryDirectory() as tmpdir:
             dir_leituras = Path(tmpdir)
@@ -573,9 +573,16 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertEqual(total, 4)
                 self.assertEqual(geral, 4)
                 self.assertEqual(unicos, 2)  # 4 envios, mas apenas 2 pessoas únicas
-                self.assertIn('Carlos Eduardo <span class="tag-rep" title="Preencheu o formulário 3 vezes">3x</span>', corpo)
+                self.assertIn("Carlos Eduardo", corpo)
+                self.assertIn("btn-acordeao", corpo)
+                self.assertIn("toggleAcordeao", corpo)
+                self.assertIn('title="Preencheu o formulário 3 vezes">3x</span>', corpo)
                 self.assertIn("Fernanda Lima", corpo)
-                self.assertNotIn("Fernanda Lima <span class=\"tag-rep\"", corpo)
+                self.assertNotIn("Fernanda Lima <button", corpo)
+                # Verifica se as sub-linhas foram renderizadas ocultas
+                self.assertIn("tr-subleitura", corpo)
+                self.assertIn("↳ tentativa anterior", corpo)
+                self.assertIn('style="display:none;"', corpo)
 
     def test_filtro_so_checkout_na_tabela_e_painel(self):
         """Verifica o botão e filtro para exibir exclusivamente leads que foram ao checkout."""
@@ -760,7 +767,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertFalse(arq.exists())  # arquivo foi excluído permanentemente
 
     def test_tabela_e_painel_renderizam_botao_e_modal_excluir(self):
-        """Verifica se a tabela de leituras e o painel contêm o botão de deletar e o popup modal centralizado."""
+        """Verifica se a tabela de leituras e o painel contêm o botão de deletar e o popup modal centralizado com opções."""
         from api.painel import _tabela_leituras, painel
         from starlette.requests import Request
 
@@ -778,12 +785,12 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 corpo, _, _, _, _, _ = _tabela_leituras(pagina=0)
                 # Verifica a coluna 'ações' no cabeçalho
                 self.assertIn("ações", corpo)
-                # Verifica o ID da linha para remoção dinâmica no DOM
-                self.assertIn(f'id="row-leitura-{lid}"', corpo)
+                # Verifica o ID da linha da pessoa para remoção dinâmica no DOM
+                self.assertIn(f'id="row-pessoa-{lid}"', corpo)
                 # Verifica o botão de exclusão
                 self.assertIn('class="btn-del"', corpo)
                 self.assertIn("🗑️ Excluir", corpo)
-                self.assertIn(f"abrirModalExcluir('{lid}', 'Marcos Silva')", corpo)
+                self.assertIn(f"abrirModalExcluir('{lid}', 'Marcos Silva'", corpo)
 
                 # Verifica o HTML completo do painel
                 req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
@@ -797,8 +804,88 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("btn-modal-confirmar", html_resp)
                 self.assertIn("fecharModalExcluir()", html_resp)
                 self.assertIn("executarExclusao()", html_resp)
+                self.assertIn('id="modal-del-opcoes"', html_resp)
+                self.assertIn('name="modo_exclusao"', html_resp)
+
+    def test_agrupamento_acordeao_consolidacao_checkout(self):
+        """Verifica se uma pessoa com múltiplos envios consolida o status de checkout na linha principal."""
+        from api.painel import _tabela_leituras
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # Tentativa 1 (mais antiga): chegou ao checkout
+            arq1 = dir_leituras / "20260907-100000-aaaa0001.json"
+            arq1.write_text(json.dumps({
+                "nome_completo": "Juliana Santos",
+                "whatsapp": "11988887777",
+                "checkout": True,
+                "etapa_max": 10,
+                "nascimento": {"dia": 5, "mes": 5, "ano": 1992},
+            }), encoding="utf-8")
+
+            # Tentativa 2 (mais recente): desistiu na tela 7, sem checkout
+            arq2 = dir_leituras / "20260907-110000-aaaa0002.json"
+            arq2.write_text(json.dumps({
+                "nome_completo": "Juliana Santos",
+                "whatsapp": "11988887777",
+                "checkout": False,
+                "etapa_max": 7,
+                "nascimento": {"dia": 5, "mes": 5, "ano": 1992},
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                corpo, total, pags, unicos, chk, geral = _tabela_leituras(pagina=0)
+                # Consolidação: teve_checkout é True porque a tentativa anterior foi ao checkout
+                self.assertEqual(unicos, 1)
+                self.assertEqual(chk, 1)
+                self.assertEqual(total, 2)
+                # Linha principal deve ter data-checkout="1" e tag-checkout sim
+                self.assertIn('id="row-pessoa-20260907-110000-aaaa0002" class="tr-pessoa" data-checkout="1"', corpo)
+                self.assertIn("✦ SIM", corpo)
+                # Sub-linha da tentativa anterior deve existir
+                self.assertIn('id="row-leitura-20260907-100000-aaaa0001"', corpo)
+
+    def test_deletar_leitura_modo_todos(self):
+        """Verifica a exclusão em lote de todos os envios de uma mesma pessoa com modo=todos."""
+        from starlette.testclient import TestClient
+        from main import app
+        client = TestClient(app)
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # 2 envios da mesma pessoa (mesmo whatsapp)
+            lid1 = "20260907-140000-11111111"
+            lid2 = "20260907-140500-22222222"
+            arq1 = dir_leituras / f"{lid1}.json"
+            arq2 = dir_leituras / f"{lid2}.json"
+            arq1.write_text(json.dumps({"nome_completo": "Ana Paula", "whatsapp": "11999990000"}), encoding="utf-8")
+            arq2.write_text(json.dumps({"nome_completo": "Ana Paula", "whatsapp": "11999990000"}), encoding="utf-8")
+
+            # 1 envio de outra pessoa
+            lid3 = "20260907-150000-33333333"
+            arq3 = dir_leituras / f"{lid3}.json"
+            arq3.write_text(json.dumps({"nome_completo": "Outro Visitante", "whatsapp": "21988881111"}), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # Executa exclusão com modo=todos usando o id do envio 2
+                res = client.post(
+                    f"/painel/leitura/{lid2}/deletar?modo=todos",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(res.status_code, 200)
+                dados = res.json()
+                self.assertTrue(dados.get("ok"))
+                self.assertEqual(dados.get("modo"), "todos")
+                self.assertIn(lid1, dados.get("removidos", []))
+                self.assertIn(lid2, dados.get("removidos", []))
+
+                # Verifica se ambos os arquivos de Ana Paula foram removidos
+                self.assertFalse(arq1.exists())
+                self.assertFalse(arq2.exists())
+                # E o outro visitante continua intacto
+                self.assertTrue(arq3.exists())
 
 
 if __name__ == "__main__":
     unittest.main()
+
 
