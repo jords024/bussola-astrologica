@@ -3,7 +3,7 @@ services:
   # Serviço da Aplicação Web (Landing Page & Painel Astrowake / Bússola)
   # ============================================================================
   landing_crassus:
-    image: aryalvesfernandes/landing-crassus:1.2.3
+    image: aryalvesfernandes/landing-crassus:1.2.4
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     
     networks:
@@ -53,11 +53,15 @@ services:
         - traefik.http.services.landing_crassus.loadbalancer.server.port=3000
         - traefik.http.services.landing_crassus.loadbalancer.passHostHeader=true
 
+        # Configura o Middleware para Headers SSL / HTTPS
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.landing_crassus.middlewares=sslheader@docker
+
   # ============================================================================
   # Serviço do Quiz Astrológico (FastAPI, Cálculos Kerykeion & Leitura IA)
   # ============================================================================
   quiz_crassus:
-    image: aryalvesfernandes/quiz-crassus:1.2.1
+    image: aryalvesfernandes/quiz-crassus:1.2.4
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
 
     networks:
@@ -112,6 +116,9 @@ services:
         - traefik.http.routers.quiz_crassus.service=quiz_crassus
         - traefik.http.services.quiz_crassus.loadbalancer.server.port=8765
         - traefik.http.services.quiz_crassus.loadbalancer.passHostHeader=true
+
+        # Configura o Middleware para Headers SSL / HTTPS
+        - traefik.http.routers.quiz_crassus.middlewares=sslheader@docker
 
 # ==============================================================================
 # Definição dos Volumes do Stack
