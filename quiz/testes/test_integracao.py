@@ -183,5 +183,27 @@ class Integracao(unittest.TestCase):
         quiz_labels = quiz['deploy']['labels']
         self.assertTrue(any('server.port=8765' in lbl for lbl in quiz_labels))
 
+    def test_meta_pixel_rastreamento_completo(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        # Validação do ID do Pixel e Script base
+        self.assertIn('776532458708522', html)
+        self.assertIn("fbq('init', '776532458708522');", html)
+        self.assertIn("fbq('track', 'PageView');", html)
+        self.assertIn('https://connect.facebook.net/en_US/fbevents.js', html)
+        self.assertIn('https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1', html)
+
+        # Validação das funções e eventos de rastreamento do funil
+        self.assertIn('Quiz_Etapa_', html)
+        self.assertIn('Quiz_Etapa', html)
+        self.assertIn('Quiz_Escolha_', html)
+        self.assertIn('Quiz_Leitura_Revelada', html)
+
+        # Validação dos eventos padrão do Meta Pixel
+        self.assertIn("window.fbq('track', 'Lead'", html)
+        self.assertIn("window.fbq('track', 'ViewContent'", html)
+        self.assertIn("window.fbq('track', 'InitiateCheckout'", html)
+
 if __name__ == '__main__':
     unittest.main()

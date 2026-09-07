@@ -9,6 +9,23 @@
 <meta name="theme-color" content="#131313">
 <meta name="description" content="Descubra qual das doze areas do seu mapa esta ativa agora.">
 <title>Bússola MVP</title>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '776532458708522');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 <style>
   :root{
     --bg:#131313;
@@ -764,6 +781,34 @@
 <script>
 (function(){
   /* ------------------------------------------------------------------
+     Meta Pixel 776532458708522 - Rastreamento de Etapas e Eventos
+     ------------------------------------------------------------------ */
+  const NOMES_ETAPAS = ['Inicio','Contexto','Area','Espelho','Quebra','Dados','Calculando','Leitura','Portas','Ponte','Oferta'];
+
+  function trackFb(evt, props){
+    if (typeof window.fbq !== 'function') return;
+    try {
+      window.fbq('trackCustom', 'Quiz_' + evt, props || {});
+      if (evt === 'escolha' && props && props.campo) {
+        window.fbq('trackCustom', 'Quiz_Escolha_' + props.campo, { valor: props.valor });
+      }
+      if (evt === 'form_envio') {
+        window.fbq('track', 'Lead', {
+          content_name: 'Quiz Bússola Lead',
+          content_category: (props && props.area) || 'astrologia'
+        });
+      }
+      if (evt === 'oferta_clique') {
+        window.fbq('track', 'InitiateCheckout', {
+          value: 67.00,
+          currency: 'BRL',
+          content_name: 'Bússola Astrológica - Pacote Completo'
+        });
+      }
+    } catch(e) {}
+  }
+
+  /* ------------------------------------------------------------------
      A · rastreamento do funil.
 
      Definido primeiro como no-op e so depois promovido dentro de try. Se o
@@ -772,7 +817,7 @@
 
      Nada aqui espera rede. ev() so empurra num array e retorna.
      ------------------------------------------------------------------ */
-  const A = {ev(){}, flush(){}, sid:'', novoSid(){}, marcou:0};
+  const A = {ev(evt, props){ trackFb(evt, props); }, flush(){}, sid:'', novoSid(){}, marcou:0};
   try{
     const uid = () => (crypto.randomUUID ? crypto.randomUUID()
                     : 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,10));
@@ -812,6 +857,7 @@
     A.novoSid = function(){ sid = uid(); ss.setItem('bsl_sid', sid); A.sid = sid; seq = 0; };
     A.flush = function(beacon){ clearTimeout(timer); timer = null; enviar(beacon); };
     A.ev = function(evt, props, urgente){
+      trackFb(evt, props);
       fila.push({seq:++seq, ts_cli:Date.now(), evt:evt, props:props||{}});
       salvar();
       if(urgente || fila.length >= 5){ A.flush(); return; }
@@ -853,6 +899,13 @@
        7->5, o go(6) do calcular, o go(7) da entrega e o go(5) do erro */
     A.ev('tela', {de:de, para:i, ms_na_anterior: Date.now()-tTela,
       direcao: (de===6 && i===5) ? 'erro' : (i>de ? 'frente' : 'tras')});
+    const nomeEtapa = NOMES_ETAPAS[i] || ('Etapa_' + i);
+    if(typeof window.fbq === 'function'){
+      try{
+        window.fbq('trackCustom', 'Quiz_Etapa_' + i, { etapa: i, nome: nomeEtapa, de: de });
+        window.fbq('trackCustom', 'Quiz_Etapa', { etapa: i, nome: nomeEtapa, de: de });
+      }catch(e){}
+    }
     tTela = Date.now();
     const p = Math.round(i/(scr.length-1)*100);
     $('#bar').classList.toggle('on', i > 0);
@@ -867,6 +920,9 @@
     if (i === 9) bridge();
   }
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(i+1)));
+  if (typeof window.fbq === 'function') {
+    try { window.fbq('trackCustom', 'Quiz_Etapa_0', { etapa: 0, nome: 'Inicio' }); } catch(e) {}
+  }
 
   /* voltar: da leitura pula o cálculo e cai direto nos dados */
   const SKIP = {7:5};
@@ -1320,6 +1376,20 @@
       nu.textContent=result.bussola.casa_aberta?('casa '+result.bussola.casa_aberta):'';
       await new Promise(resolve=>setTimeout(resolve,reduced?300:1300));
       fill();go(7);
+      if(typeof window.fbq === 'function'){
+        try{
+          window.fbq('track', 'ViewContent', {
+            content_name: 'Carta Revelada' + (result.bussola?.casa_aberta ? (' - Casa ' + result.bussola.casa_aberta) : ''),
+            content_category: S.area || 'astrologia',
+            value: 0,
+            currency: 'BRL'
+          });
+          window.fbq('trackCustom', 'Quiz_Leitura_Revelada', {
+            casa: result.bussola?.casa_aberta || null,
+            area: S.area || null
+          });
+        }catch(e){}
+      }
     }catch(error){
       A.ev('leitura_falha', {onde:'cliente', ms: Date.now()-started,
         motivo: error && error.name === 'AbortError' ? 'timeout' : 'rede'}, true);
