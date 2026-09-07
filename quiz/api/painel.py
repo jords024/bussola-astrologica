@@ -255,6 +255,7 @@ a{color:var(--amber)}
 .tag-checkout{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:700;white-space:nowrap}
 .tag-checkout.sim{background:rgba(62,145,102,.22);color:#58B982;border:1px solid rgba(62,145,102,.5)}
 .tag-checkout.nao{background:rgba(255,255,255,.04);color:var(--sand2);border:1px solid var(--line)}
+.tag-rep{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(229,169,60,.18);color:var(--amber);border:1px solid rgba(229,169,60,.35);margin-left:6px;vertical-align:middle}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -385,9 +386,83 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
     return progresso
 
 
-def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, int]:
+def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
+    """Agrupa leituras da mesma pessoa por WhatsApp, ID do visitante ou (nome, data de nascimento).
+
+    Retorna:
+      - mapa stem -> total_de_submissoes_daquela_pessoa
+      - total de pessoas únicas
+    """
+    leads = []
+    for arq in arquivos:
+        try:
+            d = json.loads(arq.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
+            continue
+        nome = " ".join((d.get("nome_completo") or "").strip().lower().split())
+        n = d.get("nascimento") or {}
+        dia, mes, ano = n.get("dia"), n.get("mes"), n.get("ano")
+        dn = f"{dia}/{mes}/{ano}" if dia and mes and ano else ""
+        wa = re.sub(r"\D", "", str(d.get("whatsapp") or ""))
+        if len(wa) >= 10 and wa.startswith("55"):
+            wa = wa[2:]
+        cid = str(d.get("cliente_id") or "").strip()
+        leads.append({
+            "stem": arq.stem,
+            "nome_norm": nome,
+            "dn": dn,
+            "wa": wa if len(wa) >= 8 else "",
+            "cid": cid,
+        })
+
+    n_leads = len(leads)
+    if n_leads == 0:
+        return {}, 0
+
+    parent = list(range(n_leads))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[ri] = rj
+
+    for i in range(n_leads):
+        for j in range(i + 1, n_leads):
+            l1, l2 = leads[i], leads[j]
+            if l1["wa"] and l2["wa"] and l1["wa"] == l2["wa"]:
+                union(i, j)
+            elif l1["cid"] and l2["cid"] and l1["cid"] == l2["cid"]:
+                union(i, j)
+            elif (l1["nome_norm"] and l2["nome_norm"] and l1["dn"] and l2["dn"]
+                  and l1["nome_norm"] == l2["nome_norm"] and l1["dn"] == l2["dn"]):
+                union(i, j)
+
+    clusters: dict[int, list[str]] = {}
+    for i in range(n_leads):
+        r = find(i)
+        clusters.setdefault(r, []).append(leads[i]["stem"])
+
+    mapa_contagens: dict[str, int] = {}
+    for stems in clusters.values():
+        qtd = len(stems)
+        for s in stems:
+            mapa_contagens[s] = qtd
+
+    return mapa_contagens, len(clusters)
+
+
+def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, int, int]:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
     total_arquivos = len(arquivos)
+    contagens_map, total_pessoas = _contagens_leituras(arquivos)
     total_paginas = max(1, (total_arquivos + por_pagina - 1) // por_pagina)
     pagina_ajustada = min(max(0, pagina), total_paginas - 1) if total_arquivos > 0 else 0
     recorte = arquivos[pagina_ajustada * por_pagina:(pagina_ajustada + 1) * por_pagina]
@@ -416,13 +491,17 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
         tag_etapa = f'<span class="{etapa_cls}">{html.escape(rotulo_etapa)}</span>'
         tag_chk = '<span class="tag-checkout sim">✦ SIM</span>' if prog["checkout"] else '<span class="tag-checkout nao">Não</span>'
 
+        qtd_submissoes = contagens_map.get(stem, 1)
+        tag_rep = f' <span class="tag-rep" title="Preencheu o formulário {qtd_submissoes} vezes">{qtd_submissoes}x</span>' if qtd_submissoes > 1 else ''
+        nome_completo = html.escape(d.get("nome_completo") or "—") + tag_rep
+
         linhas.append([
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
             f'<span style="white-space:nowrap;">{html.escape(gerada_bsb)}</span>',
             tag_etapa,
             tag_chk,
-            html.escape(d.get("nome_completo") or "—"),
+            nome_completo,
             f_wa(d.get("whatsapp")),
             f_data(nasc),
             html.escape(cid.get("uf") or cid.get("nome") or "—"),
@@ -436,7 +515,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20) -> tuple[str, int, i
         "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
         "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz"
     ], linhas)
-    return corpo, total_arquivos, total_paginas
+    return corpo, total_arquivos, total_paginas, total_pessoas
 
 
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
@@ -529,7 +608,8 @@ def painel(request: Request, _=Depends(exigir_senha),
     p = [f"<style>{ESTILO}</style><title>Painel · Bússola</title><div class=w>"]
     p.append(f"<h1>Bússola Astrológica</h1>")
     p.append(f'<p class="sub">{d1:%d/%m/%Y} a {d2:%d/%m/%Y} · '
-             f'{d["sessoes"]} sessões, {d["abertas"]} ainda em andamento</p>')
+             f'<b>{d.get("pessoas_unicas", d["sessoes"])}</b> pessoas únicas, '
+             f'{d["sessoes"]} sessões no total ({d["abertas"]} ainda em andamento)</p>')
     p.append('<div class="filtros">' + link("hoje", dias=1) + link("7 dias", dias=7)
              + link("30 dias", dias=30) + link("90 dias", dias=90)
              + f'<a href="/painel?dias={dias}&bots={0 if bots else 1}&teste={teste}">'
@@ -544,20 +624,31 @@ def painel(request: Request, _=Depends(exigir_senha),
 
     g = d["geracao"]
     oferta_item = next((f for f in d["funil"] if f["tela"] == 10), None)
-    chegaram_oferta = oferta_item["sessoes"] if oferta_item else 0
+    chegaram_oferta_sessoes = oferta_item["sessoes"] if oferta_item else 0
+    chegaram_oferta_pessoas = oferta_item.get("pessoas", chegaram_oferta_sessoes) if oferta_item else 0
+
     checkout_item = next((f for f in d["funil"] if f["tela"] == "✦"), None)
-    clicaram_checkout = checkout_item["sessoes"] if checkout_item else d.get("checkout", {}).get("cliques", 0)
+    clicaram_checkout_sessoes = checkout_item["sessoes"] if checkout_item else d.get("checkout", {}).get("cliques", 0)
+    clicaram_checkout_pessoas = checkout_item.get("pessoas", clicaram_checkout_sessoes) if checkout_item else clicaram_checkout
+
+    dados_item = next((f for f in d["funil"] if f["tela"] == 5), None)
+    chegaram_dados_sessoes = dados_item["sessoes"] if dados_item else 0
+    chegaram_dados_pessoas = dados_item.get("pessoas", chegaram_dados_sessoes) if dados_item else 0
 
     tempos = d.get("tempos") or {}
     p.append('<div class="cards">')
     for valor, rot in [
-        (d["sessoes"], "sessões"),
+        (d.get("pessoas_unicas", d["sessoes"]), "pessoas únicas"),
+        (d["sessoes"], "sessões totais"),
         (f_tempo(tempos.get("mediana_sessao_ms")), "tempo médio no funil"),
         (f_tempo(tempos.get("mediana_ate_oferta_ms")), "tempo até a oferta"),
-        (d["funil"][5]["sessoes"], "chegaram aos dados"),
+        (chegaram_dados_pessoas,
+         f"chegaram aos dados ({chegaram_dados_sessoes} sessões)" if chegaram_dados_pessoas != chegaram_dados_sessoes else "chegaram aos dados"),
         (g["total"], "cartas entregues"),
-        (chegaram_oferta, "chegaram à oferta"),
-        (clicaram_checkout, "foram ao checkout"),
+        (chegaram_oferta_pessoas,
+         f"chegaram à oferta ({chegaram_oferta_sessoes} sessões)" if chegaram_oferta_pessoas != chegaram_oferta_sessoes else "chegaram à oferta"),
+        (clicaram_checkout_pessoas,
+         f"foram ao checkout ({clicaram_checkout_sessoes} sessões)" if clicaram_checkout_pessoas != clicaram_checkout_sessoes else "foram ao checkout"),
         (f'{g["mediana_ms"]/1000:.1f}s', "mediana do agente"),
         (g["reserva"], "cartas de reserva"),
     ]:
@@ -582,6 +673,7 @@ def painel(request: Request, _=Depends(exigir_senha),
         linhas.append([
             rotulo,
             f'<div class="bar">{_barra(f["pct_do_topo"])}</div>',
+            str(f.get("pessoas", f["sessoes"])),
             str(f["sessoes"]),
             f_tempo(f.get("tempo_na_tela_ms")),
             f_tempo(f.get("cronometro_ms")),
@@ -589,8 +681,9 @@ def painel(request: Request, _=Depends(exigir_senha),
             "—" if f["queda"] in (None, 0) else f'−{f["queda"]}',
             str(f["parou_aqui"]),
         ])
-    p.append(_tabela(["etapa / tela", "", "#sessões", "tempo na tela", "cronômetro", "#% do topo", "#queda", "#pararam aqui"], linhas))
-    p.append('<p class="nota">Conta quem <b>chegou pelo menos uma vez</b> em cada tela. '
+    p.append(_tabela(["etapa / tela", "", "#pessoas", "#sessões", "tempo na tela", "cronômetro", "#% do topo", "#queda", "#pararam aqui"], linhas))
+    p.append('<p class="nota"><b>#Pessoas:</b> visitantes únicos que alcançaram a tela. '
+             '<b>#Sessões:</b> total de acessos contabilizados. '
              '<b>Tempo na tela:</b> mediana do tempo de permanência nesta etapa específica. '
              '<b>Cronômetro:</b> tempo acumulado desde o momento em que o visitante entrou na página até atingir a tela. '
              'A linha <b>✦ Clique no Checkout</b> registra quem apertou o botão de compra na oferta.</p>')
@@ -599,11 +692,11 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ==================== ABA 2: LEITURAS ====================
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
-    corpo_leituras, total_leituras, total_pags = _tabela_leituras(pag_leituras, por_pagina=20)
+    corpo_leituras, total_leituras, total_pags, total_pessoas = _tabela_leituras(pag_leituras, por_pagina=20)
     p_params = {"dias": dias, "bots": bots if bots else None, "teste": teste if teste else None}
     barra_pag = _barra_paginacao(pag_leituras, total_leituras, "/painel", p_params,
                                  por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras")
-    p.append(f'<p class="sub">{total_leituras} leitura(s) no total · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
+    p.append(f'<p class="sub"><b>{total_leituras}</b> leituras ({total_pessoas} pessoas únicas) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
     p.append(corpo_leituras)
     p.append(barra_pag)
     p.append('</section>')
@@ -611,9 +704,12 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
     p.append('<section class="aba-painel" id="aba-formulario">')
     fo = d["formulario"]
+    cheg_rot = f'chegaram ({fo["chegaram"]} sessões)' if fo.get("chegaram_pessoas", fo["chegaram"]) != fo["chegaram"] else 'chegaram'
+    env_rot = f'enviaram ({fo["enviaram"]} sessões)' if fo.get("enviaram_pessoas", fo["enviaram"]) != fo["enviaram"] else 'enviaram'
     p.append("<h2>Onde a tela dos dados trava</h2>")
-    p.append(f'<div class="cards"><div class="card"><b>{fo["chegaram"]}</b><span>chegaram</span></div>'
-             f'<div class="card"><b>{fo["enviaram"]}</b><span>enviaram</span></div>'
+    p.append(f'<div class="cards">'
+             f'<div class="card"><b>{fo.get("chegaram_pessoas", fo["chegaram"])}</b><span>{cheg_rot}</span></div>'
+             f'<div class="card"><b>{fo.get("enviaram_pessoas", fo["enviaram"])}</b><span>{env_rot}</span></div>'
              f'<div class="card"><b>{fo["travaram"]}</b><span>travaram</span></div>'
              f'<div class="card"><b>{fo["sem_tocar"]}</b><span>não tocaram em nada</span></div></div>')
     p.append(_tabela(["último campo preenchido antes de desistir", "#sessões"],
@@ -706,12 +802,12 @@ def painel(request: Request, _=Depends(exigir_senha),
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
 def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0)):
-    corpo, total_arquivos, total_pags = _tabela_leituras(pagina, por_pagina=20)
+    corpo, total_arquivos, total_pags, total_pessoas = _tabela_leituras(pagina, por_pagina=20)
     barra_pag = _barra_paginacao(pagina, total_arquivos, "/painel/leituras", {},
                                  por_pagina=20, param_nome="pagina")
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
-        f'<h1>Leituras</h1><p class="sub">{total_arquivos} no total · mostrando 20 por página · '
+        f'<h1>Leituras</h1><p class="sub"><b>{total_arquivos}</b> leituras ({total_pessoas} pessoas únicas) · mostrando 20 por página · '
         f'<a href="/painel#aba-leituras">voltar ao painel</a></p>{corpo}'
         f'{barra_pag}'
         f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>',
@@ -737,7 +833,13 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     uf_str = f' ({html.escape(cid.get("uf"))})' if cid.get("uf") else ''
     t_quiz_str = f' · tempo no quiz: {f_tempo(d.get("tempo_quiz_ms"))}' if d.get("tempo_quiz_ms") else ''
     chk_str = '<b style="color:var(--green);">✦ SIM</b>' if prog["checkout"] else '<span style="color:var(--sand2);">Não</span>'
-    ident = (f'{html.escape(d.get("nome_completo") or "—")} · '
+
+    # Verifica se a pessoa enviou mais de uma vez
+    contagens_map, _ = _contagens_leituras(list(config.DIR_LEITURAS.glob("*.json")))
+    qtd_submissoes = contagens_map.get(leitura_id, 1)
+    tag_rep_detalhe = f' · <span class="tag-rep">{qtd_submissoes} envios desta pessoa</span>' if qtd_submissoes > 1 else ''
+
+    ident = (f'{html.escape(d.get("nome_completo") or "—")}{tag_rep_detalhe} · '
              f'chegou ao quiz: <b style="color:var(--amber);">{html.escape(chegada_bsb)} (BSB)</b> · '
              f'preencheu dados: <b style="color:var(--amber);">{html.escape(gerada_bsb)} (BSB)</b> · '
              f'etapa: <b style="color:var(--amber);">{html.escape(prog["rotulo"])}</b> · '

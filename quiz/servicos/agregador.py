@@ -40,6 +40,14 @@ def _mediana(valores: Iterable[float]) -> Optional[float]:
     return round(statistics.median(v), 1) if v else None
 
 
+def _chave_pessoa(s: dict) -> str:
+    aid = str(s.get("aid") or "").strip()
+    if aid:
+        return f"aid:{aid}"
+    sid = str(s.get("sid") or "").strip()
+    return f"sid:{sid}" if sid else ""
+
+
 def agregar(eventos: Iterable[dict], de: date, ate: date,
             incluir_bots: bool = False, incluir_teste: bool = False,
             agora: Optional[datetime] = None) -> dict:
@@ -80,7 +88,10 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
                 "duracoes_tela": defaultdict(list),
                 "cronometro_tela": {0: 0.0},
                 "tempo_checkout": None,
+                "aid": str(ev.get("aid") or "").strip(),
             }
+        elif not s.get("aid") and ev.get("aid"):
+            s["aid"] = str(ev.get("aid") or "").strip()
         t = _ts(ev)
         if t:
             if s["primeiro"] is None or t < s["primeiro"]:
@@ -176,9 +187,12 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         "mediana_ate_checkout_ms": _mediana([s["tempo_checkout"] for s in sessoes if s.get("tempo_checkout") is not None]),
     }
 
+    pessoas_unicas = len({_chave_pessoa(s) for s in sessoes if _chave_pessoa(s)})
+
     return {
         "periodo": {"de": de.isoformat(), "ate": ate.isoformat()},
         "sessoes": len(sessoes),
+        "pessoas_unicas": pessoas_unicas,
         "abertas": sum(1 for s in sessoes if s["aberta"]),
         "funil": _funil(sessoes),
         "checkout": {
@@ -215,6 +229,7 @@ def _funil(sessoes: list[dict]) -> list[dict]:
     anterior = None
     for n, nome in TELAS:
         alcanceou = sum(1 for s in sessoes if n in s["telas"])
+        alcanceou_pessoas = len({_chave_pessoa(s) for s in sessoes if n in s["telas"] and _chave_pessoa(s)})
         # quem parou aqui: nunca passou desta tela e nao esta com a sessao aberta
         if n == 10:
             parou = sum(1 for s in sessoes if s["max_tela"] == 10 and not s["oferta"] and not s["aberta"])
@@ -224,7 +239,9 @@ def _funil(sessoes: list[dict]) -> list[dict]:
         cronos = [s["cronometro_tela"][n] for s in sessoes if n in s.get("cronometro_tela", {})]
 
         linhas.append({
-            "tela": n, "nome": nome, "sessoes": alcanceou,
+            "tela": n, "nome": nome,
+            "sessoes": alcanceou,
+            "pessoas": alcanceou_pessoas,
             "tempo_na_tela_ms": _mediana(duracoes),
             "cronometro_ms": _mediana(cronos),
             "pct_do_topo": pct(alcanceou, base),
@@ -235,12 +252,14 @@ def _funil(sessoes: list[dict]) -> list[dict]:
 
     # Etapa de conversão final: clique no botão da oferta direcionando ao checkout da Hotmart
     clicou_checkout = sum(1 for s in sessoes if s["oferta"])
+    clicou_checkout_pessoas = len({_chave_pessoa(s) for s in sessoes if s["oferta"] and _chave_pessoa(s)})
     duracoes_checkout = [d for s in sessoes if s.get("oferta") for d in s.get("duracoes_tela", {}).get(10, [])]
     cronos_checkout = [s["tempo_checkout"] for s in sessoes if s.get("tempo_checkout") is not None]
     linhas.append({
         "tela": "✦",
         "nome": "Clique no Checkout",
         "sessoes": clicou_checkout,
+        "pessoas": clicou_checkout_pessoas,
         "tempo_na_tela_ms": _mediana(duracoes_checkout),
         "cronometro_ms": _mediana(cronos_checkout),
         "pct_do_topo": pct(clicou_checkout, base),
@@ -262,8 +281,11 @@ def _formulario(sessoes: list[dict]) -> dict:
         erros.update(s["form_erros"])
     return {
         "chegaram": len(chegou),
+        "chegaram_pessoas": len({_chave_pessoa(s) for s in chegou if _chave_pessoa(s)}),
         "enviaram": sum(1 for s in chegou if s["form_envio"]),
+        "enviaram_pessoas": len({_chave_pessoa(s) for s in chegou if s["form_envio"] and _chave_pessoa(s)}),
         "travaram": len(travou),
+        "travaram_pessoas": len({_chave_pessoa(s) for s in travou if _chave_pessoa(s)}),
         "sem_tocar": intacto,
         "ultimo_campo": _contagem(s["ultimo_campo"] for s in travou if s["ultimo_campo"]),
         "faltou": erros.most_common(6),

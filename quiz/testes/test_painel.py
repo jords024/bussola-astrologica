@@ -399,15 +399,17 @@ class LeiturasPainelSemMascara(unittest.TestCase):
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
                 # Página 0 (deve trazer 20 itens)
-                corpo_p0, total_p0, pags_p0 = _tabela_leituras(pagina=0, por_pagina=20)
+                corpo_p0, total_p0, pags_p0, unicos_p0 = _tabela_leituras(pagina=0, por_pagina=20)
                 self.assertEqual(total_p0, 25)
+                self.assertEqual(unicos_p0, 25)
                 self.assertEqual(pags_p0, 2)
                 # O corpo da página 0 tem 20 linhas de dados (mais o cabeçalho)
                 self.assertEqual(corpo_p0.count("<tr>"), 21)
 
                 # Página 1 (deve trazer os 5 itens restantes)
-                corpo_p1, total_p1, pags_p1 = _tabela_leituras(pagina=1, por_pagina=20)
+                corpo_p1, total_p1, pags_p1, unicos_p1 = _tabela_leituras(pagina=1, por_pagina=20)
                 self.assertEqual(total_p1, 25)
+                self.assertEqual(unicos_p1, 25)
                 self.assertEqual(pags_p1, 2)
                 self.assertEqual(corpo_p1.count("<tr>"), 6)
 
@@ -518,7 +520,9 @@ class LeiturasPainelSemMascara(unittest.TestCase):
             arq.write_text(json.dumps(conteudo), encoding="utf-8")
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
-                corpo, total, pags = _tabela_leituras(pagina=0, por_pagina=20)
+                corpo, total, pags, unicos = _tabela_leituras(pagina=0, por_pagina=20)
+                self.assertEqual(total, 1)
+                self.assertEqual(unicos, 1)
                 # Verifica cabeçalhos esperados
                 self.assertIn("chegou ao quiz (bsb)", corpo)
                 self.assertIn("preencheu dados (bsb)", corpo)
@@ -533,6 +537,67 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("tag-checkout sim", corpo)
                 self.assertIn("✦ SIM", corpo)
                 self.assertIn("Ana Pereira", corpo)
+
+    def test_deduplicacao_leituras_e_badge_repeticao(self):
+        """Verifica se envios repetidos da mesma pessoa exibem a tag Nx e contam como 1 única pessoa."""
+        from api.painel import _tabela_leituras, _contagens_leituras
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # Pessoa A enviou 3 vezes (com o mesmo WhatsApp)
+            for i in range(3):
+                arq = dir_leituras / f"20260907-120{i}00-aaaa000{i}.json"
+                conteudo = {
+                    "nome_completo": "Carlos Eduardo",
+                    "nascimento": {"dia": 15, "mes": 4, "ano": 1985},
+                    "whatsapp": "(11) 98888-1234",
+                    "cliente_id": f"sid-a-{i}",
+                }
+                arq.write_text(json.dumps(conteudo), encoding="utf-8")
+
+            # Pessoa B enviou 1 vez
+            arq_b = dir_leituras / "20260907-121000-bbbb0001.json"
+            conteudo_b = {
+                "nome_completo": "Fernanda Lima",
+                "nascimento": {"dia": 20, "mes": 8, "ano": 1993},
+                "whatsapp": "21977775555",
+                "cliente_id": "sid-b",
+            }
+            arq_b.write_text(json.dumps(conteudo_b), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                corpo, total, pags, unicos = _tabela_leituras(pagina=0, por_pagina=20)
+                self.assertEqual(total, 4)
+                self.assertEqual(unicos, 2)  # 4 envios, mas apenas 2 pessoas únicas
+                self.assertIn('Carlos Eduardo <span class="tag-rep" title="Preencheu o formulário 3 vezes">3x</span>', corpo)
+                self.assertIn("Fernanda Lima", corpo)
+                self.assertNotIn("Fernanda Lima <span class=\"tag-rep\"", corpo)
+
+    def test_pessoas_unicas_no_agregador(self):
+        """Verifica se o agregador contabiliza pessoas únicas via aid e inclui no funil."""
+        # 3 sessões do mesmo visitante (aid: aid-1) em telas diferentes
+        d = [
+            {"sid": "s1", "aid": "aid-1", "seq": 1, "evt": "tela", "props": {"de": 0, "para": 1}, "ts": T0.isoformat(), "bot": False, "teste": False},
+            {"sid": "s2", "aid": "aid-1", "seq": 1, "evt": "tela", "props": {"de": 0, "para": 5}, "ts": T0.isoformat(), "bot": False, "teste": False},
+            {"sid": "s2", "aid": "aid-1", "seq": 2, "evt": "form_envio", "props": {}, "ts": T0.isoformat(), "bot": False, "teste": False},
+            {"sid": "s3", "aid": "aid-1", "seq": 1, "evt": "tela", "props": {"de": 0, "para": 10}, "ts": T0.isoformat(), "bot": False, "teste": False},
+            # 1 sessão de outro visitante (aid: aid-2)
+            {"sid": "s4", "aid": "aid-2", "seq": 1, "evt": "tela", "props": {"de": 0, "para": 1}, "ts": T0.isoformat(), "bot": False, "teste": False},
+        ]
+        r = agregar(d, HOJE, HOJE)
+        self.assertEqual(r["sessoes"], 4)
+        self.assertEqual(r["pessoas_unicas"], 2)
+
+        # No funil:
+        funil_map = {f["tela"]: f for f in r["funil"]}
+        # Tela 0: 4 sessões, 2 pessoas
+        self.assertEqual(funil_map[0]["sessoes"], 4)
+        self.assertEqual(funil_map[0]["pessoas"], 2)
+        # Tela 5: 1 sessão, 1 pessoa
+        self.assertEqual(funil_map[5]["sessoes"], 1)
+        self.assertEqual(funil_map[5]["pessoas"], 1)
+        # Formulário:
+        self.assertEqual(r["formulario"]["chegaram_pessoas"], 1)
+        self.assertEqual(r["formulario"]["enviaram_pessoas"], 1)
 
     def test_detalhe_leitura_exibe_progresso_e_checkout(self):
         from api.painel import detalhe
