@@ -61,7 +61,7 @@ services:
   # Serviço do Quiz Astrológico (FastAPI, Cálculos Kerykeion & Leitura IA)
   # ============================================================================
   quiz_crassus:
-    image: aryalvesfernandes/quiz-crassus:1.2.6
+    image: aryalvesfernandes/quiz-crassus:1.2.8
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
 
     networks:
@@ -73,6 +73,7 @@ services:
     environment:
       # Diretório gravável dentro do container para armazenar dados e cache
       - DIR_DADOS=/app/dados
+      - TZ=America/Sao_Paulo
 
       # Chave da API OpenAI para geração da carta personalizada
       - OPENAI_API_KEY=

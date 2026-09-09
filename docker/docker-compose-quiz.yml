@@ -6,6 +6,7 @@ services:
       - ../quiz/.env
     environment:
       DIR_DADOS: /app/dados
+      TZ: America/Sao_Paulo
     ports:
       - "127.0.0.1:8765:8765"
     volumes:

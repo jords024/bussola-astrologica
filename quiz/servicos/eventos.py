@@ -20,13 +20,19 @@ import re
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
 from config import DIR_EVENTOS, EVENTOS_RETENCAO_DIAS
 
 logger = logging.getLogger(__name__)
+
+FUSO_BSB = timezone(timedelta(hours=-3))
+
+
+def hoje_bsb() -> date:
+    return datetime.now(FUSO_BSB).date()
 
 VERSAO = 1
 
@@ -95,7 +101,7 @@ def gravar(linhas: list[dict]) -> int:
     """
     if not linhas:
         return 0
-    caminho = _arquivo(date.today())
+    caminho = _arquivo(hoje_bsb())
     blob = "".join(json.dumps(l, ensure_ascii=False) + "\n" for l in linhas)
     for tentativa in range(3):
         try:
@@ -126,7 +132,7 @@ def normalizar(lote: dict, ip: str, user_agent: str) -> list[dict]:
     if not limite_ok(sid, ip):
         return []
 
-    agora = datetime.now().astimezone()
+    agora = datetime.now(FUSO_BSB)
     bot = e_bot(user_agent)
     disp = dispositivo(user_agent)
     teste = bool(lote.get("teste"))
@@ -169,7 +175,7 @@ def registrar_servidor(sid: str, evt: str, props: dict) -> None:
         sid = "servidor-sem-sessao"
     gravar([{
         "v": VERSAO,
-        "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "ts": datetime.now(FUSO_BSB).isoformat(timespec="seconds"),
         "ts_cli": None,
         "seq": -1,                 # -1 = servidor; nunca colide com o cliente
         "sid": str(sid),
@@ -214,7 +220,7 @@ def limpar_antigos() -> int:
     """Retenção. Política que ninguém roda não é política, então roda no startup."""
     if EVENTOS_RETENCAO_DIAS <= 0:
         return 0
-    limite = date.today() - timedelta(days=EVENTOS_RETENCAO_DIAS)
+    limite = hoje_bsb() - timedelta(days=EVENTOS_RETENCAO_DIAS)
     apagados = 0
     for arq in DIR_EVENTOS.glob("*.jsonl"):
         try:

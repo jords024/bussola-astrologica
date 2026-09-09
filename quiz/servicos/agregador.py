@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
+
+FUSO_BSB = timezone(timedelta(hours=-3))
 
 TELAS = [
     (0, "O chamado"), (1, "O mecanismo"), (2, "A área"), (3, "O espelho"),
@@ -30,7 +32,10 @@ MINUTOS_SESSAO_ABERTA = 30
 
 def _ts(ev: dict) -> Optional[datetime]:
     try:
-        return datetime.fromisoformat(ev["ts"])
+        dt = datetime.fromisoformat(ev["ts"])
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=FUSO_BSB)
+        return dt.astimezone(FUSO_BSB)
     except Exception:
         return None
 
@@ -161,7 +166,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
             s["contato"] = True
 
     # o dia de uma sessao e o dia em que ela COMECOU, nao o dia de cada evento
-    agora = agora or datetime.now().astimezone()
+    agora = agora or datetime.now(FUSO_BSB)
     sessoes = []
     for sid, s in ses.items():
         if s["primeiro"] is None:

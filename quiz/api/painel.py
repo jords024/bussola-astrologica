@@ -8,7 +8,9 @@ nascimento e telefone.
 """
 from __future__ import annotations
 
+import csv
 import html
+import io
 import json
 import logging
 import re
@@ -19,8 +21,8 @@ from typing import Optional
 
 import pytz
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 import config
@@ -179,7 +181,13 @@ def f_wa(w: Optional[str]) -> str:
     return html.escape(w_str)
 
 
-TZ_BRASILIA = pytz.timezone("America/Sao_Paulo")
+FUSO_BSB = timezone(timedelta(hours=-3))
+TZ_BRASILIA = FUSO_BSB
+
+
+def hoje_bsb() -> date:
+    """Retorna a data atual no horário oficial de Brasília (UTC-3)."""
+    return datetime.now(FUSO_BSB).date()
 
 
 def _formatar_data_hora_curta(val: datetime | str) -> str:
@@ -201,13 +209,60 @@ def _formatar_data_hora_curta(val: datetime | str) -> str:
         return s
 
 
-def f_chegada_bsb(d: dict, arq_stem: str) -> tuple[str, str]:
-    """Retorna (chegou_em_bsb, gerado_em_bsb) formatados no horário de Brasília (UTC-3) como dd/mm/aa HH:MM."""
-    if d.get("chegou_em_bsb") and d.get("gravado_em_bsb"):
-        return (
-            _formatar_data_hora_curta(d["chegou_em_bsb"]),
-            _formatar_data_hora_curta(d["gravado_em_bsb"])
-        )
+def obter_datetimes_bsb(d: dict, arq_stem: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Calcula (dt_chegada_bsb, dt_gerada_bsb) no fuso de Brasília."""
+    c_bsb = d.get("chegou_em_bsb")
+    g_bsb = d.get("gravado_em_bsb")
+    dt_c = None
+    dt_g = None
+    if c_bsb:
+        if isinstance(c_bsb, datetime):
+            dt_c = c_bsb
+        else:
+            s = str(c_bsb).strip()
+            m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?", s)
+            if m:
+                dia, mes, ano, hora, minuto = m.groups()
+                ano_int = int(ano)
+                if ano_int < 100:
+                    ano_int += 2000
+                try:
+                    dt_c = datetime(ano_int, int(mes), int(dia), int(hora), int(minuto), tzinfo=TZ_BRASILIA)
+                except Exception:
+                    pass
+            if not dt_c:
+                try:
+                    dt_c = datetime.fromisoformat(s)
+                    if dt_c.tzinfo is None:
+                        dt_c = dt_c.replace(tzinfo=TZ_BRASILIA)
+                except Exception:
+                    pass
+
+    if g_bsb:
+        if isinstance(g_bsb, datetime):
+            dt_g = g_bsb
+        else:
+            s = str(g_bsb).strip()
+            m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?", s)
+            if m:
+                dia, mes, ano, hora, minuto = m.groups()
+                ano_int = int(ano)
+                if ano_int < 100:
+                    ano_int += 2000
+                try:
+                    dt_g = datetime(ano_int, int(mes), int(dia), int(hora), int(minuto), tzinfo=TZ_BRASILIA)
+                except Exception:
+                    pass
+            if not dt_g:
+                try:
+                    dt_g = datetime.fromisoformat(s)
+                    if dt_g.tzinfo is None:
+                        dt_g = dt_g.replace(tzinfo=TZ_BRASILIA)
+                except Exception:
+                    pass
+
+    if dt_c and dt_g:
+        return (dt_c, dt_g)
 
     dt_gerada_utc = None
     gravado_em = d.get("gravado_em")
@@ -237,15 +292,33 @@ def f_chegada_bsb(d: dict, arq_stem: str) -> tuple[str, str]:
     else:
         dt_chegada_bsb = dt_gerada_bsb
 
+    return (dt_c or dt_chegada_bsb, dt_g or dt_gerada_bsb)
+
+
+def obter_data_chegada_leitura(d: dict, arq_stem: str) -> Optional[date]:
+    """Retorna a data (date) em que o lead chegou ao quiz no horário de Brasília."""
+    dt_c, _ = obter_datetimes_bsb(d, arq_stem)
+    return dt_c.date() if dt_c else None
+
+
+def f_chegada_bsb(d: dict, arq_stem: str) -> tuple[str, str]:
+    """Retorna (chegou_em_bsb, gerado_em_bsb) formatados no horário de Brasília (UTC-3) como dd/mm/aa HH:MM."""
+    if d.get("chegou_em_bsb") and d.get("gravado_em_bsb"):
+        return (
+            _formatar_data_hora_curta(d["chegou_em_bsb"]),
+            _formatar_data_hora_curta(d["gravado_em_bsb"])
+        )
+
+    dt_c, dt_g = obter_datetimes_bsb(d, arq_stem)
     return (
-        dt_chegada_bsb.strftime("%d/%m/%y %H:%M"),
-        dt_gerada_bsb.strftime("%d/%m/%y %H:%M")
+        dt_c.strftime("%d/%m/%y %H:%M") if dt_c else "—",
+        dt_g.strftime("%d/%m/%y %H:%M") if dt_g else "—"
     )
 
 
 # --------------------------------------------------------------------- helpers
-def _periodo(de: Optional[str], ate: Optional[str], dias: int) -> tuple[date, date]:
-    hoje = date.today()
+def _periodo(de: Optional[str], ate: Optional[str], dias: int = 7) -> tuple[date, date]:
+    hoje = hoje_bsb()
     try:
         d1 = date.fromisoformat(de) if de else hoje - timedelta(days=dias - 1)
         d2 = date.fromisoformat(ate) if ate else hoje
@@ -273,10 +346,18 @@ h1{font-size:20px;margin:0 0 3px;letter-spacing:-.01em}
 h2{font-size:13px;text-transform:uppercase;letter-spacing:.13em;color:var(--amber);
 margin:34px 0 12px;font-weight:600}
 .sub{color:var(--sand2);font-size:12.5px;margin:0 0 20px}
-.filtros{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 6px}
+.filtros{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 10px;align-items:center}
 .filtros a{padding:6px 12px;border:1px solid var(--line);border-radius:999px;
-color:var(--sand2);text-decoration:none;font-size:12px}
-.filtros a.on{border-color:var(--amber);color:var(--amber)}
+color:var(--sand2);text-decoration:none;font-size:12px;transition:all .15s ease}
+.filtros a:hover{border-color:var(--amber);color:var(--amber);background:rgba(229,169,60,.08)}
+.filtros a.on{border-color:var(--amber);color:var(--amber);background:rgba(229,169,60,.12);font-weight:700}
+.form-filtro-datas{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;margin-left:auto}
+.form-filtro-datas .lbl-datas{color:var(--amber);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.form-filtro-datas .lbl-campo{display:inline-flex;align-items:center;gap:4px;color:var(--sand2);font-size:11.5px}
+.form-filtro-datas input[type="date"]{background:#1B1917;color:var(--sand);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:11.5px;font-family:inherit;color-scheme:dark;outline:none}
+.form-filtro-datas input[type="date"]:focus{border-color:var(--amber)}
+.btn-filtrar-datas{background:var(--amber);color:#131313;border:none;border-radius:999px;padding:3px 12px;font-size:11.5px;font-weight:700;cursor:pointer;transition:all .15s ease}
+.btn-filtrar-datas:hover{background:#F6C467;transform:translateY(-1px)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
 .card b{display:block;font-size:23px;line-height:1.15;font-weight:700}
@@ -388,7 +469,46 @@ a{color:var(--amber)}
 .btn-modal-confirmar-compra.desmarcar{background:linear-gradient(135deg,#C4564A 0%,#A33C31 100%);box-shadow:0 4px 14px rgba(196,86,74,.35)}
 .btn-modal-confirmar-compra.desmarcar:hover{background:linear-gradient(135deg,#D96558 0%,#B84A3E 100%);box-shadow:0 6px 18px rgba(196,86,74,.5)}
 .painel-toast{position:fixed;bottom:24px;right:24px;background:#24201D;border:1px solid var(--amber);color:var(--sand);padding:12px 20px;border-radius:8px;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,.6);z-index:999999;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none}
-.painel-toast.on{opacity:1;transform:translateY(0);pointer-events:auto}
+.th-chk{width:36px;text-align:center !important;padding:9px 6px 9px 12px !important}
+.td-chk{width:36px;text-align:center !important;padding:9px 6px 9px 12px !important}
+.chk-selecao{width:16px;height:16px;accent-color:var(--amber);cursor:pointer;vertical-align:middle;margin:0}
+.barra-acoes-leituras{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0 14px;flex-wrap:wrap;gap:10px}
+.acoes-leituras-esquerda{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.acoes-leituras-direita{display:flex;align-items:center;gap:8px}
+.chk-label-todos{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sand);cursor:pointer;user-select:none;-webkit-user-select:none}
+.chk-label-todos:hover{color:var(--amber)}
+.contador-selecao-wrap{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--amber);background:rgba(229,169,60,.12);border:1px solid rgba(229,169,60,.3);border-radius:6px;padding:2px 8px;font-weight:600}
+.badge-sel-check{font-size:11px}
+.btn-sel-todos-filtro{display:inline-flex;align-items:center;gap:6px;background:rgba(229,169,60,.08);border:1px solid rgba(229,169,60,.35);color:var(--sand);font-size:12px;font-weight:600;border-radius:6px;padding:3px 10px;cursor:pointer;transition:all .15s ease;user-select:none}
+.btn-sel-todos-filtro:hover{background:rgba(229,169,60,.18);border-color:var(--amber);color:#FFF}
+.btn-sel-todos-filtro.ativo{background:linear-gradient(135deg,rgba(229,169,60,.32) 0%,rgba(229,169,60,.15) 100%);border-color:var(--amber);color:var(--amber);font-weight:700;box-shadow:0 0 10px rgba(229,169,60,.25)}
+.btn-limpar-selecao{background:none;border:none;color:var(--sand2);font-size:11.5px;cursor:pointer;padding:3px 8px;border-radius:4px;transition:all .15s ease}
+.btn-limpar-selecao:hover{color:#D96558;background:rgba(196,86,74,.12)}
+.banner-selecao-global{background:rgba(229,169,60,.1);border:1px solid rgba(229,169,60,.3);border-radius:8px;padding:8px 14px;margin:-4px 0 12px;font-size:12.5px;color:var(--sand);display:flex;align-items:center;justify-content:center;gap:10px;text-align:center;animation:fadein .2s ease}
+.btn-link-banner{background:none;border:none;color:var(--amber);font-weight:700;text-decoration:underline;cursor:pointer;font-size:12.5px;padding:0;transition:color .15s ease}
+.btn-link-banner:hover{color:#FFF}
+.btn-exportar-csv{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(229,169,60,.18) 0%,rgba(229,169,60,.06) 100%);border:1px solid var(--amber);color:var(--sand);font-size:12px;font-weight:600;border-radius:8px;padding:6px 14px;cursor:pointer;transition:all .15s ease}
+.btn-exportar-csv:hover{background:var(--amber);color:#12100C;font-weight:700;box-shadow:0 3px 10px rgba(229,169,60,.25)}
+.btn-importar-csv{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(229,169,60,.12) 0%,rgba(229,169,60,.04) 100%);border:1px solid rgba(229,169,60,.4);color:var(--sand);font-size:12px;font-weight:600;border-radius:8px;padding:6px 14px;cursor:pointer;transition:all .15s ease}
+.btn-importar-csv:hover{background:var(--amber);color:#12100C;font-weight:700;box-shadow:0 3px 10px rgba(229,169,60,.25)}
+.dropzone-csv{border:2px dashed rgba(229,169,60,.4);border-radius:10px;padding:22px 16px;text-align:center;background:rgba(255,255,255,.015);cursor:pointer;transition:all .2s ease}
+.dropzone-csv:hover,.dropzone-csv.dragover{border-color:var(--amber);background:rgba(229,169,60,.08);transform:translateY(-1px)}
+.dropzone-icone{font-size:28px;margin-bottom:6px}
+.dropzone-texto{font-size:13px;font-weight:600;color:var(--sand)}
+.dropzone-detalhe{font-size:11px;color:rgba(235,230,222,.55);margin-top:4px}
+.dropzone-csv.selecionado{border-style:solid;border-color:var(--green);background:rgba(78,157,110,.1)}
+.dropzone-csv.selecionado .dropzone-texto{color:#58B982}
+.modal-importar-status{font-size:12.5px;padding:10px 14px;border-radius:8px;text-align:left;line-height:1.5}
+.modal-importar-status.sucesso{background:rgba(78,157,110,.15);border:1px solid var(--green);color:#58B982}
+.modal-importar-status.processando{background:rgba(229,169,60,.12);border:1px solid var(--amber);color:var(--amber)}
+.btn-filtro-leituras.wa:hover{border-color:var(--green);color:#58B982;background:rgba(78,157,110,.08)}
+.btn-filtro-leituras.wa.on{border-color:var(--green);background:rgba(78,157,110,.18);color:#58B982;font-weight:700}
+.btn-filtro-leituras.wa.on .badge-count{background:rgba(78,157,110,.25);color:#58B982}
+.filtro-uf-wrap{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:3px 10px;margin-left:4px}
+.lbl-filtro-uf{font-size:11.5px;color:var(--sand2);font-weight:600;display:inline-flex;align-items:center;white-space:nowrap}
+.select-filtro-uf{background:#1B1815;border:1px solid rgba(229,169,60,.3);color:var(--sand);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;outline:none;transition:all .15s ease}
+.select-filtro-uf:hover,.select-filtro-uf:focus{border-color:var(--amber);color:#FFF;box-shadow:0 0 8px rgba(229,169,60,.25)}
+.select-filtro-uf option{background:#1B1815;color:var(--sand);padding:4px}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -405,9 +525,26 @@ function abrirAba(id){
     history.replaceState(null, "", "#" + id);
     localStorage.setItem("painel_aba_ativa", id);
   }catch(e){}
+  atualizarLinksPresetsAba();
   iniciarArrastoScroll();
 }
 window.abrirAba = abrirAba;
+
+function atualizarLinksPresetsAba(){
+  var aba = (location.hash || "").replace("#", "") || "";
+  try{ if(!aba) aba = localStorage.getItem("painel_aba_ativa") || ""; }catch(e){}
+  if(!aba) return;
+  document.querySelectorAll(".filtros a").forEach(function(el){
+    var href = el.getAttribute("href") || "";
+    if(href){
+      el.setAttribute("href", href.split("#")[0] + "#" + aba);
+    }
+  });
+  var formDatas = document.querySelector(".form-filtro-datas");
+  if(formDatas){
+    formDatas.action = "/painel#" + aba;
+  }
+}
 
 function vincularAbas(){
   document.querySelectorAll(".aba-btn").forEach(function(btn){
@@ -498,21 +635,29 @@ function filtrarTabelaClient(filtro, btn, evt){
   var totalRows = rows.length;
   if(totalRows > 0 && totalRows <= 20){
     if(evt && evt.preventDefault){ evt.preventDefault(); }
+    var selUF = document.getElementById("select-filtro-uf");
+    var ufNorm = (selUF && selUF.value) ? selUF.value.trim().toLowerCase() : "";
     var visiveis = 0;
     rows.forEach(function(r){
       var chk = r.getAttribute("data-checkout") === "1";
       var vivo = r.getAttribute("data-ao-vivo") === "1";
       var comprou = r.getAttribute("data-comprou") === "1";
+      var wa = r.getAttribute("data-whatsapp") === "1";
+      var rowUF = (r.getAttribute("data-uf") || "").trim().toLowerCase();
       var idGrupo = r.id.replace("row-pessoa-", "");
       var subRows = document.querySelectorAll(".grupo-" + idGrupo);
-      var mostrar = true;
+      var mostrarModo = true;
       if(filtro === "checkout"){
-        mostrar = chk;
+        mostrarModo = chk;
       } else if(filtro === "ao_vivo"){
-        mostrar = vivo;
+        mostrarModo = vivo;
       } else if(filtro === "comprou"){
-        mostrar = comprou;
+        mostrarModo = comprou;
+      } else if(filtro === "whatsapp"){
+        mostrarModo = wa;
       }
+      var mostrarUF = (!ufNorm || rowUF === ufNorm);
+      var mostrar = mostrarModo && mostrarUF;
       if(!mostrar){
         r.style.display = "none";
         subRows.forEach(function(sr){ sr.style.display = "none"; });
@@ -531,18 +676,652 @@ function filtrarTabelaClient(filtro, btn, evt){
       if(filtro === "checkout") tipo = "pessoas com checkout";
       else if(filtro === "ao_vivo") tipo = "pessoas ativas navegando agora";
       else if(filtro === "comprou") tipo = "pessoas que compraram o produto";
-      sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
+      else if(filtro === "whatsapp") tipo = "pessoas que deixaram WhatsApp";
+      var ufTxt = (selUF && selUF.value) ? (" (UF: " + selUF.value + ")") : "";
+      sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + ufTxt + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
     }
+    _selecionarTodosFiltro = false;
+    atualizarContadorSelecao();
     try{
       var href = btn ? btn.getAttribute("href") : null;
-      if(href){ history.replaceState(null, "", href); }
+      if(href){
+        var u = new URL(href, window.location.href);
+        if(selUF && selUF.value){ u.searchParams.set("uf", selUF.value); }
+        else { u.searchParams.delete("uf"); }
+        history.replaceState(null, "", u.toString());
+      }
     }catch(e){}
     return false;
   }
   return true;
 }
+
+function filtrarPorUFClient(ufValor){
+  var ufNorm = (ufValor || "").trim().toLowerCase();
+  var tbody = document.getElementById("tbody-leituras");
+  if(!tbody){ return; }
+  var rows = tbody.querySelectorAll("tr.tr-pessoa");
+  var totalRows = rows.length;
+
+  if(totalRows > 20){
+    try{
+      var u = new URL(window.location.href);
+      if(ufValor){ u.searchParams.set("uf", ufValor); }
+      else { u.searchParams.delete("uf"); }
+      u.searchParams.delete("pag_leituras");
+      window.location.href = u.toString();
+    }catch(e){
+      window.location.search = (ufValor ? ("?uf=" + encodeURIComponent(ufValor)) : "");
+    }
+    return;
+  }
+
+  var bAtivo = document.querySelector(".btn-filtro-leituras.on");
+  var modo = bAtivo ? (bAtivo.getAttribute("data-filtro") || "todos") : "todos";
+  var visiveis = 0;
+
+  rows.forEach(function(r){
+    var chk = r.getAttribute("data-checkout") === "1";
+    var vivo = r.getAttribute("data-ao-vivo") === "1";
+    var comprou = r.getAttribute("data-comprou") === "1";
+    var wa = r.getAttribute("data-whatsapp") === "1";
+    var rowUF = (r.getAttribute("data-uf") || "").trim().toLowerCase();
+    var idGrupo = r.id.replace("row-pessoa-", "");
+    var subRows = document.querySelectorAll(".grupo-" + idGrupo);
+
+    var atendeModo = true;
+    if(modo === "checkout") atendeModo = chk;
+    else if(modo === "ao_vivo") atendeModo = vivo;
+    else if(modo === "comprou") atendeModo = comprou;
+    else if(modo === "whatsapp") atendeModo = wa;
+
+    var atendeUF = (!ufNorm || rowUF === ufNorm);
+    var mostrar = atendeModo && atendeUF;
+
+    if(!mostrar){
+      r.style.display = "none";
+      subRows.forEach(function(sr){ sr.style.display = "none"; });
+    } else {
+      r.style.display = "";
+      visiveis++;
+    }
+  });
+
+  var sub = document.getElementById("sub-leituras-info");
+  if(sub){
+    var tipo = "pessoas exibidas";
+    if(modo === "checkout") tipo = "pessoas com checkout";
+    else if(modo === "ao_vivo") tipo = "pessoas ativas navegando agora";
+    else if(modo === "comprou") tipo = "pessoas que compraram o produto";
+    else if(modo === "whatsapp") tipo = "pessoas que deixaram WhatsApp";
+    var ufTxt = ufValor ? (" (UF: " + ufValor + ")") : "";
+    sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + ufTxt + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
+  }
+
+  _selecionarTodosFiltro = false;
+  atualizarContadorSelecao();
+
+  try{
+    var u = new URL(window.location.href);
+    if(ufValor){ u.searchParams.set("uf", ufValor); }
+    else { u.searchParams.delete("uf"); }
+    history.replaceState(null, "", u.toString());
+  }catch(e){}
+}
 function filtrarCheckoutClient(soChk, btn, evt){
   return filtrarTabelaClient(soChk === 1 ? "checkout" : "todos", btn, evt);
+}
+
+var _selecionarTodosFiltro = false;
+var _idsSelecionados = new Set();
+
+function obterAssinaturaFiltro(){
+  try{
+    var u = new URL(window.location.href);
+    var partes = [];
+    var temDatas = (u.searchParams.get("de") || u.searchParams.get("ate"));
+    var diasVal = u.searchParams.get("dias") || (temDatas ? "" : "7");
+    if(diasVal) partes.push("dias=" + diasVal);
+    ["de", "ate", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "uf"].sort().forEach(function(k){
+      var v = u.searchParams.get(k);
+      if(v !== null && v !== "") partes.push(k + "=" + v);
+    });
+    return partes.join("&");
+  }catch(e){
+    return "";
+  }
+}
+
+function salvarEstadoSelecao(){
+  try{
+    var sig = obterAssinaturaFiltro();
+    sessionStorage.setItem("painel_sel_sig", sig);
+    sessionStorage.setItem("painel_sel_todos", _selecionarTodosFiltro ? "1" : "0");
+    sessionStorage.setItem("painel_sel_ids", JSON.stringify(Array.from(_idsSelecionados)));
+  }catch(e){}
+}
+
+function carregarEstadoSelecao(){
+  try{
+    var sigAtual = obterAssinaturaFiltro();
+    var sigSalva = sessionStorage.getItem("painel_sel_sig");
+    if(sigSalva !== null && sigSalva !== sigAtual){
+      sessionStorage.removeItem("painel_sel_todos");
+      sessionStorage.removeItem("painel_sel_ids");
+      sessionStorage.setItem("painel_sel_sig", sigAtual);
+      _selecionarTodosFiltro = false;
+      _idsSelecionados.clear();
+      return;
+    }
+    _selecionarTodosFiltro = (sessionStorage.getItem("painel_sel_todos") === "1");
+    var idsRaw = sessionStorage.getItem("painel_sel_ids");
+    if(idsRaw){
+      var lista = JSON.parse(idsRaw);
+      _idsSelecionados = new Set(lista);
+    } else {
+      _idsSelecionados = new Set();
+    }
+  }catch(e){
+    _selecionarTodosFiltro = false;
+    _idsSelecionados = new Set();
+  }
+}
+
+function aplicarSelecaoNoDOM(){
+  carregarEstadoSelecao();
+  var rows = document.querySelectorAll("tr.tr-pessoa:not([style*='display: none'])");
+  rows.forEach(function(r){
+    var c = r.querySelector(".chk-contato");
+    if(!c) return;
+    var id = c.getAttribute("data-id");
+    if(_selecionarTodosFiltro || (id && _idsSelecionados.has(id))){
+      c.checked = true;
+    } else {
+      c.checked = false;
+    }
+  });
+  atualizarContadorSelecao();
+}
+
+function toggleContatoIndividual(chk){
+  var id = chk.getAttribute("data-id");
+  if(!id) return;
+  if(chk.checked){
+    _idsSelecionados.add(id);
+  } else {
+    _idsSelecionados.delete(id);
+    _selecionarTodosFiltro = false;
+  }
+  salvarEstadoSelecao();
+  atualizarContadorSelecao();
+}
+
+function obterTotalFiltro(){
+  if(typeof window._totalLeiturasFiltro === "number") return window._totalLeiturasFiltro;
+  var barra = document.getElementById("barra-acoes-leituras");
+  if(barra){
+    var tf = parseInt(barra.getAttribute("data-total-filtro"), 10);
+    if(!isNaN(tf)) return tf;
+  }
+  return 0;
+}
+
+function obterTotalPagina(){
+  if(typeof window._totalLeiturasPagina === "number") return window._totalLeiturasPagina;
+  var chks = document.querySelectorAll("tr.tr-pessoa:not([style*='display: none']) .chk-contato");
+  return chks.length;
+}
+
+function toggleSelecionarTodosFiltro(){
+  if(_selecionarTodosFiltro){
+    limparSelecao();
+  } else {
+    selecionarTodosFiltro();
+  }
+}
+
+function selecionarTodosFiltro(){
+  _selecionarTodosFiltro = true;
+  _idsSelecionados.clear();
+  var chkTopo = document.getElementById("chk-selecionar-todos-topo");
+  var chkBarra = document.getElementById("chk-selecionar-todos-barra");
+  if(chkTopo) chkTopo.checked = true;
+  if(chkBarra) chkBarra.checked = true;
+  var rows = document.querySelectorAll("tr.tr-pessoa:not([style*='display: none'])");
+  rows.forEach(function(r){
+    var c = r.querySelector(".chk-contato");
+    if(c){ c.checked = true; }
+  });
+  salvarEstadoSelecao();
+  atualizarContadorSelecao();
+  mostrarToastPainel("Todos os contatos do período foram selecionados!");
+}
+
+function limparSelecao(){
+  _selecionarTodosFiltro = false;
+  _idsSelecionados.clear();
+  try{
+    sessionStorage.removeItem("painel_sel_todos");
+    sessionStorage.removeItem("painel_sel_ids");
+  }catch(e){}
+  var chkTopo = document.getElementById("chk-selecionar-todos-topo");
+  var chkBarra = document.getElementById("chk-selecionar-todos-barra");
+  if(chkTopo) chkTopo.checked = false;
+  if(chkBarra) chkBarra.checked = false;
+  var chks = document.querySelectorAll("tr.tr-pessoa .chk-contato");
+  chks.forEach(function(c){ c.checked = false; });
+  atualizarContadorSelecao();
+}
+
+function toggleSelecionarTodos(chkMaster){
+  var marcado = !!chkMaster.checked;
+  var chkTopo = document.getElementById("chk-selecionar-todos-topo");
+  var chkBarra = document.getElementById("chk-selecionar-todos-barra");
+  if(chkTopo && chkTopo !== chkMaster) chkTopo.checked = marcado;
+  if(chkBarra && chkBarra !== chkMaster) chkBarra.checked = marcado;
+
+  var rows = document.querySelectorAll("tr.tr-pessoa");
+  rows.forEach(function(r){
+    if(r.style.display !== "none"){
+      var c = r.querySelector(".chk-contato");
+      if(c){
+        c.checked = marcado;
+        var id = c.getAttribute("data-id");
+        if(id){
+          if(marcado) _idsSelecionados.add(id);
+          else _idsSelecionados.delete(id);
+        }
+      }
+    }
+  });
+
+  if(!marcado){
+    _selecionarTodosFiltro = false;
+  }
+  salvarEstadoSelecao();
+  atualizarContadorSelecao();
+}
+
+function atualizarContadorSelecao(){
+  var chks = document.querySelectorAll("tr.tr-pessoa:not([style*='display: none']) .chk-contato");
+  var totalPagina = chks.length;
+  var selecionadosPagina = 0;
+  chks.forEach(function(c){
+    if(c.checked) selecionadosPagina++;
+  });
+
+  var totalFiltro = obterTotalFiltro() || totalPagina;
+  if(totalFiltro < totalPagina) totalFiltro = totalPagina;
+
+  var chkTopo = document.getElementById("chk-selecionar-todos-topo");
+  var chkBarra = document.getElementById("chk-selecionar-todos-barra");
+  var todosPaginaMarcados = (totalPagina > 0 && selecionadosPagina === totalPagina);
+  if(chkTopo) chkTopo.checked = (_selecionarTodosFiltro || todosPaginaMarcados);
+  if(chkBarra) chkBarra.checked = (_selecionarTodosFiltro || todosPaginaMarcados);
+
+  var wrap = document.getElementById("contador-selecao-wrap");
+  var btnTxt = document.getElementById("btn-exportar-contagem");
+  var btnSelFiltro = document.getElementById("btn-sel-todos-filtro");
+  var btnLimpar = document.getElementById("btn-limpar-selecao");
+  var banner = document.getElementById("banner-selecao-global");
+  var txtBanner = document.getElementById("txt-banner-selecao");
+  var btnBannerAcao = document.getElementById("btn-banner-acao");
+
+  if(btnSelFiltro){
+    btnSelFiltro.classList.toggle("ativo", !!_selecionarTodosFiltro);
+    if(_selecionarTodosFiltro){
+      btnSelFiltro.innerHTML = '✓ Todos os <b>' + totalFiltro + '</b> selecionados';
+      btnSelFiltro.title = "Clique para desmarcar a seleção global de contatos";
+    } else {
+      btnSelFiltro.innerHTML = '📋 Selecionar todos os <span class="num-total-filtro">' + totalFiltro + '</span> contatos';
+      btnSelFiltro.title = "Selecionar todos os " + totalFiltro + " contatos deste filtro em todas as páginas";
+    }
+  }
+
+  if(_selecionarTodosFiltro){
+    if(wrap){
+      wrap.style.display = "inline-flex";
+      wrap.innerHTML = '<span class="badge-sel-check">✓</span> Todos os <b id="contador-selecao-num">' + totalFiltro + '</b> selecionados (todas as páginas)';
+    }
+    if(btnTxt){
+      btnTxt.textContent = "(todos os " + totalFiltro + " contatos)";
+    }
+    if(btnLimpar){
+      btnLimpar.style.display = "inline-flex";
+    }
+    if(banner){
+      banner.style.display = "flex";
+      if(txtBanner) txtBanner.innerHTML = "✓ Todos os <b>" + totalFiltro + "</b> contatos deste filtro estão selecionados (incluindo todas as páginas).";
+      if(btnBannerAcao){
+        btnBannerAcao.textContent = "Desmarcar seleção";
+        btnBannerAcao.onclick = limparSelecao;
+      }
+    }
+  } else {
+    var totalSelGeral = _idsSelecionados.size;
+    if(wrap){
+      if(totalSelGeral > 0){
+        wrap.style.display = "inline-flex";
+        wrap.innerHTML = '<span class="badge-sel-check">✓</span> <b id="contador-selecao-num">' + totalSelGeral + '</b> selecionado' + (totalSelGeral > 1 ? "s" : "");
+      } else {
+        wrap.style.display = "none";
+      }
+    }
+    if(btnLimpar){
+      btnLimpar.style.display = (totalSelGeral > 0) ? "inline-flex" : "none";
+    }
+    if(btnTxt){
+      if(totalSelGeral > 0){
+        btnTxt.textContent = "(" + totalSelGeral + " selecionado" + (totalSelGeral > 1 ? "s" : "") + ")";
+      } else {
+        btnTxt.textContent = "(todos: " + totalFiltro + ")";
+      }
+    }
+    if(banner){
+      if(todosPaginaMarcados && totalFiltro > totalPagina){
+        banner.style.display = "flex";
+        if(txtBanner) txtBanner.innerHTML = "Todos os <b>" + totalPagina + "</b> contatos desta página estão selecionados.";
+        if(btnBannerAcao){
+          btnBannerAcao.innerHTML = "👉 Selecionar todos os <b>" + totalFiltro + "</b> contatos deste filtro";
+          btnBannerAcao.onclick = selecionarTodosFiltro;
+        }
+      } else {
+        banner.style.display = "none";
+      }
+    }
+  }
+}
+
+function exportarTodosViaServidor(){
+  var u = new URL(window.location.href);
+  var exportUrl = new URL("/painel/exportar-csv", window.location.origin);
+  ["de", "ate", "dias", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "uf"].forEach(function(param){
+    var val = u.searchParams.get(param);
+    if(val !== null && val !== "") {
+      exportUrl.searchParams.set(param, val);
+    }
+  });
+  var selUF = document.getElementById("select-filtro-uf");
+  if(selUF && selUF.value){
+    exportUrl.searchParams.set("uf", selUF.value);
+  }
+  var bAtivo = document.querySelector(".btn-filtro-leituras.on");
+  if(bAtivo){
+    var modo = bAtivo.getAttribute("data-filtro");
+    if(modo === "checkout") exportUrl.searchParams.set("so_checkout", "1");
+    else if(modo === "ao_vivo") exportUrl.searchParams.set("so_ao_vivo", "1");
+    else if(modo === "comprou") exportUrl.searchParams.set("so_comprou", "1");
+    else if(modo === "whatsapp") exportUrl.searchParams.set("so_whatsapp", "1");
+    else if(modo === "todos"){
+      exportUrl.searchParams.delete("so_checkout");
+      exportUrl.searchParams.delete("so_ao_vivo");
+      exportUrl.searchParams.delete("so_comprou");
+      exportUrl.searchParams.delete("so_whatsapp");
+    }
+  }
+
+  var a = document.createElement("a");
+  a.href = exportUrl.toString();
+  a.setAttribute("download", "");
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  mostrarToastPainel("Baixando planilha CSV com todos os contatos do período...");
+}
+
+function exportarSelecionadosViaServidor(idsList){
+  if(!idsList || idsList.length === 0){
+    alert("Nenhum contato selecionado para exportar.");
+    return;
+  }
+  var exportUrl = new URL("/painel/exportar-csv", window.location.origin);
+  exportUrl.searchParams.set("ids", idsList.join(","));
+  var a = document.createElement("a");
+  a.href = exportUrl.toString();
+  a.setAttribute("download", "");
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  mostrarToastPainel("Baixando " + idsList.length + " contato(s) selecionado(s)...");
+}
+
+function exportarContatosCSV(){
+  var totalFiltro = obterTotalFiltro();
+  if(_selecionarTodosFiltro || (_idsSelecionados.size === 0 && totalFiltro > 0)){
+    exportarTodosViaServidor();
+    return;
+  }
+
+  if(_idsSelecionados.size === 0){
+    alert("Nenhum contato selecionado para exportar.");
+    return;
+  }
+
+  var mapa = window._contatosExportacao || {};
+  var selecionados = Array.from(_idsSelecionados);
+  var todosNoMapa = selecionados.every(function(id){ return !!mapa[id]; });
+
+  if(!todosNoMapa){
+    exportarSelecionadosViaServidor(selecionados);
+    return;
+  }
+
+  var colunas = [
+    "ID da Leitura",
+    "Chegou ao Quiz (BSB)",
+    "Preencheu Dados (BSB)",
+    "Etapa Alcançada",
+    "Fez Checkout",
+    "Comprou",
+    "Nome Completo",
+    "WhatsApp",
+    "Data de Nascimento",
+    "Hora de Nascimento",
+    "Cidade",
+    "UF",
+    "País",
+    "Área do Quiz",
+    "Cenário Astrológico",
+    "Casa Astrológica",
+    "Tempo no Quiz",
+    "Total de Envios"
+  ];
+
+  function esc(val){
+    if(val === null || val === undefined) return '""';
+    return '"' + String(val).replace(/"/g, '""') + '"';
+  }
+
+  var linhas = [];
+  linhas.push(colunas.map(esc).join(";"));
+
+  selecionados.forEach(function(id){
+    var d = mapa[id] || {};
+    linhas.push([
+      esc(d.id || id),
+      esc(d.chegou_em_bsb || "—"),
+      esc(d.gravado_em_bsb || "—"),
+      esc(d.etapa || "—"),
+      esc(d.checkout || "NÃO"),
+      esc(d.comprou || "NÃO"),
+      esc(d.nome || "—"),
+      esc(d.whatsapp || "—"),
+      esc(d.nascimento || "—"),
+      esc(d.hora_nasc || "—"),
+      esc(d.cidade || "—"),
+      esc(d.uf || "—"),
+      esc(d.pais || "Brasil"),
+      esc(d.area || "—"),
+      esc(d.cenario || "—"),
+      esc(d.casa || "—"),
+      esc(d.tempo_quiz || "—"),
+      esc(d.total_envios || 1)
+    ].join(";"));
+  });
+
+  var csvConteudo = "\uFEFF" + linhas.join("\r\n");
+  var blob = new Blob([csvConteudo], { type: "text/csv;charset=utf-8;" });
+  var link = document.createElement("a");
+  var url = URL.createObjectURL(blob);
+  var hoje = new Date().toISOString().slice(0, 10);
+  link.setAttribute("href", url);
+  link.setAttribute("download", "leituras_bussola_" + hoje + ".csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  mostrarToastPainel(selecionados.length + " contato(s) exportado(s) com sucesso!");
+}
+
+var _arquivoCSVParaImportar = null;
+
+function abrirModalImportarCSV(){
+  _arquivoCSVParaImportar = null;
+  var input = document.getElementById("input-arquivo-csv");
+  if(input) input.value = "";
+  var dropzone = document.getElementById("dropzone-csv");
+  if(dropzone) dropzone.classList.remove("selecionado", "dragover");
+  var dropTexto = document.getElementById("dropzone-texto");
+  if(dropTexto) dropTexto.textContent = "Clique ou arraste o arquivo CSV aqui";
+  var dropDet = document.getElementById("dropzone-detalhe");
+  if(dropDet) dropDet.textContent = "Compatível com Excel, Google Sheets e CRM (UTF-8, Latin-1, sep: ; ou ,)";
+  var st = document.getElementById("modal-importar-status");
+  if(st){ st.style.display = "none"; st.textContent = ""; st.className = "modal-importar-status"; }
+  var er = document.getElementById("modal-importar-erro");
+  if(er){ er.style.display = "none"; er.textContent = ""; }
+  var btn = document.getElementById("btn-modal-enviar-csv");
+  if(btn){ btn.disabled = true; btn.textContent = "Iniciar Importação"; }
+  var modal = document.getElementById("modal-importar-csv-backdrop");
+  if(modal) modal.classList.add("on");
+  inicializarDropzoneCSV();
+}
+
+function fecharModalImportarCSV(){
+  _arquivoCSVParaImportar = null;
+  var modal = document.getElementById("modal-importar-csv-backdrop");
+  if(modal) modal.classList.remove("on");
+}
+
+function arquivoCSVSelecionado(input){
+  if(!input || !input.files || input.files.length === 0) return;
+  definirArquivoCSV(input.files[0]);
+}
+
+function definirArquivoCSV(file){
+  if(!file) return;
+  if(!file.name.toLowerCase().endsWith(".csv")){
+    var er = document.getElementById("modal-importar-erro");
+    if(er){
+      er.textContent = "Por favor, selecione um arquivo válido com extensão .csv";
+      er.style.display = "block";
+    }
+    return;
+  }
+  _arquivoCSVParaImportar = file;
+  var er = document.getElementById("modal-importar-erro");
+  if(er){ er.style.display = "none"; }
+  var dropzone = document.getElementById("dropzone-csv");
+  if(dropzone) dropzone.classList.add("selecionado");
+  var dropTexto = document.getElementById("dropzone-texto");
+  if(dropTexto) dropTexto.textContent = "📄 " + file.name;
+  var dropDet = document.getElementById("dropzone-detalhe");
+  if(dropDet){
+    var tamKb = (file.size / 1024).toFixed(1);
+    dropDet.textContent = "Tamanho: " + tamKb + " KB · Arquivo pronto para envio";
+  }
+  var btn = document.getElementById("btn-modal-enviar-csv");
+  if(btn) btn.disabled = false;
+}
+
+function inicializarDropzoneCSV(){
+  var drop = document.getElementById("dropzone-csv");
+  if(!drop || drop._inicializado) return;
+  drop._inicializado = true;
+  ["dragenter", "dragover"].forEach(function(evt){
+    drop.addEventListener(evt, function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.add("dragover");
+    }, false);
+  });
+  ["dragleave", "drop"].forEach(function(evt){
+    drop.addEventListener(evt, function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      drop.classList.remove("dragover");
+    }, false);
+  });
+  drop.addEventListener("drop", function(e){
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0){
+      definirArquivoCSV(e.dataTransfer.files[0]);
+    }
+  }, false);
+}
+
+function executarImportacaoCSV(){
+  if(!_arquivoCSVParaImportar){
+    alert("Selecione um arquivo CSV para importar.");
+    return;
+  }
+  var btn = document.getElementById("btn-modal-enviar-csv");
+  var st = document.getElementById("modal-importar-status");
+  var er = document.getElementById("modal-importar-erro");
+  var chkAtualizar = document.getElementById("chk-importar-atualizar");
+  var atualizar = (chkAtualizar && !chkAtualizar.checked) ? "0" : "1";
+
+  if(btn){ btn.disabled = true; btn.textContent = "Importando..."; }
+  if(er){ er.style.display = "none"; er.textContent = ""; }
+  if(st){
+    st.style.display = "block";
+    st.className = "modal-importar-status processando";
+    st.textContent = "Processando arquivo e atualizando contatos...";
+  }
+
+  var formData = new FormData();
+  formData.append("arquivo", _arquivoCSVParaImportar);
+  formData.append("atualizar", atualizar);
+
+  fetch("/painel/importar-csv", {
+    method: "POST",
+    body: formData,
+    headers: { "Accept": "application/json" }
+  }).then(function(res){
+    if(!res.ok){
+      return res.json().then(function(j){ throw new Error(j.detail || ("Erro HTTP " + res.status)); })
+             .catch(function(e){ throw new Error(e.message || ("Erro HTTP " + res.status)); });
+    }
+    return res.json();
+  }).then(function(res){
+    if(btn){ btn.disabled = false; btn.textContent = "Iniciar Importação"; }
+    if(st){
+      st.className = "modal-importar-status sucesso";
+      var msg = "✓ Sucesso! Total de " + res.total + " contato(s) processado(s): " +
+                res.criados + " novo(s) contato(s) criado(s), " +
+                res.atualizados + " atualizado(s).";
+      if(res.erros && res.erros.length > 0){
+        msg += " (" + res.erros.length + " inconsistência(s))";
+      }
+      st.innerHTML = "<b>" + msg + "</b><div style='margin-top:6px;font-size:11.5px;'>Atualizando visualização...</div>";
+    }
+    if(typeof mostrarToast === "function"){
+      mostrarToast("Importação concluída: " + res.criados + " criados, " + res.atualizados + " atualizados.");
+    }
+    setTimeout(function(){
+      fecharModalImportarCSV();
+      if(typeof recarregarTabelaLeiturasViaWS === "function"){
+        recarregarTabelaLeiturasViaWS();
+      } else {
+        window.location.reload();
+      }
+    }, 1200);
+  }).catch(function(err){
+    if(btn){ btn.disabled = false; btn.textContent = "Tentar Novamente"; }
+    if(st) st.style.display = "none";
+    if(er){
+      er.style.display = "block";
+      er.textContent = "Falha na importação: " + err.message;
+    }
+  });
 }
 
 var _leituraCompraAlvo = null;
@@ -767,6 +1546,7 @@ document.addEventListener("keydown", function(e){
   if(e.key === "Escape"){
     fecharModalExcluir();
     fecharModalCompra();
+    fecharModalImportarCSV();
   }
 });
 function executarExclusao(){
@@ -1062,6 +1842,11 @@ function processarMensagemTempoReal(msg){
         tr.setAttribute("data-checkout", "0");
         tr.setAttribute("data-ao-vivo", "1");
         if(msg.sid){ tr.setAttribute("data-sid", msg.sid); }
+        var temWaLive = (d.whatsapp && d.whatsapp !== "—" && (d.whatsapp || "").replace(/\D/g, "").length >= 8);
+        tr.setAttribute("data-whatsapp", temWaLive ? "1" : "0");
+        var cidLive = d.cidade || {};
+        var ufLive = (cidLive.uf || cidLive.nome || "").trim().toLowerCase();
+        tr.setAttribute("data-uf", ufLive);
 
         var agoraStr = new Date().toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
         var waHtml = "—";
@@ -1079,7 +1864,8 @@ function processarMensagemTempoReal(msg){
         var nomeEsc = (d.nome_completo || "—").replace(/</g, "&lt;");
         var nomeJs = nomeEsc.replace(/'/g, "\\'");
 
-        tr.innerHTML = '<td><a href="/painel/leitura/' + newLid + '">' + newLid.substring(0, 15) + '</a></td>'
+        tr.innerHTML = '<td class="td-chk"><input type="checkbox" class="chk-selecao chk-contato" data-id="' + newLid + '" data-nome="' + nomeJs + '" onchange="toggleContatoIndividual(this)" title="Selecionar ' + nomeJs + '"></td>'
+          + '<td><a href="/painel/leitura/' + newLid + '">' + newLid.substring(0, 15) + '</a></td>'
           + '<td><span style="white-space:nowrap;">' + agoraStr + '</span></td>'
           + '<td><span style="white-space:nowrap;">' + agoraStr + '</span></td>'
           + '<td><span class="tag-etapa" id="tag-etapa-' + newLid + '">Tela 7 (Leitura)</span> <span class="tag-ao-vivo" id="live-tag-' + newLid + '">🟢 Ao vivo</span></td>'
@@ -1095,8 +1881,32 @@ function processarMensagemTempoReal(msg){
           + '<td>' + (d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—') + '</td>'
           + '<td><button type="button" class="btn-del" onclick="abrirModalExcluir(\'' + newLid + '\', \'' + nomeJs + '\', 1, \'[]\', false);" title="Excluir">🗑️ Excluir</button></td>';
 
+        if(window._contatosExportacao){
+          window._contatosExportacao[newLid] = {
+            id: newLid,
+            chegou_em_bsb: agoraStr,
+            gravado_em_bsb: agoraStr,
+            etapa: "Tela 7 (Leitura)",
+            checkout: "NÃO",
+            comprou: "NÃO",
+            nome: d.nome_completo || "—",
+            whatsapp: d.whatsapp || "—",
+            nascimento: nascStr,
+            hora_nasc: horaStr,
+            cidade: cid.nome || "—",
+            uf: cid.uf || "—",
+            pais: cid.pais || "Brasil",
+            area: (d.quiz && d.quiz.area) || "—",
+            cenario: veredito.tipo || "—",
+            casa: veredito.casa_eleita_real ? ("Casa " + veredito.casa_aberta) : "—",
+            tempo_quiz: d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—',
+            total_envios: 1
+          };
+        }
+
         tbody.insertBefore(tr, tbody.firstChild);
         flashElemento(tr);
+        atualizarContadorSelecao();
         mostrarToast("Nova leitura recebida: " + (d.nome_completo || "Novo visitante"));
       }
     }
@@ -1109,8 +1919,11 @@ function processarMensagemTempoReal(msg){
   var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}
   var alvo=hash||salva;
   if(alvo&&document.getElementById(alvo)){window.abrirAba(alvo);}
+  atualizarLinksPresetsAba();
   iniciarArrastoScroll();
+  inicializarDropzoneCSV();
   conectarWebSocketPainel();
+  aplicarSelecaoNoDOM();
 })();
 """
 
@@ -1120,13 +1933,23 @@ def _tabela(cabecalhos: list[str], linhas: list[list[str]], classes: str = "",
             wrap_class: str = "tbl-wrap") -> str:
     if not linhas:
         return '<p class="vazio">Ainda sem dados neste período.</p>'
-    th = "".join(f'<th class="{"n" if h.startswith("#") else ""}">{html.escape(h.lstrip("#"))}</th>'
-                 for h in cabecalhos)
+    ths = []
+    for h in cabecalhos:
+        if h == "[sel]":
+            ths.append('<th class="th-chk"><input type="checkbox" id="chk-selecionar-todos-topo" class="chk-selecao" onchange="toggleSelecionarTodos(this)" title="Selecionar todos os contatos visíveis"></th>')
+        else:
+            cls_n = "n" if h.startswith("#") else ""
+            ths.append(f'<th class="{cls_n}">{html.escape(h.lstrip("#"))}</th>')
+    th = "".join(ths)
     tr = ""
     for idx, l in enumerate(linhas):
         extra = f" {tr_attrs[idx]}" if tr_attrs and idx < len(tr_attrs) else ""
-        tds = "".join(f'<td class="{"n" if h.startswith("#") else ""}">{c}</td>'
-                      for h, c in zip(cabecalhos, l))
+        tds_list = []
+        for h_idx, (h, c) in enumerate(zip(cabecalhos, l)):
+            cls_td = "td-chk" if h == "[sel]" else ("n" if h.startswith("#") else "")
+            td_class_attr = f' class="{cls_td}"' if cls_td else ""
+            tds_list.append(f'<td{td_class_attr}>{c}</td>')
+        tds = "".join(tds_list)
         tr += f"<tr{extra}>{tds}</tr>"
     tbody_attr = f' id="{tbody_id}"' if tbody_id else ""
     return f'<div class="{wrap_class}"><table class="{classes}"><thead><tr>{th}</tr></thead><tbody{tbody_attr}>{tr}</tbody></table></div>'
@@ -1184,6 +2007,44 @@ def _modal_confirmar_compra() -> str:
     )
 
 
+def _modal_importar_csv() -> str:
+    return (
+        '<div id="modal-importar-csv-backdrop" class="modal-backdrop">'
+        '  <div id="modal-importar-csv-card" class="modal-card modal-card-compra" role="dialog" aria-modal="true" aria-labelledby="modal-importar-titulo">'
+        '    <button type="button" class="modal-fechar-btn" onclick="fecharModalImportarCSV()" title="Fechar">✕</button>'
+        '    <div class="modal-icone-wrap">'
+        '      <span id="modal-importar-icone">📤</span>'
+        '    </div>'
+        '    <h3 id="modal-importar-titulo" class="modal-titulo">Importar Contatos via CSV</h3>'
+        '    <p class="modal-texto">'
+        '      Selecione uma planilha <b>.csv</b> para importar novos leads ou atualizar contatos existentes.'
+        '    </p>'
+        '    <div class="importar-csv-area" style="margin-top:14px;">'
+        '      <input type="file" id="input-arquivo-csv" accept=".csv,text/csv" style="display:none;" onchange="arquivoCSVSelecionado(this)">'
+        '      <div id="dropzone-csv" class="dropzone-csv" onclick="document.getElementById(\'input-arquivo-csv\').click()">'
+        '        <div class="dropzone-icone">📁</div>'
+        '        <div class="dropzone-texto" id="dropzone-texto">Clique ou arraste o arquivo CSV aqui</div>'
+        '        <div class="dropzone-detalhe" id="dropzone-detalhe">Compatível com Excel, Google Sheets e CRM (UTF-8, Latin-1, sep: ; ou ,)</div>'
+        '      </div>'
+        '      <div class="importar-opcoes" style="margin-top:14px;text-align:left;">'
+        '        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sand);cursor:pointer;">'
+        '          <input type="checkbox" id="chk-importar-atualizar" checked style="accent-color:var(--amber);width:16px;height:16px;">'
+        '          <span>Atualizar contatos existentes caso o ID já exista</span>'
+        '        </label>'
+        '      </div>'
+        '      <div id="modal-importar-status" class="modal-importar-status" style="display:none;margin-top:14px;"></div>'
+        '      <div id="modal-importar-erro" class="modal-erro" style="display:none;margin-top:14px;"></div>'
+        '    </div>'
+        '    <div class="modal-acoes" style="margin-top:18px;">'
+        '      <button type="button" class="btn-modal-cancelar" onclick="fecharModalImportarCSV()">Cancelar</button>'
+        '      <button type="button" id="btn-modal-enviar-csv" class="btn-modal-confirmar-compra" onclick="executarImportacaoCSV()" disabled>Iniciar Importação</button>'
+        '    </div>'
+        '  </div>'
+        '</div>'
+    )
+
+
+
 
 def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
     """Mapeia cada leitura para (max_tela, rotulo, checkout).
@@ -1222,7 +2083,7 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
             except Exception:
                 pass
         if not dt_leitura:
-            dt_leitura = date.today()
+            dt_leitura = hoje_bsb()
 
         datas_pesquisa.add(dt_leitura)
         datas_pesquisa.add(dt_leitura - timedelta(days=1))
@@ -1376,6 +2237,9 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
                     wa_consolidado = w_alt
                     break
 
+        wa_digitos = re.sub(r"\D", "", str(wa_consolidado or ""))
+        tem_wa = bool(wa_consolidado and str(wa_consolidado).strip() not in ("", "—", "-") and len(wa_digitos) >= 8)
+
         # Nome consolidado
         nome_consolidado = d_principal.get("nome_completo") or "—"
         if nome_consolidado in ("—", ""):
@@ -1391,6 +2255,7 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
             "d_principal": d_principal,
             "nome_completo": nome_consolidado,
             "whatsapp": wa_consolidado,
+            "tem_whatsapp": tem_wa,
             "nascimento": d_principal.get("nascimento") or {},
             "cidade": d_principal.get("cidade") or {},
             "teve_checkout": teve_checkout,
@@ -1426,18 +2291,24 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
 
 
 class ResultadoTabela(tuple):
-    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0):
+    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0, total_whatsapp=0, lista_ufs=None):
         return super().__new__(cls, (corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral))
 
-    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0):
+    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0, total_whatsapp=0, lista_ufs=None):
         self.total_ao_vivo = total_ao_vivo
         self.total_comprou = total_comprou
+        self.total_whatsapp = total_whatsapp
+        self.lista_ufs = lista_ufs or []
 
 
 def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                      so_checkout: bool = False,
                      so_ao_vivo: bool = False,
-                     so_comprou: bool = False) -> tuple[str, int, int, int, int, int]:
+                     so_comprou: bool = False,
+                     so_whatsapp: bool = False,
+                     uf: Optional[str] = None,
+                     de: Optional[date] = None,
+                     ate: Optional[date] = None) -> ResultadoTabela:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
 
     todos_dados: list[tuple[str, dict]] = []
@@ -1448,6 +2319,12 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             continue
         if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
             continue          # fixtures da suite de testes
+
+        if de and ate:
+            dt_ch = obter_data_chegada_leitura(d, arq.stem)
+            if dt_ch and not (de <= dt_ch <= ate):
+                continue
+
         todos_dados.append((arq.stem, d))
 
     total_leituras_geral = len(todos_dados)
@@ -1460,6 +2337,15 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
     todos_grupos = _agrupar_leituras_por_pessoa(todos_dados, progresso_map)
     total_pessoas_geral = len(todos_grupos)
     total_pessoas_checkout = sum(1 for g in todos_grupos if g["teve_checkout"])
+
+    # Coleta todas as UFs/Cidades preenchidas nos dados do período
+    mapa_ufs: dict[str, int] = {}
+    for g in todos_grupos:
+        cid_g = g.get("cidade") or {}
+        val_uf = str(cid_g.get("uf") or cid_g.get("nome") or "").strip()
+        if val_uf and val_uf != "—":
+            mapa_ufs[val_uf] = mapa_ufs.get(val_uf, 0) + 1
+    lista_ufs = sorted(mapa_ufs.items(), key=lambda x: x[0].lower())
 
     # Identifica quem está ativo no momento (últimos 90 segundos)
     ativos = rastreador_presenca.obter_ativos(90.0)
@@ -1477,8 +2363,11 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
 
     total_pessoas_ao_vivo = sum(1 for g in todos_grupos if g["ao_vivo"])
     total_pessoas_comprou = sum(1 for g in todos_grupos if g.get("comprou"))
+    total_pessoas_whatsapp = sum(1 for g in todos_grupos if g.get("tem_whatsapp"))
 
-    if so_comprou:
+    if so_whatsapp:
+        grupos_filtrados = [g for g in todos_grupos if g.get("tem_whatsapp")]
+    elif so_comprou:
         grupos_filtrados = [g for g in todos_grupos if g.get("comprou")]
     elif so_ao_vivo:
         grupos_filtrados = [g for g in todos_grupos if g["ao_vivo"]]
@@ -1486,6 +2375,13 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         grupos_filtrados = [g for g in todos_grupos if g["teve_checkout"]]
     else:
         grupos_filtrados = todos_grupos
+
+    if uf and uf.strip():
+        uf_norm = uf.strip().lower()
+        grupos_filtrados = [
+            g for g in grupos_filtrados
+            if str((g.get("cidade") or {}).get("uf") or (g.get("cidade") or {}).get("nome") or "").strip().lower() == uf_norm
+        ]
 
     total_pessoas_exibidas = len(grupos_filtrados)
     total_leituras_exibidas = sum(g["total_envios"] for g in grupos_filtrados)
@@ -1497,6 +2393,8 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
 
     linhas = []
     tr_attrs = []
+    dados_exportacao_map = {}
+
     for g in recorte_grupos:
         stem = g["stem_principal"]
         d = g["d_principal"]
@@ -1542,8 +2440,12 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         acoes_principal = f'<div style="display:flex;gap:5px;align-items:center;">{btn_compra_principal}{btn_del_principal}</div>'
 
         cid_str = html.escape(str(g["d_principal"].get("cliente_id") or ""))
-        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-sid="{cid_str}"')
+        uf_attr = html.escape(str(cid.get("uf") or cid.get("nome") or "").strip().lower())
+        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-uf="{uf_attr}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-whatsapp="{"1" if g.get("tem_whatsapp") else "0"}" data-sid="{cid_str}"')
+        
+        chk_principal = f'<input type="checkbox" class="chk-selecao chk-contato" data-id="{html.escape(stem)}" data-nome="{nome_js}" onchange="toggleContatoIndividual(this)" title="Selecionar {nome_js}">'
         linhas.append([
+            chk_principal,
             f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
             f'<span style="white-space:nowrap;">{html.escape(gerada_bsb)}</span>',
@@ -1561,10 +2463,32 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             acoes_principal,
         ])
 
+        dados_exportacao_map[stem] = {
+            "id": stem,
+            "chegou_em_bsb": chegada_bsb,
+            "gravado_em_bsb": gerada_bsb,
+            "etapa": rotulo_etapa,
+            "checkout": "SIM" if g["teve_checkout"] else "NÃO",
+            "comprou": "SIM" if g_comprou else "NÃO",
+            "nome": g["nome_completo"],
+            "whatsapp": g["whatsapp"] or "—",
+            "nascimento": f_data(nasc),
+            "hora_nasc": f_hora(nasc, pr),
+            "cidade": cid.get("nome") or "—",
+            "uf": cid.get("uf") or "—",
+            "pais": cid.get("pais") or "Brasil",
+            "area": str((d.get("quiz") or {}).get("area") or "—"),
+            "cenario": str(v.get("tipo") or "—"),
+            "casa": "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
+            "tempo_quiz": f_tempo(d.get("tempo_quiz_ms")),
+            "total_envios": g["total_envios"]
+        }
+
         # Sub-linhas para tentativas anteriores do acordeão
         for sub_stem, sub_d in g["outras_leituras"]:
             sub_v, sub_pr = sub_d.get("veredito") or {}, sub_d.get("precisao") or {}
             sub_nasc = sub_d.get("nascimento") or {}
+            sub_cid = sub_d.get("cidade") or {}
             sub_chegada_bsb, sub_gerada_bsb = f_chegada_bsb(sub_d, sub_stem)
             sub_prog = progresso_map.get(sub_stem, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
             sub_rotulo_etapa = sub_prog["rotulo"]
@@ -1591,8 +2515,13 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             )
             acoes_sub = f'<div style="display:flex;gap:4px;align-items:center;">{btn_compra_sub}{btn_del_sub}</div>'
 
-            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-sid="{sub_cid_str}"')
+            sub_wa_digitos = re.sub(r"\D", "", str(sub_d.get("whatsapp") or ""))
+            sub_tem_wa = bool(sub_d.get("whatsapp") and len(sub_wa_digitos) >= 8)
+
+            sub_uf_attr = html.escape(str(sub_cid.get("uf") or sub_cid.get("nome") or "").strip().lower())
+            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" data-uf="{sub_uf_attr}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-whatsapp="{"1" if sub_tem_wa else "0"}" data-sid="{sub_cid_str}"')
             linhas.append([
+                '<span style="opacity:0.25;font-size:11px;display:inline-block;padding-left:4px;">↳</span>',
                 f'<span style="padding-left:14px;"><a href="/painel/leitura/{html.escape(sub_stem)}" style="color:var(--sand2);">↳ {html.escape(sub_stem[:15])}</a></span>',
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_chegada_bsb)}</span>',
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_gerada_bsb)}</span>',
@@ -1610,21 +2539,114 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 acoes_sub,
             ])
 
-    if not linhas and so_comprou:
-        corpo = '<p class="vazio">Nenhum comprador registrado até o momento.</p>'
-    elif not linhas and so_ao_vivo:
-        corpo = '<p class="vazio">Nenhum visitante ativo navegando nas telas neste momento.</p>'
-    elif not linhas and so_checkout:
-        corpo = '<p class="vazio">Nenhum visitante foi ao checkout neste período.</p>'
-    elif not linhas:
-        corpo = '<p class="vazio">Nenhuma leitura encontrada.</p>'
-    else:
-        corpo = _tabela([
-            "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
-            "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
-        ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras", wrap_class="tbl-wrap tbl-wrap-leituras")
+    btn_importar_html = (
+        '    <button type="button" id="btn-importar-csv" class="btn-importar-csv" onclick="abrirModalImportarCSV()"'
+        '      title="Importar contatos de uma planilha CSV">'
+        '      📤 Importar CSV'
+        '    </button>'
+    )
 
-    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou)
+    if not linhas:
+        barra_vazio = (
+            '<div class="barra-acoes-leituras" id="barra-acoes-leituras">'
+            '  <div class="acoes-leituras-esquerda"></div>'
+            '  <div class="acoes-leituras-direita">'
+            f'  {btn_importar_html}'
+            '  </div>'
+            '</div>'
+        )
+        if so_whatsapp:
+            corpo = barra_vazio + '<p class="vazio">Nenhum contato com WhatsApp registrado neste período.</p>'
+        elif so_comprou:
+            corpo = barra_vazio + '<p class="vazio">Nenhum comprador registrado neste período.</p>'
+        elif so_ao_vivo:
+            corpo = barra_vazio + '<p class="vazio">Nenhum visitante ativo navegando nas telas neste momento.</p>'
+        elif so_checkout:
+            corpo = barra_vazio + '<p class="vazio">Nenhum visitante foi ao checkout neste período.</p>'
+        else:
+            corpo = barra_vazio + '<p class="vazio">Nenhuma leitura encontrada neste período.</p>'
+    else:
+        btn_todos_filtro_html = ""
+        if total_pessoas_exibidas > len(recorte_grupos):
+            btn_todos_filtro_html = (
+                f'    <button type="button" id="btn-sel-todos-filtro" class="btn-sel-todos-filtro" '
+                f'      onclick="toggleSelecionarTodosFiltro()" '
+                f'      title="Selecionar todos os {total_pessoas_exibidas} contatos deste filtro em todas as páginas">'
+                f'      📋 Selecionar todos os <span class="num-total-filtro">{total_pessoas_exibidas}</span> contatos'
+                f'    </button>'
+            )
+
+        banner_selecao_html = (
+            f'<div id="banner-selecao-global" class="banner-selecao-global" style="display:none;" '
+            f'  data-total-filtro="{total_pessoas_exibidas}" data-total-pagina="{len(recorte_grupos)}">'
+            f'  <span id="txt-banner-selecao">Todos os <b>{len(recorte_grupos)}</b> contatos desta página estão selecionados.</span>'
+            f'  <button type="button" id="btn-banner-acao" class="btn-link-banner" onclick="selecionarTodosFiltro()">'
+            f'    👉 Selecionar todos os <b>{total_pessoas_exibidas}</b> contatos deste filtro'
+            f'  </button>'
+            f'</div>'
+        )
+
+        barra_acoes = (
+            f'<div class="barra-acoes-leituras" id="barra-acoes-leituras" '
+            f'  data-total-filtro="{total_pessoas_exibidas}" data-total-pagina="{len(recorte_grupos)}">'
+            '  <div class="acoes-leituras-esquerda">'
+            '    <label class="chk-label-todos">'
+            '      <input type="checkbox" id="chk-selecionar-todos-barra" class="chk-selecao" onchange="toggleSelecionarTodos(this)">'
+            '      <span id="txt-selecionar-todos">Selecionar todos da página</span>'
+            '    </label>'
+            f'  {btn_todos_filtro_html}'
+            '    <span id="contador-selecao-wrap" class="contador-selecao-wrap" style="display:none;">'
+            '      <span class="badge-sel-check">✓</span> <b id="contador-selecao-num">0</b> selecionados'
+            '    </span>'
+            '    <button type="button" id="btn-limpar-selecao" class="btn-limpar-selecao" style="display:none;" onclick="limparSelecao()" title="Limpar seleção de contatos">'
+            '      ✕ Limpar'
+            '    </button>'
+            '  </div>'
+            '  <div class="acoes-leituras-direita">'
+            f'  {btn_importar_html}'
+            '    <button type="button" id="btn-exportar-csv" class="btn-exportar-csv" onclick="exportarContatosCSV()"'
+            '      title="Exportar contatos para planilha CSV compatível com Excel">'
+            f'      📥 Exportar CSV <span id="btn-exportar-contagem">(todos: {total_pessoas_exibidas})</span>'
+            '    </button>'
+            '  </div>'
+            '</div>'
+            + banner_selecao_html
+        )
+        json_export = json.dumps(dados_exportacao_map)
+        script_export = (
+            f'<script>'
+            f'window._contatosExportacao = Object.assign(window._contatosExportacao || {{}}, {json_export});'
+            f'window._totalLeiturasFiltro = {total_pessoas_exibidas};'
+            f'window._totalLeiturasPagina = {len(recorte_grupos)};'
+            f'setTimeout(aplicarSelecaoNoDOM, 30);'
+            f'</script>'
+        )
+        corpo = barra_acoes + _tabela([
+            "[sel]", "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
+            "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
+        ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras", wrap_class="tbl-wrap tbl-wrap-leituras") + script_export
+
+    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou, total_pessoas_whatsapp, lista_ufs)
+
+
+def _dropdown_filtro_uf(lista_ufs: list[tuple[str, int]], uf_selecionado: Optional[str] = None) -> str:
+    """Renderiza o dropdown de filtro por UF / Cidade para a aba de leituras."""
+    if not lista_ufs:
+        return ""
+    options = ['<option value="">Todos os estados / UFs</option>']
+    uf_sel_norm = (uf_selecionado or "").strip().lower()
+    for nome_uf, count in lista_ufs:
+        sel = ' selected' if nome_uf.strip().lower() == uf_sel_norm else ''
+        options.append(f'<option value="{html.escape(nome_uf)}"{sel}>{html.escape(nome_uf)} ({count})</option>')
+
+    return (
+        '<div class="filtro-uf-wrap" title="Filtrar contatos pelo estado ou cidade preenchida">'
+        '  <label for="select-filtro-uf" class="lbl-filtro-uf">📍 UF:</label>'
+        '  <select id="select-filtro-uf" class="select-filtro-uf" onchange="filtrarPorUFClient(this.value)">'
+        + "".join(options) +
+        '  </select>'
+        '</div>'
+    )
 
 
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
@@ -1699,7 +2721,9 @@ def painel(request: Request, _=Depends(exigir_senha),
            pag_leituras: int = Query(0, ge=0),
            so_checkout: int = 0,
            so_ao_vivo: int = 0,
-           so_comprou: int = 0):
+           so_comprou: int = 0,
+           so_whatsapp: int = 0,
+           uf: Optional[str] = None):
     dias_int = dias.default if hasattr(dias, "default") else int(dias)
     pag_leituras_int = pag_leituras.default if hasattr(pag_leituras, "default") else int(pag_leituras)
     d1, d2 = _periodo(de, ate, dias_int)
@@ -1708,35 +2732,107 @@ def painel(request: Request, _=Depends(exigir_senha),
     brutos = eventos.ler_dias(d1 - timedelta(days=1), d2 + timedelta(days=1))
     d = agregar(brutos, d1, d2, incluir_bots=bool(bots), incluir_teste=bool(teste))
 
-    def link(rot, **kw):
-        q = {"dias": kw.get("dias", dias_int)}
+    hoje = hoje_bsb()
+    ontem = hoje - timedelta(days=1)
+    segunda_esta_semana = hoje - timedelta(days=hoje.weekday())
+    segunda_passada = segunda_esta_semana - timedelta(days=7)
+    domingo_passado = segunda_esta_semana - timedelta(days=1)
+
+    is_hoje = (d1 == hoje and d2 == hoje)
+    is_ontem = (d1 == ontem and d2 == ontem)
+    is_esta_semana = (d1 == segunda_esta_semana and d2 == hoje)
+    is_semana_passada = (d1 == segunda_passada and d2 == domingo_passado)
+    is_7dias = (d1 == hoje - timedelta(days=6) and d2 == hoje and not de and not ate)
+    is_30dias = (d1 == hoje - timedelta(days=29) and d2 == hoje and not de and not ate)
+    is_90dias = (d1 == hoje - timedelta(days=89) and d2 == hoje and not de and not ate)
+
+    def link_preset(rot: str, p_de: Optional[str] = None, p_ate: Optional[str] = None, p_dias: Optional[int] = None, ativo: bool = False) -> str:
+        q = {}
+        if p_de and p_ate:
+            q["de"] = p_de
+            q["ate"] = p_ate
+        elif p_dias:
+            q["dias"] = p_dias
         if bots:
             q["bots"] = 1
         if teste:
             q["teste"] = 1
-        if pag_leituras:
-            q["pag_leituras"] = pag_leituras
+        if pag_leituras_int:
+            q["pag_leituras"] = pag_leituras_int
         if so_checkout:
             q["so_checkout"] = 1
         if so_ao_vivo:
             q["so_ao_vivo"] = 1
         if so_comprou:
             q["so_comprou"] = 1
+        if so_whatsapp:
+            q["so_whatsapp"] = 1
+        if uf:
+            q["uf"] = uf
         qs = "&".join(f"{k}={v}" for k, v in q.items())
-        on = " on" if kw.get("dias") == dias_int else ""
+        on = " on" if ativo else ""
         return f'<a class="f{on}" href="/painel?{qs}">{rot}</a>'
+
+    def link_toggle(rot: str, novo_bots: int, novo_teste: int) -> str:
+        q = {}
+        if de:
+            q["de"] = de
+        if ate:
+            q["ate"] = ate
+        if not de and not ate:
+            q["dias"] = dias_int
+        if novo_bots:
+            q["bots"] = 1
+        if novo_teste:
+            q["teste"] = 1
+        if pag_leituras_int:
+            q["pag_leituras"] = pag_leituras_int
+        if so_checkout:
+            q["so_checkout"] = 1
+        if so_ao_vivo:
+            q["so_ao_vivo"] = 1
+        if so_comprou:
+            q["so_comprou"] = 1
+        if so_whatsapp:
+            q["so_whatsapp"] = 1
+        if uf:
+            q["uf"] = uf
+        qs = "&".join(f"{k}={v}" for k, v in q.items())
+        return f'<a href="/painel?{qs}">{rot}</a>'
+
+    form_datas = (
+        '<form method="GET" action="/painel" class="form-filtro-datas">'
+        + (f'<input type="hidden" name="bots" value="1">' if bots else '')
+        + (f'<input type="hidden" name="teste" value="1">' if teste else '')
+        + (f'<input type="hidden" name="so_checkout" value="1">' if so_checkout else '')
+        + (f'<input type="hidden" name="so_ao_vivo" value="1">' if so_ao_vivo else '')
+        + (f'<input type="hidden" name="so_comprou" value="1">' if so_comprou else '')
+        + (f'<input type="hidden" name="so_whatsapp" value="1">' if so_whatsapp else '')
+        + (f'<input type="hidden" name="uf" value="{html.escape(uf)}">' if uf else '')
+        + '<span class="lbl-datas">📅 Personalizado:</span>'
+        + f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
+        + f'<label class="lbl-campo">Até <input type="date" name="ate" value="{d2:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
+        + '<button type="submit" class="btn-filtrar-datas">Filtrar</button>'
+        + '</form>'
+    )
 
     p = [f"<style>{ESTILO}</style><title>Painel · Bússola</title><div class=w>"]
     p.append(f"<h1>Bússola Astrológica</h1>")
     p.append(f'<p class="sub">{d1:%d/%m/%Y} a {d2:%d/%m/%Y} · '
              f'<b>{d.get("pessoas_unicas", d["sessoes"])}</b> pessoas únicas, '
              f'{d["sessoes"]} sessões no total ({d["abertas"]} ainda em andamento)</p>')
-    p.append('<div class="filtros">' + link("hoje", dias=1) + link("7 dias", dias=7)
-             + link("30 dias", dias=30) + link("90 dias", dias=90)
-             + f'<a href="/painel?dias={dias}&bots={0 if bots else 1}&teste={teste}">'
-             f'{"ocultar" if bots else "mostrar"} bots</a>'
-             + f'<a href="/painel?dias={dias}&bots={bots}&teste={0 if teste else 1}">'
-             f'{"ocultar" if teste else "mostrar"} meus testes</a></div>')
+    p.append('<div class="filtros">'
+             + link_preset("hoje", p_de=hoje.isoformat(), p_ate=hoje.isoformat(), ativo=is_hoje)
+             + link_preset("ontem", p_de=ontem.isoformat(), p_ate=ontem.isoformat(), ativo=is_ontem)
+             + link_preset("esta semana", p_de=segunda_esta_semana.isoformat(), p_ate=hoje.isoformat(), ativo=is_esta_semana)
+             + link_preset("semana passada", p_de=segunda_passada.isoformat(), p_ate=domingo_passado.isoformat(), ativo=is_semana_passada)
+             + link_preset("7 dias", p_dias=7, ativo=is_7dias)
+             + link_preset("30 dias", p_dias=30, ativo=is_30dias)
+             + link_preset("90 dias", p_dias=90, ativo=is_90dias)
+             + link_toggle("ocultar bots" if bots else "mostrar bots", novo_bots=0 if bots else 1, novo_teste=teste)
+             + link_toggle("ocultar meus testes" if teste else "mostrar meus testes", novo_bots=bots, novo_teste=0 if teste else 1)
+             + form_datas
+             + '</div>')
 
     if d["sessoes"] < MIN_PARA_PORCENTAGEM:
         p.append(f'<div class="alerta">Menos de {MIN_PARA_PORCENTAGEM} sessões no período. '
@@ -1782,7 +2878,6 @@ def painel(request: Request, _=Depends(exigir_senha),
              '<button type="button" class="aba-btn" data-tab="aba-leituras" onclick="window.abrirAba(\'aba-leituras\');return false;">📖 Leituras</button>'
              '<button type="button" class="aba-btn" data-tab="aba-formulario" onclick="window.abrirAba(\'aba-formulario\');return false;">📝 Formulário & Horário</button>'
              '<button type="button" class="aba-btn" data-tab="aba-astrologia" onclick="window.abrirAba(\'aba-astrologia\');return false;">🔮 Áreas & Casas</button>'
-             '<button type="button" class="aba-btn" data-tab="aba-agente" onclick="window.abrirAba(\'aba-agente\');return false;">⚡ Saúde do Agente</button>'
              '</nav>')
 
     # ==================== ABA 1: FUNIL ====================
@@ -1814,14 +2909,25 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
     res_leituras = _tabela_leituras(
-        pag_leituras_int, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo), so_comprou=bool(so_comprou)
+        pag_leituras_int, por_pagina=20,
+        so_checkout=bool(so_checkout),
+        so_ao_vivo=bool(so_ao_vivo),
+        so_comprou=bool(so_comprou),
+        so_whatsapp=bool(so_whatsapp),
+        uf=uf,
+        de=d1, ate=d2
     )
     corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
     total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
     total_comprou = getattr(res_leituras, "total_comprou", 0)
+    total_whatsapp = getattr(res_leituras, "total_whatsapp", 0)
 
     def link_filtro_leituras(modo: str) -> str:
         q = {"dias": dias_int}
+        if de:
+            q["de"] = de
+        if ate:
+            q["ate"] = ate
         if bots:
             q["bots"] = 1
         if teste:
@@ -1832,6 +2938,10 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_ao_vivo"] = 1
         elif modo == "comprou":
             q["so_comprou"] = 1
+        elif modo == "whatsapp":
+            q["so_whatsapp"] = 1
+        if uf:
+            q["uf"] = uf
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         url = f"/painel?{qs}#aba-leituras"
         if modo == "checkout":
@@ -1852,9 +2962,15 @@ def painel(request: Request, _=Depends(exigir_senha),
             rotulo = "💰 Só quem comprou"
             badge_id = "badge-count-comprou"
             cnt = total_comprou
+        elif modo == "whatsapp":
+            cls = " wa"
+            on = " on" if so_whatsapp else ""
+            rotulo = "📱 Só com WhatsApp"
+            badge_id = "badge-count-wa"
+            cnt = total_whatsapp
         else:
             cls = ""
-            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou) else ""
+            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
             cnt = total_geral
@@ -1863,23 +2979,33 @@ def painel(request: Request, _=Depends(exigir_senha),
                 f'data-filtro="{modo}" onclick="return filtrarTabelaClient(\'{modo}\', this, event);">'
                 f'{rotulo} <span id="{badge_id}" class="badge-count">{cnt}</span></a>')
 
+    dropdown_uf = _dropdown_filtro_uf(getattr(res_leituras, "lista_ufs", []), uf_selecionado=uf)
+
     p.append('<div class="filtros-leituras">'
              + link_filtro_leituras("todos")
+             + link_filtro_leituras("whatsapp")
              + link_filtro_leituras("checkout")
              + link_filtro_leituras("ao_vivo")
              + link_filtro_leituras("comprou")
+             + dropdown_uf
              + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
              + '</div>')
 
     p_params = {
         "dias": dias_int,
+        "de": de if de else None,
+        "ate": ate if ate else None,
         "bots": bots if bots else None,
         "teste": teste if teste else None,
         "so_checkout": 1 if so_checkout else None,
         "so_ao_vivo": 1 if so_ao_vivo else None,
         "so_comprou": 1 if so_comprou else None,
+        "so_whatsapp": 1 if so_whatsapp else None,
+        "uf": uf if uf else None,
     }
-    if so_comprou:
+    if so_whatsapp:
+        rotulo_pag = "contatos com WhatsApp"
+    elif so_comprou:
         rotulo_pag = "compradores"
     elif so_ao_vivo:
         rotulo_pag = "pessoas ativas ao vivo"
@@ -1891,7 +3017,9 @@ def painel(request: Request, _=Depends(exigir_senha),
     barra_pag = _barra_paginacao(pag_leituras_int, total_pessoas, "/painel", p_params,
                                  por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras",
                                  rotulo_item=rotulo_pag)
-    if so_comprou:
+    if so_whatsapp:
+        sub_tipo = "que deixaram WhatsApp"
+    elif so_comprou:
         sub_tipo = "que compraram o produto"
     elif so_ao_vivo:
         sub_tipo = "ativas navegando agora"
@@ -1970,27 +3098,9 @@ def painel(request: Request, _=Depends(exigir_senha),
                  'acima é mais ruído que sinal.</p>')
     p.append('</section>')
 
-    # ==================== ABA 4: SAÚDE DO AGENTE ====================
-    p.append('<section class="aba-painel" id="aba-agente">')
-    # ---- geração ----
-    p.append("<h2>Saúde do agente</h2>")
-    p.append(f'<div class="cards">'
-             f'<div class="card"><b>{g["mediana_ms"]/1000:.1f}s</b><span>mediana</span></div>'
-             f'<div class="card"><b>{g["p95_ms"]/1000:.1f}s</b><span>p95</span></div>'
-             f'<div class="card"><b>{g["cacheadas"]}</b><span>vieram do cache</span></div>'
-             f'<div class="card"><b>{g["reserva"]}</b><span>carta de reserva</span></div>'
-             f'<div class="card"><b>{g["falhas"]}</b><span>falhas de cálculo</span></div></div>')
-    p.append(f'<p class="nota">Tempo medido sobre {g["amostra_tempo"]} leitura(s) realmente geradas. '
-             'As que vieram do cache ficam de fora: elas respondem em milissegundos e puxariam a '
-             'mediana para baixo, escondendo lentidão real. Modelos usados: '
-             + (", ".join(f"{html.escape(str(k))} ({v})" for k, v in g["modelos"]) or "—") + ".</p>")
-
-    p.append(f'<h2>Leituras</h2><p class="nota">'
-             f'<a href="#aba-leituras" onclick="abrirAba(\'aba-leituras\');return false;">ver a lista na aba Leituras</a>.</p>')
-    p.append('</section>')
-
     p.append(_modal_confirmar_exclusao())
     p.append(_modal_confirmar_compra())
+    p.append(_modal_importar_csv())
     token_ws = gerar_token_ws()
     p.append(f'<script>window._wsToken = "{token_ws}";</script>')
     p.append(f'<script>{JS_PAINEL}</script>')
@@ -2000,20 +3110,37 @@ def painel(request: Request, _=Depends(exigir_senha),
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
 def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
-          so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0):
+          de: Optional[str] = None, ate: Optional[str] = None, dias: int = 7,
+          so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0, so_whatsapp: int = 0,
+          uf: Optional[str] = None):
+    d1, d2 = _periodo(de, ate, dias) if (de or ate or dias) else (None, None)
     res_leituras = _tabela_leituras(
-        pagina, por_pagina=20, so_checkout=bool(so_checkout), so_ao_vivo=bool(so_ao_vivo), so_comprou=bool(so_comprou)
+        pagina, por_pagina=20,
+        so_checkout=bool(so_checkout),
+        so_ao_vivo=bool(so_ao_vivo),
+        so_comprou=bool(so_comprou),
+        so_whatsapp=bool(so_whatsapp),
+        uf=uf,
+        de=d1, ate=d2
     )
     corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
     total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
     total_comprou = getattr(res_leituras, "total_comprou", 0)
+    total_whatsapp = getattr(res_leituras, "total_whatsapp", 0)
 
     p_params = {
+        "dias": dias,
+        "de": de if de else None,
+        "ate": ate if ate else None,
         "so_checkout": 1 if so_checkout else None,
         "so_ao_vivo": 1 if so_ao_vivo else None,
         "so_comprou": 1 if so_comprou else None,
+        "so_whatsapp": 1 if so_whatsapp else None,
+        "uf": uf if uf else None,
     }
-    if so_comprou:
+    if so_whatsapp:
+        rotulo_pag = "contatos com WhatsApp"
+    elif so_comprou:
         rotulo_pag = "pessoas que compraram"
     elif so_ao_vivo:
         rotulo_pag = "pessoas ativas ao vivo"
@@ -2027,12 +3154,22 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
 
     def link_filtro_lista(modo: str) -> str:
         q = {}
+        if dias != 7:
+            q["dias"] = dias
+        if de:
+            q["de"] = de
+        if ate:
+            q["ate"] = ate
         if modo == "checkout":
             q["so_checkout"] = 1
         elif modo == "ao_vivo":
             q["so_ao_vivo"] = 1
         elif modo == "comprou":
             q["so_comprou"] = 1
+        elif modo == "whatsapp":
+            q["so_whatsapp"] = 1
+        if uf:
+            q["uf"] = uf
         qs = ("?" + "&".join(f"{k}={v}" for k, v in q.items())) if q else ""
         url = f"/painel/leituras{qs}"
         if modo == "checkout":
@@ -2053,9 +3190,15 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
             rotulo = "💰 Só quem comprou"
             badge_id = "badge-count-comprou"
             cnt = total_comprou
+        elif modo == "whatsapp":
+            cls = " wa"
+            on = " on" if so_whatsapp else ""
+            rotulo = "📱 Só com WhatsApp"
+            badge_id = "badge-count-wa"
+            cnt = total_whatsapp
         else:
             cls = ""
-            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou) else ""
+            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
             cnt = total_geral
@@ -2064,15 +3207,21 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
                 f'data-filtro="{modo}" onclick="return filtrarTabelaClient(\'{modo}\', this, event);">'
                 f'{rotulo} <span id="{badge_id}" class="badge-count">{cnt}</span></a>')
 
+    dropdown_uf = _dropdown_filtro_uf(getattr(res_leituras, "lista_ufs", []), uf_selecionado=uf)
+
     botoes_filtro = ('<div class="filtros-leituras">'
                      + link_filtro_lista("todos")
+                     + link_filtro_lista("whatsapp")
                      + link_filtro_lista("checkout")
                      + link_filtro_lista("ao_vivo")
                      + link_filtro_lista("comprou")
+                     + dropdown_uf
                      + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
                      + '</div>')
 
-    if so_comprou:
+    if so_whatsapp:
+        sub_tipo = "que deixaram WhatsApp"
+    elif so_comprou:
         sub_tipo = "que compraram o produto"
     elif so_ao_vivo:
         sub_tipo = "ativas navegando agora"
@@ -2093,10 +3242,474 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         f'{barra_pag}'
         f'{_modal_confirmar_exclusao()}'
         f'{_modal_confirmar_compra()}'
+        f'{_modal_importar_csv()}'
         f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>'
         f'<script>window._wsToken = "{token_ws}";</script>'
         f'<script>{JS_PAINEL}</script>',
         headers=CABECALHOS)
+
+
+def _normalizar_nome_coluna(col: str) -> str:
+    """Normaliza o cabeçalho de coluna do CSV para facilitar o mapeamento."""
+    c = col.strip().lower()
+    for o, d in [("á", "a"), ("à", "a"), ("ã", "a"), ("â", "a"),
+                 ("é", "e"), ("ê", "e"), ("í", "i"), ("ó", "o"),
+                 ("õ", "o"), ("ô", "o"), ("ú", "u"), ("ç", "c")]:
+        c = c.replace(o, d)
+    c = re.sub(r"[^\w\s]", "", c)
+    return re.sub(r"\s+", "_", c)
+
+
+def _parsear_data_nasc(s: str) -> dict:
+    """Extrai dia, mês e ano de nascimento a partir de formatos comuns."""
+    if not s or s.strip() in ("", "—", "-"):
+        return {}
+    s = s.strip()
+    m = re.match(r"^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$", s)
+    if m:
+        dia, mes, ano = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if ano < 100:
+            ano += 1900 if ano > 40 else 2000
+        return {"dia": dia, "mes": mes, "ano": ano}
+    m2 = re.match(r"^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$", s)
+    if m2:
+        ano, mes, dia = int(m2.group(1)), int(m2.group(2)), int(m2.group(3))
+        return {"dia": dia, "mes": mes, "ano": ano}
+    return {}
+
+
+def _parsear_hora_nasc(s: str) -> dict:
+    """Extrai hora e minuto ou período de nascimento."""
+    if not s or s.strip() in ("", "—", "-"):
+        return {}
+    s = s.strip().lower()
+    m = re.match(r"^(\d{1,2})[h:](\d{1,2})?$", s)
+    if m:
+        hora = int(m.group(1))
+        minuto = int(m.group(2)) if m.group(2) is not None else 0
+        return {"hora": hora, "minuto": minuto}
+    return {"periodo": s}
+
+
+def _parsear_booleano(s: Optional[str]) -> Optional[bool]:
+    """Converte valores textuais comuns para booleano."""
+    if s is None:
+        return None
+    val = str(s).strip().upper()
+    if val in ("SIM", "S", "1", "TRUE", "VERDADEIRO", "COMPROU", "CHECKOUT"):
+        return True
+    if val in ("NÃO", "NAO", "N", "0", "FALSE", "FALSO"):
+        return False
+    return None
+
+
+def processar_csv_leituras(conteudo_bytes: bytes, atualizar: bool = True) -> dict:
+    """Processa o conteúdo binário de um arquivo CSV e cria ou atualiza leituras."""
+    texto = None
+    for enc in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
+        try:
+            texto = conteudo_bytes.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        texto = conteudo_bytes.decode("latin-1", errors="replace")
+
+    linhas_puras = [l for l in texto.splitlines() if l.strip()]
+    if not linhas_puras:
+        return {"sucesso": False, "erro": "O arquivo CSV está vazio.", "total": 0, "criados": 0, "atualizados": 0, "erros": []}
+
+    primeira_linha = linhas_puras[0]
+    if primeira_linha.count(";") >= primeira_linha.count(","):
+        delim = ";"
+    elif "," in primeira_linha:
+        delim = ","
+    elif "\t" in primeira_linha:
+        delim = "\t"
+    else:
+        delim = ";"
+
+    leitor = csv.reader(io.StringIO(texto), delimiter=delim)
+    try:
+        cabecalho_bruto = next(leitor)
+    except StopIteration:
+        return {"sucesso": False, "erro": "Cabeçalho não encontrado no CSV.", "total": 0, "criados": 0, "atualizados": 0, "erros": []}
+
+    col_map = {}
+    for idx, c in enumerate(cabecalho_bruto):
+        norm = _normalizar_nome_coluna(c)
+        if norm in ("id", "id_da_leitura", "leitura_id", "stem"):
+            col_map["id"] = idx
+        elif norm in ("nome", "nome_completo", "cliente", "lead", "nome_do_cliente"):
+            col_map["nome"] = idx
+        elif norm in ("whatsapp", "telefone", "celular", "fone", "tel", "zap", "contato"):
+            col_map["whatsapp"] = idx
+        elif norm in ("data_de_nascimento", "data_nasc", "nascimento", "data_nascimento", "dt_nasc"):
+            col_map["nascimento"] = idx
+        elif norm in ("hora_de_nascimento", "hora_nasc", "hora_nascimento", "hora"):
+            col_map["hora_nasc"] = idx
+        elif norm in ("cidade", "municipio"):
+            col_map["cidade"] = idx
+        elif norm in ("uf", "estado"):
+            col_map["uf"] = idx
+        elif norm in ("pais", "pais_de_residencia"):
+            col_map["pais"] = idx
+        elif norm in ("etapa", "etapa_alcancada", "etapa_max"):
+            col_map["etapa"] = idx
+        elif norm in ("checkout", "fez_checkout"):
+            col_map["checkout"] = idx
+        elif norm in ("comprou", "compra", "comprador"):
+            col_map["comprou"] = idx
+        elif norm in ("area", "area_do_quiz"):
+            col_map["area"] = idx
+        elif norm in ("cenario", "cenario_astrologico"):
+            col_map["cenario"] = idx
+        elif norm in ("casa", "casa_astrologica"):
+            col_map["casa"] = idx
+        elif norm in ("chegou_ao_quiz_bsb", "chegou_ao_quiz", "chegou_em_bsb", "chegou_bsb"):
+            col_map["chegou_bsb"] = idx
+        elif norm in ("preencheu_dados_bsb", "preencheu_dados", "gravado_em_bsb", "gravado_bsb"):
+            col_map["gravado_bsb"] = idx
+        elif norm in ("tempo_no_quiz", "tempo_quiz"):
+            col_map["tempo_quiz"] = idx
+
+    if "nome" not in col_map and "whatsapp" not in col_map and "id" not in col_map:
+        return {
+            "sucesso": False,
+            "erro": "Não foi possível identificar colunas mínimas (Nome, WhatsApp ou ID) no cabeçalho do CSV.",
+            "total": 0, "criados": 0, "atualizados": 0, "erros": []
+        }
+
+    total = 0
+    criados = 0
+    atualizados = 0
+    erros = []
+
+    def get_v(row: list, key: str) -> str:
+        idx = col_map.get(key)
+        if idx is not None and idx < len(row):
+            return row[idx].strip()
+        return ""
+
+    agora_bsb_dt = datetime.now(FUSO_BSB)
+    agora_bsb_str = agora_bsb_dt.strftime("%d/%m/%y %H:%M")
+
+    for num_linha, row in enumerate(leitor, start=2):
+        if not row or not any(x.strip() for x in row):
+            continue
+        total += 1
+        try:
+            val_id = get_v(row, "id")
+            val_nome = get_v(row, "nome")
+            val_wa = get_v(row, "whatsapp")
+            val_nasc = get_v(row, "nascimento")
+            val_hora = get_v(row, "hora_nasc")
+            val_cidade = get_v(row, "cidade")
+            val_uf = get_v(row, "uf")
+            val_pais = get_v(row, "pais")
+            val_etapa = get_v(row, "etapa")
+            val_checkout = get_v(row, "checkout")
+            val_comprou = get_v(row, "comprou")
+            val_area = get_v(row, "area")
+            val_cenario = get_v(row, "cenario")
+            val_casa = get_v(row, "casa")
+            val_chegou = get_v(row, "chegou_bsb")
+            val_gravado = get_v(row, "gravado_bsb")
+
+            def limpa_traco(v: str) -> str:
+                return "" if v in ("—", "-") else v
+
+            val_id = limpa_traco(val_id)
+            val_nome = limpa_traco(val_nome)
+            val_wa = limpa_traco(val_wa)
+            val_cidade = limpa_traco(val_cidade)
+            val_uf = limpa_traco(val_uf)
+            val_pais = limpa_traco(val_pais) or "Brasil"
+            val_area = limpa_traco(val_area)
+            val_cenario = limpa_traco(val_cenario)
+            val_casa = limpa_traco(val_casa)
+            val_chegou = limpa_traco(val_chegou)
+            val_gravado = limpa_traco(val_gravado)
+
+            b_comprou = _parsear_booleano(val_comprou)
+            b_checkout = _parsear_booleano(val_checkout)
+
+            arq_existente = None
+            if val_id:
+                candidato = config.DIR_LEITURAS / f"{val_id}.json"
+                if candidato.exists():
+                    arq_existente = candidato
+
+            if arq_existente and atualizar:
+                try:
+                    d = json.loads(arq_existente.read_text(encoding="utf-8"))
+                except Exception:
+                    d = {}
+
+                if val_nome:
+                    d["nome_completo"] = val_nome
+                    quiz_dict = d.setdefault("quiz", {})
+                    if not quiz_dict.get("primeiro_nome"):
+                        quiz_dict["primeiro_nome"] = val_nome.split()[0]
+                if val_wa:
+                    d["whatsapp"] = val_wa
+                if b_comprou is not None:
+                    d["comprou"] = b_comprou
+                    if b_comprou and not d.get("comprado_em"):
+                        d["comprado_em"] = datetime.now().isoformat(timespec="seconds")
+                if b_checkout is not None:
+                    d["checkout"] = b_checkout
+                if val_nasc:
+                    parsed_nasc = _parsear_data_nasc(val_nasc)
+                    if parsed_nasc:
+                        d_nasc = d.setdefault("nascimento", {})
+                        d_nasc.update(parsed_nasc)
+                if val_hora:
+                    parsed_hora = _parsear_hora_nasc(val_hora)
+                    if parsed_hora:
+                        d_nasc = d.setdefault("nascimento", {})
+                        d_nasc.update(parsed_hora)
+                if val_cidade or val_uf or val_pais:
+                    d_cid = d.setdefault("cidade", {})
+                    if val_cidade: d_cid["nome"] = val_cidade
+                    if val_uf: d_cid["uf"] = val_uf
+                    if val_pais: d_cid["pais"] = val_pais
+                if val_area:
+                    d.setdefault("quiz", {})["area"] = val_area
+                if val_cenario:
+                    d.setdefault("veredito", {})["tipo"] = val_cenario
+                if val_casa:
+                    m_c = re.search(r"\d+", val_casa)
+                    if m_c:
+                        c_num = int(m_c.group(0))
+                        d.setdefault("veredito", {})["casa_aberta"] = c_num
+                        d["veredito"]["casa_eleita_real"] = True
+                if val_chegou:
+                    d["chegou_em_bsb"] = val_chegou
+                if val_gravado:
+                    d["gravado_em_bsb"] = val_gravado
+
+                arq_existente.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+                atualizados += 1
+
+            elif not arq_existente:
+                novo_lid = val_id if (val_id and re.fullmatch(r"[\w-]+", val_id)) else registro.novo_id()
+                agora_utc = datetime.now(timezone.utc)
+                parsed_nasc = _parsear_data_nasc(val_nasc) if val_nasc else {}
+                parsed_hora = _parsear_hora_nasc(val_hora) if val_hora else {}
+                nasc_obj = dict(parsed_nasc, **parsed_hora)
+
+                casa_num = 0
+                if val_casa:
+                    m_c = re.search(r"\d+", val_casa)
+                    if m_c:
+                        casa_num = int(m_c.group(0))
+
+                etapa_num = 7
+                etapa_nome = val_etapa or "Tela 7 (Leitura)"
+                if val_etapa:
+                    m_et = re.search(r"\d+", val_etapa)
+                    if m_et:
+                        etapa_num = int(m_et.group(0))
+
+                d_novo = {
+                    "leitura_id": novo_lid,
+                    "nome_completo": val_nome or "—",
+                    "whatsapp": val_wa or "",
+                    "quiz": {
+                        "primeiro_nome": val_nome.split()[0] if val_nome else "",
+                        "area": val_area or "geral",
+                    },
+                    "nascimento": nasc_obj,
+                    "cidade": {
+                        "nome": val_cidade or "—",
+                        "uf": val_uf or "—",
+                        "pais": val_pais or "Brasil",
+                    },
+                    "veredito": {
+                        "tipo": val_cenario or "—",
+                        "casa_aberta": casa_num,
+                        "casa_eleita_real": bool(casa_num > 0),
+                    },
+                    "etapa_max": etapa_num,
+                    "etapa_nome": etapa_nome,
+                    "checkout": bool(b_checkout) if b_checkout is not None else False,
+                    "comprou": bool(b_comprou) if b_comprou is not None else False,
+                    "gravado_em": agora_utc.isoformat(timespec="seconds"),
+                    "gravado_em_bsb": val_gravado or agora_bsb_str,
+                    "chegou_em_bsb": val_chegou or agora_bsb_str,
+                    "pesos_v": 1,
+                }
+                if b_comprou:
+                    d_novo["comprado_em"] = agora_utc.isoformat(timespec="seconds")
+
+                caminho_novo = config.DIR_LEITURAS / f"{novo_lid}.json"
+                caminho_novo.write_text(json.dumps(d_novo, ensure_ascii=False, indent=1), encoding="utf-8")
+                criados += 1
+
+        except Exception as ex:
+            logger.warning("Erro ao processar linha %d do CSV: %s", num_linha, ex)
+            erros.append(f"Linha {num_linha}: {str(ex)}")
+
+    return {
+        "sucesso": True,
+        "total": total,
+        "criados": criados,
+        "atualizados": atualizados,
+        "erros": erros
+    }
+
+
+@router.post("/painel/importar-csv")
+async def importar_csv(
+    arquivo: UploadFile = File(...),
+    atualizar: int = Form(1),
+    _=Depends(exigir_senha)
+):
+    """Recebe planilha CSV enviada e cadastra ou atualiza leituras."""
+    nome = arquivo.filename or ""
+    if not nome.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="O arquivo enviado deve ter extensão .csv")
+
+    try:
+        conteudo = await arquivo.read()
+    except Exception as e:
+        logger.error("Falha ao ler arquivo CSV enviado: %s", e)
+        raise HTTPException(status_code=400, detail="Não foi possível ler o arquivo enviado.")
+
+    if not conteudo or not conteudo.strip():
+        raise HTTPException(status_code=400, detail="O arquivo CSV enviado está vazio.")
+
+    resultado = processar_csv_leituras(conteudo, atualizar=bool(atualizar))
+    if not resultado.get("sucesso"):
+        raise HTTPException(status_code=400, detail=resultado.get("erro", "Erro ao processar CSV."))
+
+    return resultado
+
+
+@router.get("/painel/exportar-csv")
+def exportar_csv(_=Depends(exigir_senha),
+                 de: Optional[str] = None, ate: Optional[str] = None, dias: int = 7,
+                 so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0, so_whatsapp: int = 0,
+                 uf: Optional[str] = None,
+                 ids: Optional[str] = None):
+    """Gera planilha CSV estruturada com as leituras filtradas ou selecionadas."""
+    d1, d2 = _periodo(de, ate, dias) if not ids else (None, None)
+    arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
+
+    ids_alvo = set(x.strip() for x in ids.split(",") if x.strip()) if ids else None
+
+    todos_dados: list[tuple[str, dict]] = []
+    for arq in arquivos:
+        if ids_alvo and arq.stem not in ids_alvo:
+            continue
+        try:
+            d = json.loads(arq.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
+            continue
+        if not ids_alvo and d1 and d2:
+            dt_ch = obter_data_chegada_leitura(d, arq.stem)
+            if dt_ch and not (d1 <= dt_ch <= d2):
+                continue
+        todos_dados.append((arq.stem, d))
+
+    progresso_map = obter_progresso_leituras(todos_dados)
+    todos_grupos = _agrupar_leituras_por_pessoa(todos_dados, progresso_map)
+
+    ativos = rastreador_presenca.obter_ativos(90.0)
+    ids_ao_vivo = {str(a["leitura_id"]).strip() for a in ativos if a.get("leitura_id")}
+    sids_ao_vivo = {str(a["sid"]).strip() for a in ativos if a.get("sid")}
+
+    for g in todos_grupos:
+        cid = str(g["d_principal"].get("cliente_id") or "").strip()
+        g_cids = {cid} if cid else set()
+        for _, sub_d in g["outras_leituras"]:
+            sc = str(sub_d.get("cliente_id") or "").strip()
+            if sc:
+                g_cids.add(sc)
+        g["ao_vivo"] = bool(set(g["todos_ids"]) & ids_ao_vivo or g_cids & sids_ao_vivo)
+
+    if not ids_alvo:
+        if so_whatsapp:
+            todos_grupos = [g for g in todos_grupos if g.get("tem_whatsapp")]
+        elif so_comprou:
+            todos_grupos = [g for g in todos_grupos if g.get("comprou")]
+        elif so_ao_vivo:
+            todos_grupos = [g for g in todos_grupos if g["ao_vivo"]]
+        elif so_checkout:
+            todos_grupos = [g for g in todos_grupos if g["teve_checkout"]]
+
+        if uf and uf.strip():
+            uf_norm = uf.strip().lower()
+            todos_grupos = [
+                g for g in todos_grupos
+                if str((g.get("cidade") or {}).get("uf") or (g.get("cidade") or {}).get("nome") or "").strip().lower() == uf_norm
+            ]
+
+    out = io.StringIO()
+    out.write("\ufeff")
+    writer = csv.writer(out, delimiter=";", quoting=csv.QUOTE_ALL)
+    writer.writerow([
+        "ID da Leitura",
+        "Chegou ao Quiz (BSB)",
+        "Preencheu Dados (BSB)",
+        "Etapa Alcançada",
+        "Fez Checkout",
+        "Comprou",
+        "Nome Completo",
+        "WhatsApp",
+        "Data de Nascimento",
+        "Hora de Nascimento",
+        "Cidade",
+        "UF",
+        "País",
+        "Área do Quiz",
+        "Cenário Astrológico",
+        "Casa Astrológica",
+        "Tempo no Quiz",
+        "Total de Envios"
+    ])
+
+    for g in todos_grupos:
+        stem = g["stem_principal"]
+        d = g["d_principal"]
+        v, pr = d.get("veredito") or {}, d.get("precisao") or {}
+        nasc = g["nascimento"]
+        cid = g["cidade"]
+        chegada_bsb, gerada_bsb = f_chegada_bsb(d, stem)
+        writer.writerow([
+            stem,
+            chegada_bsb,
+            gerada_bsb,
+            g["rotulo_etapa"],
+            "SIM" if g["teve_checkout"] else "NÃO",
+            "SIM" if g.get("comprou") else "NÃO",
+            g["nome_completo"],
+            g["whatsapp"] or "—",
+            f_data(nasc),
+            f_hora(nasc, pr),
+            cid.get("nome") or "—",
+            cid.get("uf") or "—",
+            cid.get("pais") or "Brasil",
+            str((d.get("quiz") or {}).get("area") or "—"),
+            str(v.get("tipo") or "—"),
+            "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
+            f_tempo(d.get("tempo_quiz_ms")),
+            g["total_envios"]
+        ])
+
+    csv_data = out.getvalue().encode("utf-8")
+    nome_arquivo = f"leituras_bussola_{hoje_bsb().strftime('%Y-%m-%d')}.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nome_arquivo}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        }
+    )
 
 
 @router.get("/painel/leitura/{leitura_id}", response_class=HTMLResponse)
