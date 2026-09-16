@@ -11,7 +11,10 @@ O ecossistema da **Bússola Astrológica** é composto por duas aplicações int
 1. **Aplicação do Quiz & Painel de Leads (`quiz/`)**:
    - Desenvolvida em **Python 3.10+ / FastAPI / WebSockets**, servindo na raiz `/` o quiz em 11 etapas, cálculo astrológico de casas e trânsitos (Swiss Ephemeris / Kerykeion), geração de carta personalizada por IA, acompanhamento em tempo real e painel administrativo protegido (`/painel`).
 2. **Landing Pages & Vendas (`frontend/`)**:
-   - Desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**, com apresentação das 12 casas (as 12 portas da vida), animações e checkout Hotmart.
+   - Desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**.
+   - **Página Principal da Bússola (`/bussola` e `/`)**: Apresentação das 12 casas (as 12 portas da vida), narrativa astrológica imersiva, animações em Framer Motion/GSAP e checkout integrado.
+   - **Página de Oferta Relâmpago (`/oferta-relampago`)**: Página de alta conversão para remarketing com **cronômetro regressivo dinâmico** (`TimerOferta`), ancoragem de preço flexível (ex: R$37 à vista ou 12x de R$3,83), destaque para bônus exclusivos e botão flutuante de suporte via WhatsApp.
+   - **Painel Administrativo (`/admin`)**: Gestão de leads capturados, autenticação JWT (`jose`/`bcryptjs`) e integração com PostgreSQL.
 
 ---
 
@@ -130,16 +133,14 @@ O projeto conta com cobertura completa e testes automatizados em ambas as aplica
 ```bash
 cd quiz
 .\.venv\Scripts\pytest -o pythonpath=. testes
-# 75 testes cobrindo integração, painel, tempo real, websocket, webhooks e persistência
+# 105 testes cobrindo integração, painel, tempo real, websocket, webhooks, filtros por data e UF, importação/exportação CSV e persistência
 ```
 
 ### Frontend (Vitest)
 ```bash
-npm test -- --run
-# 68 testes cobrindo componentes, validações, autenticação, modais e rotas
-```
 cd frontend
-npm run test -- --watch
+npm test -- --run
+# 78 testes cobrindo componentes, validações, autenticação, modais, timer regressivo, página de oferta relâmpago e rotas
 ```
 
 ---

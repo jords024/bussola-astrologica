@@ -8,9 +8,10 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 
 type Props = {
   onCheckout: () => void;
+  preco?: string;
 };
 
-export default function HeroBussolaV2({ onCheckout }: Props) {
+export default function HeroBussolaV2({ onCheckout, preco = "R$67" }: Props) {
   return (
     <header className="relative isolate flex min-h-[100svh] w-full items-end justify-center overflow-hidden bg-[oklch(0.09_0.03_265)] md:items-center">
       {/* Fundo cósmico: claro em cima (a roda aparece inteira), escurece
@@ -73,7 +74,7 @@ export default function HeroBussolaV2({ onCheckout }: Props) {
                 <ShieldCheck className="h-3.5 w-3.5 text-gold" /> 7 dias de garantia
               </span>
               <span className="flex items-center gap-1.5">
-                <Tag className="h-3.5 w-3.5 text-gold" /> R$67
+                <Tag className="h-3.5 w-3.5 text-gold" /> {preco}
               </span>
             </div>
           </div>

@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BussolaRouteImport } from './routes/bussola'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ObrigadoRouteImport } from './routes/obrigado'
+import { Route as OfertaRelampagoRouteImport } from './routes/oferta-relampago'
 import { Route as PoliticasDePrivacidadeRouteImport } from './routes/politicas-de-privacidade'
 import { Route as TermosDeUsoRouteImport } from './routes/termos-de-uso'
 import { Route as VendasRouteImport } from './routes/vendas'
@@ -52,6 +53,11 @@ const McpRoute = McpRouteImport.update({
 const ObrigadoRoute = ObrigadoRouteImport.update({
   id: '/obrigado',
   path: '/obrigado',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfertaRelampagoRoute = OfertaRelampagoRouteImport.update({
+  id: '/oferta-relampago',
+  path: '/oferta-relampago',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PoliticasDePrivacidadeRoute = PoliticasDePrivacidadeRouteImport.update({
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/bussola': typeof BussolaRoute
   '/mcp': typeof McpRoute
   '/obrigado': typeof ObrigadoRoute
+  '/oferta-relampago': typeof OfertaRelampagoRoute
   '/politicas-de-privacidade': typeof PoliticasDePrivacidadeRoute
   '/termos-de-uso': typeof TermosDeUsoRoute
   '/vendas': typeof VendasRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/bussola': typeof BussolaRoute
   '/mcp': typeof McpRoute
   '/obrigado': typeof ObrigadoRoute
+  '/oferta-relampago': typeof OfertaRelampagoRoute
   '/politicas-de-privacidade': typeof PoliticasDePrivacidadeRoute
   '/termos-de-uso': typeof TermosDeUsoRoute
   '/vendas': typeof VendasRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/bussola': typeof BussolaRoute
   '/mcp': typeof McpRoute
   '/obrigado': typeof ObrigadoRoute
+  '/oferta-relampago': typeof OfertaRelampagoRoute
   '/politicas-de-privacidade': typeof PoliticasDePrivacidadeRoute
   '/termos-de-uso': typeof TermosDeUsoRoute
   '/vendas': typeof VendasRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/bussola'
     | '/mcp'
     | '/obrigado'
+    | '/oferta-relampago'
     | '/politicas-de-privacidade'
     | '/termos-de-uso'
     | '/vendas'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/bussola'
     | '/mcp'
     | '/obrigado'
+    | '/oferta-relampago'
     | '/politicas-de-privacidade'
     | '/termos-de-uso'
     | '/vendas'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/bussola'
     | '/mcp'
     | '/obrigado'
+    | '/oferta-relampago'
     | '/politicas-de-privacidade'
     | '/termos-de-uso'
     | '/vendas'
@@ -212,6 +224,7 @@ export interface RootRouteChildren {
   BussolaRoute: typeof BussolaRoute
   McpRoute: typeof McpRoute
   ObrigadoRoute: typeof ObrigadoRoute
+  OfertaRelampagoRoute: typeof OfertaRelampagoRoute
   PoliticasDePrivacidadeRoute: typeof PoliticasDePrivacidadeRoute
   TermosDeUsoRoute: typeof TermosDeUsoRoute
   VendasRoute: typeof VendasRoute
@@ -264,6 +277,13 @@ declare module '@tanstack/react-router' {
       path: '/obrigado'
       fullPath: '/obrigado'
       preLoaderRoute: typeof ObrigadoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oferta-relampago': {
+      id: '/oferta-relampago'
+      path: '/oferta-relampago'
+      fullPath: '/oferta-relampago'
+      preLoaderRoute: typeof OfertaRelampagoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/politicas-de-privacidade': {
@@ -350,6 +370,7 @@ const rootRouteChildren: RootRouteChildren = {
   BussolaRoute: BussolaRoute,
   McpRoute: McpRoute,
   ObrigadoRoute: ObrigadoRoute,
+  OfertaRelampagoRoute: OfertaRelampagoRoute,
   PoliticasDePrivacidadeRoute: PoliticasDePrivacidadeRoute,
   TermosDeUsoRoute: TermosDeUsoRoute,
   VendasRoute: VendasRoute,

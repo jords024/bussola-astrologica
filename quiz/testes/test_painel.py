@@ -261,7 +261,8 @@ class LeiturasPainelSemMascara(unittest.TestCase):
 
     def test_lista_e_detalhe_leituras_mostram_dados_completos(self):
         """Verifica se /painel/leituras e /painel/leitura/{id} exibem nome completo, ano completo, hora/minuto e tempo no quiz."""
-        leitura_id = "20260907-123456-abcdef12"
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        leitura_id = f"{hoje_pfx}-123456-abcdef12"
         dados_leitura = {
             "cliente_id": "test-id",
             "nome_completo": "Aryaraj Alves Fernandes",
@@ -469,6 +470,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             dir_ev = Path(tmpdir)
             hoje_str = date.today().strftime("%Y-%m-%d")
+            hoje_pfx = date.today().strftime("%Y%m%d")
             arq_ev = dir_ev / f"{hoje_str}.jsonl"
 
             # Eventos: sid1 avançou até tela 8 (portas), sid2 avançou até tela 10 e clicou checkout
@@ -481,23 +483,23 @@ class LeiturasPainelSemMascara(unittest.TestCase):
 
             with mock.patch.object(config, "DIR_EVENTOS", dir_ev):
                 itens = [
-                    ("20260907-100000-aaaa1111", {"cliente_id": "sid1", "etapa_max": 7}),
-                    ("20260907-100500-bbbb2222", {"cliente_id": "sid2", "etapa_max": 7}),
-                    ("20260907-101000-cccc3333", {"cliente_id": "sid3", "etapa_max": 7}),
+                    (f"{hoje_pfx}-100000-aaaa1111", {"cliente_id": "sid1", "etapa_max": 7}),
+                    (f"{hoje_pfx}-100500-bbbb2222", {"cliente_id": "sid2", "etapa_max": 7}),
+                    (f"{hoje_pfx}-101000-cccc3333", {"cliente_id": "sid3", "etapa_max": 7}),
                 ]
                 prog = obter_progresso_leituras(itens)
 
-                self.assertEqual(prog["20260907-100000-aaaa1111"]["max_tela"], 8)
-                self.assertEqual(prog["20260907-100000-aaaa1111"]["rotulo"], "Tela 8 (Portas)")
-                self.assertFalse(prog["20260907-100000-aaaa1111"]["checkout"])
+                self.assertEqual(prog[f"{hoje_pfx}-100000-aaaa1111"]["max_tela"], 8)
+                self.assertEqual(prog[f"{hoje_pfx}-100000-aaaa1111"]["rotulo"], "Tela 8 (Portas)")
+                self.assertFalse(prog[f"{hoje_pfx}-100000-aaaa1111"]["checkout"])
 
-                self.assertEqual(prog["20260907-100500-bbbb2222"]["max_tela"], 10)
-                self.assertEqual(prog["20260907-100500-bbbb2222"]["rotulo"], "Tela 10 (Oferta)")
-                self.assertTrue(prog["20260907-100500-bbbb2222"]["checkout"])
+                self.assertEqual(prog[f"{hoje_pfx}-100500-bbbb2222"]["max_tela"], 10)
+                self.assertEqual(prog[f"{hoje_pfx}-100500-bbbb2222"]["rotulo"], "Tela 10 (Oferta)")
+                self.assertTrue(prog[f"{hoje_pfx}-100500-bbbb2222"]["checkout"])
 
-                self.assertEqual(prog["20260907-101000-cccc3333"]["max_tela"], 7)
-                self.assertEqual(prog["20260907-101000-cccc3333"]["rotulo"], "Tela 7 (Leitura)")
-                self.assertFalse(prog["20260907-101000-cccc3333"]["checkout"])
+                self.assertEqual(prog[f"{hoje_pfx}-101000-cccc3333"]["max_tela"], 7)
+                self.assertEqual(prog[f"{hoje_pfx}-101000-cccc3333"]["rotulo"], "Tela 7 (Leitura)")
+                self.assertFalse(prog[f"{hoje_pfx}-101000-cccc3333"]["checkout"])
 
     def test_tabela_leituras_exibe_novas_colunas(self):
         from api.painel import _tabela_leituras
@@ -588,10 +590,11 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         """Verifica o botão e filtro para exibir exclusivamente leads que foram ao checkout."""
         from api.painel import _tabela_leituras, painel
         from starlette.requests import Request
+        hoje_pfx = date.today().strftime("%Y%m%d")
         with TemporaryDirectory() as tmpdir:
             dir_leituras = Path(tmpdir)
             # Lead 1: foi ao checkout
-            arq1 = dir_leituras / "20260907-100000-11111111.json"
+            arq1 = dir_leituras / f"{hoje_pfx}-100000-11111111.json"
             arq1.write_text(json.dumps({
                 "nome_completo": "Lead Com Checkout 1",
                 "checkout": True,
@@ -600,7 +603,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
             }), encoding="utf-8")
 
             # Lead 2: foi ao checkout
-            arq2 = dir_leituras / "20260907-100100-22222222.json"
+            arq2 = dir_leituras / f"{hoje_pfx}-100100-22222222.json"
             arq2.write_text(json.dumps({
                 "nome_completo": "Lead Com Checkout 2",
                 "checkout": True,
@@ -609,7 +612,7 @@ class LeiturasPainelSemMascara(unittest.TestCase):
             }), encoding="utf-8")
 
             # Lead 3: parou na tela 7, NÃO foi ao checkout
-            arq3 = dir_leituras / "20260907-100200-33333333.json"
+            arq3 = dir_leituras / f"{hoje_pfx}-100200-33333333.json"
             arq3.write_text(json.dumps({
                 "nome_completo": "Lead Sem Checkout",
                 "checkout": False,
@@ -1800,12 +1803,13 @@ class TestFiltroUFCidade(unittest.TestCase):
     def test_endpoints_com_filtro_uf(self):
         from main import app
         client = TestClient(app)
+        hoje_pfx = date.today().strftime("%Y%m%d")
 
         with TemporaryDirectory() as tmpdir:
             dir_leituras = Path(tmpdir)
             leituras = [
-                ("20260908-100000-00000001", "Alice Gaúcha", "51999991111", "Porto Alegre", "RS"),
-                ("20260908-110000-00000002", "Bruno Paulista", "11988882222", "São Paulo", "SP"),
+                (f"{hoje_pfx}-100000-00000001", "Alice Gaúcha", "51999991111", "Porto Alegre", "RS"),
+                (f"{hoje_pfx}-110000-00000002", "Bruno Paulista", "11988882222", "São Paulo", "SP"),
             ]
             for lid, nome, wa, cid_nome, cid_uf in leituras:
                 (dir_leituras / f"{lid}.json").write_text(json.dumps({
@@ -1940,11 +1944,12 @@ class TestSelecaoGlobalContatos(unittest.TestCase):
         """Valida que /painel/exportar-csv exporta todos os contatos de todas as páginas."""
         from main import app
         client = TestClient(app)
+        hoje_pfx = date.today().strftime("%Y%m%d")
 
         with TemporaryDirectory() as tmpdir:
             dir_leituras = Path(tmpdir)
             for i in range(25):
-                lid = f"20260908-1200{i:02d}-11111111"
+                lid = f"{hoje_pfx}-1200{i:02d}-11111111"
                 (dir_leituras / f"{lid}.json").write_text(json.dumps({
                     "nome_completo": f"Pessoa Geral {i}",
                     "whatsapp": f"119777700{i:02d}",

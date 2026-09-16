@@ -18,11 +18,27 @@ const ITENS = [
   { nome: "E-book: A Linguagem Astrológica", preco: "R$47" },
 ];
 
+import TimerOferta from "./timer-oferta";
+
 type Props = {
   onCheckout: () => void;
+  precoAVista?: string;
+  precoParcelado?: string;
+  valorTotalReal?: string;
+  itens?: { nome: string; preco: string }[];
+  mostrarTimer?: boolean;
+  textoTimer?: string;
 };
 
-export default function BlocoOfertaFinal({ onCheckout }: Props) {
+export default function BlocoOfertaFinal({
+  onCheckout,
+  precoAVista = "R$67",
+  precoParcelado = "12x de R$6,93",
+  valorTotalReal = "R$405,00",
+  itens = ITENS,
+  mostrarTimer = false,
+  textoTimer,
+}: Props) {
   return (
     <section
       aria-label="Oferta especial de inscrição"
@@ -49,11 +65,11 @@ export default function BlocoOfertaFinal({ onCheckout }: Props) {
           {...fadeUp}
           className="mt-7 overflow-hidden rounded-3xl border border-gold/20 bg-card/50"
         >
-          {ITENS.map((item, i) => (
+          {itens.map((item, i) => (
             <div
               key={item.nome}
               className={`flex items-center justify-between gap-4 px-5 py-4 sm:px-7 ${
-                i !== ITENS.length - 1 ? "border-b border-border/60" : ""
+                i !== itens.length - 1 ? "border-b border-border/60" : ""
               }`}
             >
               <span className="text-[14px] leading-snug text-foreground/90 sm:text-[15px]">
@@ -70,7 +86,7 @@ export default function BlocoOfertaFinal({ onCheckout }: Props) {
               Valor total real
             </span>
             <span className="text-lg font-bold text-muted-foreground line-through decoration-2 sm:text-xl">
-              R$405,00
+              {valorTotalReal}
             </span>
           </div>
         </motion.div>
@@ -98,10 +114,18 @@ export default function BlocoOfertaFinal({ onCheckout }: Props) {
           </p>
         </motion.div>
 
+        {mostrarTimer && (
+          <motion.div {...fadeUp} className="mt-8">
+            <TimerOferta texto={textoTimer} />
+          </motion.div>
+        )}
+
         {/* Card de oferta final */}
         <motion.div
           {...fadeUp}
-          className="relative mx-auto mt-10 max-w-xl overflow-hidden rounded-[28px] border border-gold/40 bg-card/80 p-1 shadow-[0_30px_100px_-40px_color-mix(in_oklab,var(--gold)_60%,transparent)] backdrop-blur-sm"
+          className={`relative mx-auto max-w-xl overflow-hidden rounded-[28px] border border-gold/40 bg-card/80 p-1 shadow-[0_30px_100px_-40px_color-mix(in_oklab,var(--gold)_60%,transparent)] backdrop-blur-sm ${
+            mostrarTimer ? "mt-5" : "mt-10"
+          }`}
         >
           <div
             aria-hidden
@@ -125,10 +149,10 @@ export default function BlocoOfertaFinal({ onCheckout }: Props) {
 
             <div className="mt-6 flex flex-col items-center">
               <span className="font-display text-4xl font-bold text-gold-gradient sm:text-5xl">
-                12x de R$6,93
+                {precoParcelado}
               </span>
               <span className="mt-2 text-sm text-muted-foreground">
-                ou <span className="font-semibold text-foreground">R$67</span> à vista
+                ou <span className="font-semibold text-foreground">{precoAVista}</span> à vista
               </span>
             </div>
 
