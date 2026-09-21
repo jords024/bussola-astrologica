@@ -55,6 +55,14 @@ async def receber(request: Request) -> Response:
                 if lid and (tela is not None or checkout is not None):
                     await asyncio.to_thread(registro.atualizar_progresso, lid, tela, checkout)
 
+                # a nota da carta anda pelo mesmo cano do resto: o painel a le
+                # do arquivo de eventos, e aqui ela e copiada para o lado da
+                # carta que a gerou
+                if lid and evt == "feedback":
+                    await asyncio.to_thread(
+                        registro.anexar_feedback, lid,
+                        props.get("estrelas"), bool(props.get("pulou")))
+
                 sessao_atual = rastreador_presenca.registrar_atividade(
                     sid=sid,
                     aid=aid,

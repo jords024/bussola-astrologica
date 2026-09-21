@@ -43,6 +43,10 @@ _LOCK = threading.Lock()
 EVENTOS_VALIDOS = {
     "sessao_inicio", "tela", "escolha", "form_campo", "form_erro", "form_envio",
     "leitura_entregue", "leitura_falha", "oferta_clique", "contato_enviado", "saida",
+    # a nota de 1 a 5 que a pessoa da para a carta. Nome fora desta lista e
+    # descartado em silencio, e /api/evento continua respondendo 204 - entao
+    # esquecer esta linha significa perder o dado sem nenhum aviso.
+    "feedback",
 }
 
 RE_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")

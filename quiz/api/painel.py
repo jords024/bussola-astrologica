@@ -3066,6 +3066,48 @@ def painel(request: Request, _=Depends(exigir_senha),
 
     # ==================== ABA 3: ÁREAS & CASAS ====================
     p.append('<section class="aba-painel" id="aba-astrologia">')
+
+    # ---- a nota que a pessoa deu para a carta ----
+    # E a unica medida de qualidade da mensagem que nao depende de alguem ler
+    # as cartas uma a uma. Fica no topo desta aba de proposito: tudo que vem
+    # abaixo (cenarios, casas, planetas) so importa se a carta estiver boa.
+    fb = d.get("feedback") or {}
+    p.append("<h2>O que acharam da carta</h2>")
+    if not fb.get("mostrados"):
+        p.append('<p class="vazio">Ainda ninguém avaliou neste período.</p>')
+    else:
+        media = fb.get("media")
+        p.append('<div class="cards">'
+                 f'<div class="card"><b>{(f"{media:.2f}".replace(".", ",") if media is not None else "—")}</b>'
+                 '<span>média de 1 a 5</span></div>'
+                 f'<div class="card"><b>{fb["respostas"]}</b><span>responderam</span></div>'
+                 f'<div class="card"><b>{fb["pulou"]}</b><span>pularam</span></div>'
+                 f'<div class="card"><b>{_n(fb.get("pct_resposta"))}</b><span>% que respondeu</span></div>'
+                 '</div>')
+        if fb.get("alarme"):
+            p.append('<div class="alerta"><b>Uma porta está gerando carta pior que as outras.</b> '
+                     'Alguma casa com volume suficiente ficou abaixo de 3,5 de média. Vale abrir as '
+                     'leituras dessa casa e ler o texto: quase sempre é o material de '
+                     '<code>servicos/nomes.py</code> daquela casa que está genérico.</div>')
+        p.append(_tabela(["nota", "", "#respostas", "#%"],
+                         [[("★" * i["estrelas"]) + ("☆" * (5 - i["estrelas"])),
+                           f'<div class="bar">{_barra(i["pct"])}</div>',
+                           str(i["qtd"]), _n(i["pct"])] for i in fb["distribuicao"]]))
+        if fb.get("por_casa"):
+            p.append('<p class="nota">Por porta aberta, da pior média para a melhor. '
+                     'Média só vira sinal com pelo menos 20 respostas na mesma casa; abaixo '
+                     'disso é ruído.</p>')
+            p.append(_tabela(["porta", "#respostas", "#média"],
+                             [[f'Casa {i["casa"]}', str(i["qtd"]),
+                               (f'{i["media"]:.2f}'.replace(".", ",") if i["media"] is not None else "—")
+                               + (" ⚠" if i["alarme"] else "")]
+                              for i in fb["por_casa"]]))
+        if fb.get("por_area"):
+            p.append(_tabela(["área escolhida", "#respostas", "#média"],
+                             [[html.escape(str(i["area"])), str(i["qtd"]),
+                               (f'{i["media"]:.2f}'.replace(".", ",") if i["media"] is not None else "—")]
+                              for i in fb["por_area"]]))
+
     # ---- áreas ----
     p.append("<h2>Áreas escolhidas</h2>")
     tot_a = sum(v for _, v in d["areas"]) or 1

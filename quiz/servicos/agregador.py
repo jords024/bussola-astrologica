@@ -90,7 +90,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
                 "area": None, "modo_hora": None, "ultimo_campo": None,
                 "campos": set(), "form_envio": False, "form_erros": [],
                 "leitura": None, "oferta": False, "disp": ev.get("disp"),
-                "contato": False, "falha": None,
+                "contato": False, "falha": None, "feedback": None,
                 "duracoes_tela": defaultdict(list),
                 "cronometro_tela": {0: 0.0},
                 "tempo_checkout": None,
@@ -147,6 +147,10 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
             s["area"] = s["area"] or props.get("area")
         elif evt == "leitura_falha":
             s["falha"] = props.get("motivo")
+        elif evt == "feedback":
+            # so a primeira resposta conta, igual ao que o registro grava
+            if s["feedback"] is None:
+                s["feedback"] = props
         elif evt == "oferta_clique":
             s["oferta"] = True
             ms_tela = props.get("ms_na_tela")
@@ -211,7 +215,10 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         "formulario": _formulario(sessoes),
         "areas": _contagem(s["area"] for s in sessoes if s["area"]),
         "cenarios": _cenarios(sessoes),
+        "identificacao": _identificacao(sessoes),
+        "portas": _portas(sessoes),
         "casas": _casas(sessoes),
+        "feedback": _feedback(sessoes),
         "horario": _horario(sessoes),
         "geracao": _geracao(sessoes),
         "dispositivos": _contagem(s["disp"] for s in sessoes if s["disp"]),
@@ -300,6 +307,50 @@ def _formulario(sessoes: list[dict]) -> dict:
     }
 
 
+def _identificacao(sessoes: list[dict]) -> dict:
+    """Por qual criterio a Parte 1 entrou, e com que planeta.
+
+    Serve para uma pergunta so: a leitura esta ficando generica? Se um planeta
+    passar de uns 35%, muita gente esta recebendo a mesma frase de abertura, e
+    os pesos da Parte 1 precisam de revisao.
+    """
+    leituras = [s["leitura"] for s in sessoes if s["leitura"]]
+    crit = Counter(l.get("criterio_identificacao") for l in leituras
+                   if l.get("criterio_identificacao"))
+    planetas = Counter(l.get("planeta_identificacao") for l in leituras
+                       if l.get("planeta_identificacao"))
+    total = sum(crit.values())
+    tp = sum(planetas.values())
+    dominante = planetas.most_common(1)[0] if planetas else None
+    return {
+        "total": total,
+        "criterios": [{"n": k, "qtd": v, "pct": pct(v, total)}
+                      for k, v in sorted(crit.items())],
+        "planetas": [{"nome": k, "qtd": v, "pct": pct(v, tp)}
+                     for k, v in planetas.most_common()],
+        # alarme de generico: so vale ler com amostra suficiente
+        "alarme": bool(dominante and tp >= MIN_PARA_PORCENTAGEM
+                       and dominante[1] * 100 / tp > 35),
+    }
+
+
+def _portas(sessoes: list[dict]) -> dict:
+    """Que porta a Parte 2 abriu. Os rapidos trocam de casa a cada semanas,
+    entao uma casa dominando aqui e sinal de bug, nao de ceu."""
+    leituras = [s["leitura"] for s in sessoes if s["leitura"]]
+    c = Counter(l.get("porta_casa") for l in leituras if l.get("porta_casa"))
+    total = sum(c.values())
+    itens = [{"casa": k, "n": v, "pct": pct(v, total)} for k, v in c.most_common()]
+    return {
+        "total": total,
+        "itens": itens,
+        "empates": sum(1 for l in leituras if l.get("porta_empate")),
+        "solares": sum(1 for l in leituras if l.get("casas_solares")),
+        "alarme": bool(itens and total >= MIN_PARA_PORCENTAGEM
+                       and itens[0]["n"] * 100 / total > 30),
+    }
+
+
 def _cenarios(sessoes: list[dict]) -> dict:
     """Só onde a casa saiu do cálculo.
 
@@ -316,6 +367,74 @@ def _cenarios(sessoes: list[dict]) -> dict:
         "total": total, "excluidas_sem_casa": fora,
         "itens": [{"nome": k, "n": v, "pct": pct(v, total)}
                   for k, v in c.most_common()],
+    }
+
+
+def _feedback(sessoes: list[dict]) -> dict:
+    """A nota de 1 a 5 que a pessoa deu para a carta.
+
+    E a unica medida de qualidade da mensagem que nao depende de alguem ler as
+    cartas uma a uma. O recorte por casa e o que importa de verdade: mostra se
+    alguma porta esta gerando carta pior que as outras.
+    """
+    respostas, pulos = [], 0
+    por_area: dict = defaultdict(list)
+    por_casa: dict = defaultdict(list)
+
+    for s in sessoes:
+        fb = s.get("feedback")
+        if not isinstance(fb, dict):
+            continue
+        if fb.get("pulou"):
+            pulos += 1
+            continue
+        try:
+            n = int(fb.get("estrelas"))
+        except (TypeError, ValueError):
+            continue
+        if not (1 <= n <= 5):
+            continue
+        respostas.append(n)
+        area = fb.get("area") or s.get("area")
+        if area:
+            por_area[str(area)].append(n)
+        casa = fb.get("casa")
+        if isinstance(casa, int) and 1 <= casa <= 12:
+            por_casa[casa].append(n)
+
+    mostrados = len(respostas) + pulos
+
+    def _media(v: list) -> Optional[float]:
+        return round(sum(v) / len(v), 2) if v else None
+
+    distribuicao = [
+        {"estrelas": n,
+         "qtd": sum(1 for x in respostas if x == n),
+         "pct": pct(sum(1 for x in respostas if x == n), len(respostas))}
+        for n in range(5, 0, -1)
+    ]
+
+    # abaixo deste volume a media de uma casa e ruido, nao sinal
+    MIN_POR_CASA = 20
+    casas = sorted(
+        ({"casa": c, "qtd": len(v), "media": _media(v),
+          "alarme": len(v) >= MIN_POR_CASA and (_media(v) or 5) < 3.5}
+         for c, v in por_casa.items()),
+        key=lambda x: (x["media"] if x["media"] is not None else 9, -x["qtd"]))
+
+    return {
+        "mostrados": mostrados,
+        "respostas": len(respostas),
+        "pulou": pulos,
+        "pct_resposta": pct(len(respostas), mostrados),
+        "media": _media(respostas),
+        "distribuicao": distribuicao,
+        "por_area": sorted(
+            ({"area": a, "qtd": len(v), "media": _media(v)}
+             for a, v in por_area.items()),
+            key=lambda x: (x["media"] if x["media"] is not None else 9, -x["qtd"])),
+        "por_casa": casas,
+        "alarme": any(c["alarme"] for c in casas),
     }
 
 

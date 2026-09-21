@@ -21,7 +21,9 @@ import pytz
 from kerykeion import AstrologicalSubjectFactory, ChartDataFactory, ChartDrawer
 
 from .aspectos import AspectoNorm, PresencaNorm, normalizar, orbes_maximos
-from .regencia import NUM_DA_CASA, PONTO_ATTR
+from .pesos import ORBES_CANONICOS, PESO_ANGULAR
+from .lentos import Perfil
+from .regencia import (CUSPIDE, NUM_DA_CASA, PONTO_ATTR, SIGN_RULER)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,17 @@ EIXOS = {"Ascendant", "Medium_Coeli", "Descendant", "Imum_Coeli"}
 PERIODO_HORA = {"madrugada": (0, 3, 6), "manha": (6, 9, 12),
                 "tarde": (12, 15, 18), "noite": (18, 21, 23)}
 
+# A Kerykeion corta por orbe ANTES de nos entregar os aspectos: quadratura so
+# ate 5 graus, sextil ate 6. A Parte 1 precisa enxergar aspectos de 5 a 10
+# graus ja separando, para reconhecer o que a pessoa acabou de atravessar.
+# Entao pedimos 10 para todos, e o orbe canonico volta em ORBES_CANONICOS
+# so para pontuar - assim o placar de casas nao muda em nada.
+ASPECTOS_MAIORES = ("conjunction", "opposition", "square", "trine", "sextile")
+ORBE_LARGO = 10.0
+ASPECTOS_LARGOS = [{"name": n, "orb": ORBE_LARGO} for n in ASPECTOS_MAIORES]
+
+GRAUS_POR_CASA = 30.0
+
 
 @dataclass
 class Mapa:
@@ -48,6 +61,13 @@ class Mapa:
     presencas: list[PresencaNorm]
     casas_confiaveis: bool
     lua_confiavel: bool
+    # Sem hora, as casas sao SOLARES: o signo do Sol vai para a cuspide da
+    # casa 1. Tecnica tradicional, usada justamente quando nao ha horario.
+    # Precisa ser declarado na tela - fingir precisao e o que o Crassus combate.
+    casas_solares: bool = False
+    # o que o mapa DELA diz sobre o que a toca mais, para a Parte 1 nao
+    # depender de uma ordem de planetas igual para todo mundo
+    perfil: Perfil = field(default_factory=Perfil)
     sol_signo: Optional[str] = None
     lua_signo: Optional[str] = None
     asc_signo: Optional[str] = None
@@ -104,7 +124,109 @@ def _casa_dos_pontos_natais(natal) -> dict[str, int]:
     return out
 
 
-def _presencas_e_casas(chart, nome_transito):
+def _cuspides(natal) -> dict[int, float]:
+    """Posicao absoluta das doze cuspides. Confirmado na 5.12.9: todas expoem
+    abs_pos."""
+    fora: dict[int, float] = {}
+    for n, attr in CUSPIDE.items():
+        c = getattr(natal, attr, None)
+        pos = getattr(c, "abs_pos", None) if c is not None else None
+        if pos is not None:
+            fora[n] = float(pos)
+    return fora
+
+
+def _quanto_andou_na_casa(cuspides: dict[int, float], abs_pos: Optional[float],
+                          casa: Optional[int]) -> Optional[float]:
+    """Quantos graus o planeta ja percorreu DENTRO da casa, desde a cuspide.
+
+    Um lento recem-entrado numa casa e um evento de vida; no meio dela, ja e
+    paisagem. E essa diferenca que o criterio 2 da Parte 1 usa.
+    """
+    if abs_pos is None or not casa or casa not in cuspides:
+        return None
+    return (float(abs_pos) - cuspides[casa]) % 360.0
+
+
+def _perfil(natal, casas_ok: bool) -> Perfil:
+    """O que torna um transito DESTA pessoa, e nao de qualquer uma.
+
+    Duas coisas, ambas lidas do natal:
+
+    Regencia - quem manda no signo do Sol, da Lua e do Ascendente dela.
+    Saturno sobre o Sol de quem tem Ascendente em Capricornio nao e a mesma
+    coisa que Saturno sobre o Sol de outra pessoa qualquer.
+
+    Angularidade - Sol ou Lua perto de um angulo sao mais sentidos. Depende de
+    hora, entao sem casas os dois voltam a pesar igual e simplesmente nao
+    desempatam.
+    """
+    regentes = set()
+    for attr in ("sun", "moon"):
+        ponto = getattr(natal, attr, None)
+        r = SIGN_RULER.get(getattr(ponto, "sign", None)) if ponto else None
+        if r:
+            regentes.add(r)
+    if casas_ok:
+        asc = getattr(natal, "first_house", None)
+        r = SIGN_RULER.get(getattr(asc, "sign", None)) if asc else None
+        if r:
+            regentes.add(r)
+
+    peso_sol = peso_lua = 1.0
+    if casas_ok:
+        angulos = []
+        for attr in ("first_house", "tenth_house"):
+            c = getattr(natal, attr, None)
+            pos = getattr(c, "abs_pos", None) if c is not None else None
+            if pos is not None:
+                angulos += [float(pos), (float(pos) + 180.0) % 360.0]
+        if angulos:
+            def peso(attr):
+                ponto = getattr(natal, attr, None)
+                pos = getattr(ponto, "abs_pos", None) if ponto else None
+                if pos is None:
+                    return 1.0
+                d = min(min(abs(float(pos) - x), 360 - abs(float(pos) - x))
+                        for x in angulos)
+                return 1.0 + PESO_ANGULAR * max(0.0, 1.0 - d / 30.0)
+            peso_sol, peso_lua = peso("sun"), peso("moon")
+
+    return Perfil(regentes=frozenset(regentes),
+                  peso_sol=peso_sol, peso_lua=peso_lua)
+
+
+def _presencas_solares(natal, transito) -> list[PresencaNorm]:
+    """Casas solares: o signo do Sol natal ocupa a casa 1, doze setores de 30.
+
+    E o caminho para quem nao sabe a hora de nascer. Sem isto a Parte 2 morre
+    justamente para a maior fatia dos leads, e a leitura fica sem direcao.
+    """
+    sol = getattr(natal, "sun", None)
+    base = getattr(sol, "abs_pos", None) if sol else None
+    if base is None:
+        return []
+    inicio = (float(base) // GRAUS_POR_CASA) * GRAUS_POR_CASA
+
+    fora: list[PresencaNorm] = []
+    for nome, attr in PONTO_ATTR.items():
+        ponto = getattr(transito, attr, None)
+        pos = getattr(ponto, "abs_pos", None) if ponto else None
+        if pos is None:
+            continue
+        d = (float(pos) - inicio) % 360.0
+        fora.append(PresencaNorm(
+            planeta=nome,
+            casa=int(d // GRAUS_POR_CASA) + 1,
+            signo=getattr(ponto, "sign", None),
+            grau=getattr(ponto, "position", None),
+            retrogrado=bool(getattr(ponto, "retrograde", False)),
+            graus_na_casa=d % GRAUS_POR_CASA,
+        ))
+    return fora
+
+
+def _presencas_e_casas(chart, nome_transito, natal=None, transito=None):
     """O que os planetas em trânsito estão pisando nas casas natais dela.
 
     Usa second_points_in_first_houses: pontos do segundo subject (trânsito)
@@ -117,13 +239,25 @@ def _presencas_e_casas(chart, nome_transito):
     if not hc:
         return presencas, casa_de
 
+    cusp = _cuspides(natal) if natal is not None else {}
+
     for p in getattr(hc, "second_points_in_first_houses", []) or []:
         if p.point_owner_name != nome_transito or p.point_name in EIXOS:
             continue
-        casa_de[p.point_name] = p.projected_house_number
+        casa = p.projected_house_number
+        casa_de[p.point_name] = casa
+
+        # o point_degree do overlay e a posicao dentro do SIGNO; a distancia
+        # ate a cuspide exige a posicao absoluta, que vem do proprio subject
+        abs_pos = None
+        if transito is not None:
+            ponto = getattr(transito, PONTO_ATTR.get(p.point_name, ""), None)
+            abs_pos = getattr(ponto, "abs_pos", None) if ponto else None
+
         presencas.append(PresencaNorm(
-            planeta=p.point_name, casa=p.projected_house_number,
+            planeta=p.point_name, casa=casa,
             signo=p.point_sign, grau=p.point_degree,
+            graus_na_casa=_quanto_andou_na_casa(cusp, abs_pos, casa),
         ))
     return presencas, casa_de
 
@@ -174,22 +308,28 @@ def calcular(nascimento: dict, cidade: dict, nome: str, agora: Optional[datetime
 
     chart = ChartDataFactory.create_transit_chart_data(
         natal, transito, active_points=PONTOS, include_house_comparison=True,
+        active_aspects=ASPECTOS_LARGOS,
     )
 
-    presencas, casa_transito_de = _presencas_e_casas(chart, nome_transito)
+    presencas, casa_transito_de = _presencas_e_casas(
+        chart, nome_transito, natal, transito)
     casa_natal_de = _casa_dos_pontos_natais(natal)
     retro = _retrogrados(transito)
     for p in presencas:
         if p.planeta in retro:
             presencas[presencas.index(p)] = PresencaNorm(
-                p.planeta, p.casa, p.signo, p.grau, True)
+                p.planeta, p.casa, p.signo, p.grau, True, p.graus_na_casa)
 
+    # ORBE CANONICO para pontuar, LARGO para entrar. A heuristica de casas
+    # continua enxergando exatamente o que enxergava; os aspectos largos
+    # chegam com forca zero e servem so a Parte 1.
     aspectos = normalizar(
         chart.aspects, nome_natal, nome_transito,
-        orbes_maximos(chart.active_aspects),
+        ORBES_CANONICOS,
         casa_natal_de=casa_natal_de,
         casa_transito_de=casa_transito_de,
         retrogrados=retro,
+        limites=orbes_maximos(chart.active_aspects),
     )
     aspectos = _com_signos(aspectos, natal, transito)
 
@@ -202,16 +342,22 @@ def calcular(nascimento: dict, cidade: dict, nome: str, agora: Optional[datetime
     if precisao == "periodo":
         casas_confiaveis = _casas_estaveis(nascimento, cidade, nome_natal, transito, agora)
 
+    casas_solares = False
     if not casas_confiaveis:
         from dataclasses import replace
         aspectos = [replace(a, casa_natal=None, casa_transito=None)
                     for a in aspectos if a.natal not in EIXOS]
-        presencas = []
+        # As casas de Placidus caem, mas a leitura nao fica sem direcao: entra
+        # a camada solar, que nao depende de hora nenhuma.
+        presencas = _presencas_solares(natal, transito)
+        casas_solares = bool(presencas)
 
     return Mapa(
         natal=natal, transito=transito, chart=chart,
         aspectos=aspectos, presencas=presencas,
         casas_confiaveis=casas_confiaveis, lua_confiavel=lua_confiavel,
+        casas_solares=casas_solares,
+        perfil=_perfil(natal, casas_confiaveis),
         sol_signo=_signo(natal, "sun"), lua_signo=_signo(natal, "moon"),
         asc_signo=_signo(natal, "first_house"), aviso=aviso,
     )

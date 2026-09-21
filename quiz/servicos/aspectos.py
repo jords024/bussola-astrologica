@@ -44,6 +44,11 @@ class PresencaNorm:
     signo: Optional[str] = None
     grau: Optional[float] = None
     retrogrado: bool = False
+    # Quanto o planeta ja andou DENTRO da casa, contado da cuspide.
+    # E diferente de `grau`, que e a posicao dentro do SIGNO. Planeta lento
+    # recem-entrado numa casa e um evento de vida; no meio dela, ja e paisagem.
+    # None quando nao ha hora confiavel e as casas nao valem.
+    graus_na_casa: Optional[float] = None
 
 
 def orbes_maximos(active_aspects: Iterable[dict]) -> dict[str, float]:
@@ -66,6 +71,7 @@ def normalizar(
     casa_natal_de: Optional[dict] = None,
     casa_transito_de: Optional[dict] = None,
     retrogrados: Optional[set] = None,
+    limites: Optional[dict[str, float]] = None,
 ) -> list[AspectoNorm]:
     """Converte AspectModel da Kerykeion em AspectoNorm, descartando o que os
     dicionarios de peso nao conhecem.
@@ -77,6 +83,12 @@ def normalizar(
     casa_natal_de = casa_natal_de or {}
     casa_transito_de = casa_transito_de or {}
     retrogrados = retrogrados or set()
+    # `limites` e o que ENTRA; `orbes_max` e o que PONTUA. Sao coisas
+    # diferentes desde que a Parte 1 passou a precisar de aspectos largos
+    # (5 a 10 graus, ja separando) que o orbe canonico rejeita.
+    # Mantendo orbe_max canonico, heuristica.forca() devolve 0 para os largos
+    # e o placar de casas continua exatamente como era.
+    limites = limites or orbes_max
     out: list[AspectoNorm] = []
 
     for a in aspects or []:
@@ -101,7 +113,7 @@ def normalizar(
 
         orbe = abs(float(getattr(a, "orbit", 0.0)))
         omax = orbes_max.get(aspecto, 8.0)
-        if orbe > omax:
+        if orbe > limites.get(aspecto, omax):
             continue
 
         out.append(AspectoNorm(

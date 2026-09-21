@@ -213,6 +213,9 @@ class Endpoint(unittest.TestCase):
             self.assertIn('painel_aba_ativa', html_text)
             # Métricas e linha de checkout
             self.assertIn('foram ao checkout', html_text)
+
+            # a nota da carta vive na aba de astrologia
+            self.assertIn('O que acharam da carta', html_text)
             self.assertIn('Clique no Checkout', html_text)
             # Métricas de tempo e cronômetro
             self.assertIn('tempo na tela', html_text)
@@ -2033,3 +2036,102 @@ if __name__ == "__main__":
 
 
 
+
+
+class NotaDaCarta(unittest.TestCase):
+    """A avaliação de 1 a 5 que a pessoa dá para a leitura.
+
+    É a única medida de qualidade da mensagem que não depende de alguém ler as
+    cartas uma a uma, então cada jeito de ela mentir custa caro.
+    """
+
+    def test_feedback_sobrevive_a_normalizacao(self):
+        """Nome fora de EVENTOS_VALIDOS é descartado em silêncio e o endpoint
+        continua respondendo 204 - o dado sumiria sem nenhum aviso."""
+        lote = {"sid": "abcd1234-aa", "aid": "wxyz9876-bb", "eventos": [
+            {"seq": 1, "evt": "feedback", "props": {"estrelas": 4}},
+        ]}
+        saida = eventos.normalizar(lote, "1.1.1.1", "")
+        self.assertEqual(len(saida), 1)
+        self.assertEqual(saida[0]["evt"], "feedback")
+
+    def _sessao(self, sid, props, off=0):
+        return [ev(sid, 1, "sessao_inicio", off=off),
+                ev(sid, 2, "tela", {"de": 0, "para": 7}, off=off),
+                ev(sid, 3, "feedback", props, off=off)]
+
+    def test_media_distribuicao_e_pulos(self):
+        eventos_ = []
+        for i, n in enumerate([5, 5, 4, 2]):
+            eventos_ += self._sessao(f"s{i}", {"estrelas": n, "casa": 8, "area": "amor"})
+        eventos_ += self._sessao("sp", {"pulou": True, "casa": 8})
+        d = agregar(eventos_, HOJE - timedelta(days=1), HOJE)["feedback"]
+        self.assertEqual(d["respostas"], 4)
+        self.assertEqual(d["pulou"], 1)
+        self.assertEqual(d["mostrados"], 5)
+        self.assertEqual(d["media"], 4.0)
+        self.assertEqual({x["estrelas"]: x["qtd"] for x in d["distribuicao"]},
+                         {5: 2, 4: 1, 3: 0, 2: 1, 1: 0})
+
+    def test_so_a_primeira_resposta_conta(self):
+        """Quem volta na tela e avalia de novo não reescreve a própria nota."""
+        eventos_ = self._sessao("s1", {"estrelas": 5, "casa": 3})
+        eventos_.append(ev("s1", 4, "feedback", {"estrelas": 1, "casa": 3}, off=1))
+        d = agregar(eventos_, HOJE - timedelta(days=1), HOJE)["feedback"]
+        self.assertEqual(d["respostas"], 1)
+        self.assertEqual(d["media"], 5.0)
+
+    def test_nota_fora_da_escala_e_ignorada(self):
+        eventos_ = self._sessao("s1", {"estrelas": 9, "casa": 3})
+        eventos_ += self._sessao("s2", {"estrelas": "muitas", "casa": 3})
+        d = agregar(eventos_, HOJE - timedelta(days=1), HOJE)["feedback"]
+        self.assertEqual(d["respostas"], 0)
+        self.assertIsNone(d["media"])
+
+    def test_alarme_so_com_volume(self):
+        """Média baixa em 5 respostas é ruído; o alarme espera 20."""
+        poucas = []
+        for i in range(5):
+            poucas += self._sessao(f"p{i}", {"estrelas": 1, "casa": 12})
+        d = agregar(poucas, HOJE - timedelta(days=1), HOJE)["feedback"]
+        self.assertFalse(d["alarme"])
+
+        muitas = []
+        for i in range(22):
+            muitas += self._sessao(f"m{i}", {"estrelas": 2, "casa": 12})
+        d2 = agregar(muitas, HOJE - timedelta(days=1), HOJE)["feedback"]
+        self.assertTrue(d2["alarme"])
+
+    def test_anexar_feedback_no_registro(self):
+        from servicos import registro
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras), \
+                 mock.patch.object(registro, "DIR_LEITURAS", dir_leituras):
+                lid = "20260907-120000-11223344"
+                (dir_leituras / f"{lid}.json").write_text(
+                    json.dumps({"nome_completo": "Cliente Teste"}), encoding="utf-8")
+
+                self.assertTrue(registro.anexar_feedback(lid, 4))
+                d = json.loads((dir_leituras / f"{lid}.json").read_text(encoding="utf-8"))
+                self.assertEqual(d["feedback_estrelas"], 4)
+                self.assertIn("feedback_em", d)
+
+                # a primeira resposta manda: quem volta nao reescreve a nota
+                self.assertFalse(registro.anexar_feedback(lid, 1))
+                d2 = json.loads((dir_leituras / f"{lid}.json").read_text(encoding="utf-8"))
+                self.assertEqual(d2["feedback_estrelas"], 4)
+
+                # fora da escala, id torto e arquivo inexistente nao gravam
+                lid2 = "20260907-120001-11223345"
+                (dir_leituras / f"{lid2}.json").write_text("{}", encoding="utf-8")
+                self.assertFalse(registro.anexar_feedback(lid2, 0))
+                self.assertFalse(registro.anexar_feedback(lid2, 6))
+                self.assertFalse(registro.anexar_feedback("../etc/passwd", 5))
+                self.assertFalse(registro.anexar_feedback("20260907-999999-ffffffff", 5))
+
+                # pular grava a marca, sem nota
+                self.assertTrue(registro.anexar_feedback(lid2, None, True))
+                d3 = json.loads((dir_leituras / f"{lid2}.json").read_text(encoding="utf-8"))
+                self.assertTrue(d3["feedback_pulou"])
+                self.assertNotIn("feedback_estrelas", d3)

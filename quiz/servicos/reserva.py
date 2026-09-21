@@ -159,9 +159,16 @@ def montar(fatos: dict, veredito, quiz: dict, precisao: dict) -> dict:
         if veredito.casa_fechada == 6:
             espera = "Evite sobrecarregar a rotina com mais tarefas. Cuidados de saúde não devem esperar por uma leitura astrológica."
 
+    # A reserva tambem sai em duas partes, senao a tela 7 mostraria blocos
+    # vazios justamente quando o modelo falhou. Corte no meio: o que descreve
+    # vai para a identificacao, o que aponta caminho vai para a porta.
+    corte = max(1, len(p) - 1)
     return {
         "titulo": TITULO.get(area, TITULO["caminhos"]),
         "destaque": DESTAQUE.get(area, DESTAQUE["caminhos"]),
+        "identificacao": {"abertura": "", "paragrafos": p[:corte]},
+        "porta": {"abertura": "", "paragrafos": p[corte:],
+                  "aproveitar": [], "cuidado": None},
         "paragrafos": p,
         "espera": espera,
         "janela": fatos.get("janela") or "nas próximas semanas",

@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import pytz
 
 from servicos import astro, eventos, fatos as mod_fatos, llm, registro, mandala, webhook
+from servicos.lentos import eleger_identificacao
+from servicos.porta import eleger_porta
 from servicos.heuristica import eleger
 from servicos.nomes import MES_PT, PLANETA_PT
 from servicos.regencia import regente_da_casa
@@ -125,9 +127,17 @@ def _pipeline(p: Pedido, agora: datetime):
         empate_tecnico=placar.empate_tecnico,
     )
 
+    # AS DUAS PARTES DA LEITURA.
+    # A Parte 1 nao consulta a area escolhida no quiz - ela fala da vida
+    # inteira. A Parte 2 elege a porta pelos rapidos, e NAO e comparada com a
+    # escolha dela: e isso que remove a deflacao do veredito antigo.
+    ident = eleger_identificacao(mapa.aspectos, mapa.presencas, mapa.perfil)
+    porta = eleger_porta(mapa.presencas)
+
     precisao = {
         "modo_hora": p.nascimento.precisao,
         "casas_confiaveis": mapa.casas_confiaveis,
+        "casas_solares": mapa.casas_solares,
         "lua_confiavel": mapa.lua_confiavel,
         "aviso": mapa.aviso,
     }
@@ -137,9 +147,21 @@ def _pipeline(p: Pedido, agora: datetime):
     quiz["quebra_texto"] = QUEBRA_TEXTO.get(p.quiz.quebra, "")
 
     bloco = mod_fatos.montar(placar, veredito, mapa.presencas, quiz,
-                             precisao, agora.date())
+                             precisao, agora.date(), ident, porta)
+    # A roda destaca a PORTA ABERTA, que e o que a carta aponta agora.
     # Uma roda de casas calculadas com hora presumida sugere precisão inexistente.
-    svg = mandala.desenhar(mapa.natal, veredito.casa_aberta) if mapa.casas_confiaveis else ""
+    destaque = porta.casa if porta else None
+    svg = mandala.desenhar(mapa.natal, destaque) if mapa.casas_confiaveis else ""
+
+    # ident e porta seguem DENTRO do bloco, como valores simples. A tupla fica
+    # com sete posicoes, que e como o resto do codigo a desempacota; e
+    # chave_cache() serializa `bloco` em JSON, entao dataclass ali dentro
+    # quebraria o cache inteiro.
+    bloco["porta_casa"] = porta.casa if porta else None
+    bloco["porta_planetas"] = list(porta.planetas) if porta else []
+    bloco["porta_empate"] = bool(porta.empate) if porta else False
+    bloco["identificacao_criterio"] = ident.criterio if ident else 0
+    bloco["identificacao_planeta"] = ident.planeta if ident else None
     return mapa, placar, veredito, precisao, quiz, bloco, svg
 
 
@@ -164,13 +186,63 @@ def _assinatura(p: Pedido, hoje: date) -> str:
 
 
 def _selo(bloco: dict, veredito: Veredito, casas_ok: bool) -> str:
-    ap = bloco.get("aspecto_principal") or {}
-    planeta = ap.get("transito_pt") or ""
-    if casas_ok and veredito.casa_aberta:
-        base = f"Casa {veredito.casa_aberta} · {CASA_NOME.get(veredito.casa_aberta, '')}"
-    else:
-        base = "leitura por signo e aspecto"
-    return f"{base} · {planeta} em trânsito" if planeta else base
+    """O selo principal da carta: a PORTA ABERTA.
+
+    Antes vinha da casa eleita pela heuristica. Isso passou a CONTRADIZER a
+    propria carta: numa leitura real o selo dizia "Casa 8, recursos
+    compartilhados" enquanto o texto apontava a casa 3. O selo tem que ser a
+    mesma coisa que a leitura aponta.
+    """
+    porta = bloco.get("selo_porta")
+    if porta:
+        return porta
+    ident = bloco.get("selo_identificacao")
+    return ident or "leitura por signo e aspecto"
+
+
+def _parte_identificacao(carta: dict, bloco: dict) -> dict:
+    """Parte 1 pronta para a tela: o texto do modelo com o selo do codigo."""
+    d = carta.get("identificacao") or {}
+    return {
+        "selo": bloco.get("selo_identificacao") or "",
+        "abertura": d.get("abertura") or "",
+        "paragrafos": d.get("paragrafos") or [],
+    }
+
+
+def _parte_porta(carta: dict, bloco: dict) -> dict:
+    d = carta.get("porta") or {}
+    return {
+        "selo": bloco.get("selo_porta") or "",
+        "abertura": d.get("abertura") or "",
+        "paragrafos": d.get("paragrafos") or [],
+        "aproveitar": d.get("aproveitar") or [],
+        "cuidado": d.get("cuidado"),
+    }
+
+
+def _paragrafos_planos(carta: dict) -> list:
+    """As duas partes em lista unica, para quem le a carta como texto corrido.
+
+    Montada por CODIGO. O modelo nao escreve `paragrafos` no esquema novo, e
+    tres consumidores dependem dela: o guard do cliente, a mensagem da
+    ZapVoice e o painel. Sem isto o deploy derruba os tres de uma vez.
+    """
+    ident = carta.get("identificacao") or {}
+    porta = carta.get("porta") or {}
+    fora = []
+    if ident.get("abertura"):
+        fora.append(ident["abertura"])
+    fora += list(ident.get("paragrafos") or [])
+    if porta.get("abertura"):
+        fora.append(porta["abertura"])
+    fora += list(porta.get("paragrafos") or [])
+    if porta.get("aproveitar"):
+        fora.append(" ".join(porta["aproveitar"]))
+    if porta.get("cuidado"):
+        fora.append(porta["cuidado"])
+    # a reserva ainda entrega `paragrafos` pronto; nesse caso, respeita
+    return fora or list(carta.get("paragrafos") or [])
 
 
 def _ressalva(precisao: dict) -> Optional[str]:
@@ -240,15 +312,25 @@ async def gerar(p: Pedido):
             "notas": bloco.get("notas") or [],
             "selo": _selo(bloco, veredito, casas_ok),
             "saudacao": f"{primeiro}," if primeiro else "",
-            "paragrafos": carta.get("paragrafos") or [],
+            # AS DUAS PARTES, cada uma com o selo gerado por codigo
+            "identificacao": _parte_identificacao(carta, bloco),
+            "porta": _parte_porta(carta, bloco),
+            # `paragrafos` continua existindo e e a CONCATENACAO das duas
+            # partes. O cliente trava com "carta incompleta" se esta lista
+            # vier vazia, e a mensagem da ZapVoice sai dela.
+            "paragrafos": _paragrafos_planos(carta),
             "espera": carta.get("espera"),
             "janela": carta.get("janela") or bloco.get("janela"),
             "assinatura": _assinatura(p, agora.date()),
             "ressalva": _ressalva(precisao),
         },
         "bussola": {
-            "slot": ((veredito.casa_aberta - 1) % 12)
-                    if (casas_ok and veredito.casa_aberta) else None,
+            # a roda aponta a PORTA ABERTA, que e o que a carta indica agora
+            "slot": ((bloco["porta_casa"] - 1) % 12)
+                    if (casas_ok and bloco.get("porta_casa")) else None,
+            "porta_casa": bloco.get("porta_casa"),
+            "porta_planetas": bloco.get("porta_planetas") or [],
+            "criterio_identificacao": bloco.get("identificacao_criterio"),
             "casa_aberta": veredito.casa_aberta if casas_ok else None,
             "casa_fechada": veredito.casa_fechada if casas_ok else None,
         },
@@ -279,6 +361,14 @@ async def gerar(p: Pedido):
         "casa_fechada": veredito.casa_fechada,
         "casas_confiaveis": casas_ok,
         "casa_eleita_real": bool(veredito.casa_aberta),
+        # a leitura em duas partes: por qual criterio a Parte 1 entrou, e que
+        # porta a Parte 2 abriu. Sem isto o painel continua medindo o cenario
+        # antigo, que a carta nao usa mais.
+        "criterio_identificacao": bloco.get("identificacao_criterio"),
+        "planeta_identificacao": bloco.get("identificacao_planeta"),
+        "porta_casa": bloco.get("porta_casa"),
+        "porta_empate": bloco.get("porta_empate"),
+        "casas_solares": precisao.get("casas_solares", False),
         "via_regente": veredito.via_regente,
         "empate_tecnico": veredito.empate_tecnico,
         "cached": bool(cacheado),

@@ -23,7 +23,9 @@ from openai import AsyncOpenAI
 
 from config import DIR_PROMPTS, MAX_TOKENS_SAIDA, MODELOS, OPENAI_API_KEY, TIMEOUT_LLM
 from . import reserva
-from .verificacao import auditar, auditar_simplicidade, texto_da_carta
+from .verificacao import (auditar, auditar_destaque, auditar_porta,
+                          auditar_registro, auditar_simplicidade,
+                          texto_da_carta)
 
 logger = logging.getLogger(__name__)
 
@@ -35,34 +37,73 @@ ESQUEMA = {
     "schema": {
         "type": "object",
         "additionalProperties": False,
-        "required": ["titulo", "destaque", "paragrafos", "espera", "janela"],
+        "required": ["titulo", "destaque", "identificacao", "porta", "janela"],
         "properties": {
             "titulo": {
                 "type": "string",
-                "description": "4 a 7 palavras, minusculas, sem ponto final. A direcao do momento em forma de verbo. Ex: reorganizar antes de expandir",
+                "description": "4 a 7 palavras, minusculas, sem ponto final, comecando por VERBO: a COISA que ela faz agora. Concreto e falado, nada de conceito. Ex: cobrar o que ficou combinado. PROIBIDO: dar nome ao que pesa, revisar o padrao, acolher o proprio ritmo.",
             },
             "destaque": {
                 "type": "string",
-                "description": "UMA frase completa, de 8 a 18 palavras, que a pessoa releria e mandaria para uma amiga. DIFERENTE do titulo: o titulo e a direcao em forma de verbo, o destaque e uma sentenca inteira. Sem jargao, sem nome de planeta, sem numero de casa. Nao repita literalmente nenhum paragrafo.",
+                "description": "UMA frase completa, de 8 a 16 palavras, que a pessoa releria e mandaria para uma amiga. DIFERENTE do titulo: o titulo e a direcao em forma de verbo, o destaque e uma sentenca inteira. TEM QUE CARREGAR ALGO QUE SO EXISTE NO MAPA DESTA PESSOA ou na frase que ela escolheu no quiz - a cena do primeiro paragrafo, o assunto concreto do transito. Se couber na carta de outra pessoa, esta errada. PROIBIDO proverbio, verdade universal e frase de autoajuda. Sem jargao, sem nome de planeta, sem numero de casa. Nao repita literalmente nenhum paragrafo.",
             },
-            "paragrafos": {
-                "type": "array",
-                "minItems": 4,
-                "maxItems": 6,
-                "items": {"type": "string"},
-                "description": "A carta. Prosa corrida, sem rotulo e sem titulo de secao. Cada paragrafo com no maximo quatro linhas.",
+            "identificacao": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["abertura", "paragrafos"],
+                "description": "PARTE 1. O que esta acontecendo com ela. So identificacao: nada de conselho aqui.",
+                "properties": {
+                    "abertura": {
+                        "type": "string",
+                        "description": "UMA frase de ate 12 palavras, do jeito que ela contaria para uma amiga. NAO precisa carregar o reconhecimento sozinha: pode dizer que alguma coisa se MOVEU, que abriu espaco. Comeca por 'Voce' ou pelo assunto concreto. PROIBIDO comecar por 'O que', 'Voce tende a', 'E comum que', 'Talvez'. Descreva terreno, nunca prometa resultado. Sem jargao e sem poesia.",
+                    },
+                    "paragrafos": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {"type": "string"},
+                        "description": "EXATAMENTE DOIS, de no maximo 32 palavras cada. O PRIMEIRO e a cena da semana dela MAIS A VIRADA: a situacao concreta e a consequencia que ela nao tinha ligado aquela situacao. Lista de tres coisas que ela faz nao serve - precisa ter um porem. E o paragrafo mais importante da carta. O SEGUNDO aponta para onde isso vai e para num ponto que deixa a pessoa pronta para a parte 2, sem nomear a area dela nem adiantar o conteudo. A CARTA NUNCA FALA DE SI MESMA: proibido escrever 'a proxima parte', 'logo abaixo', 'a seguir', 'esta leitura', 'esta carta' - ela esta lendo um texto, nao um indice. Proibido filosofar e proibido soar poetico: palavra curta e comum, do jeito que se fala. PROIBIDO 'o que pesa', 'o que trava', 'aquilo que', 'esta pedindo X', 'dar nome a'.",
+                    },
+                },
             },
-            "espera": {
-                "type": ["string", "null"],
-                "description": "Uma frase de no maximo 20 palavras sobre a area que pede espera. null quando o veredito nao trouxer area de espera.",
+            "porta": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["abertura", "paragrafos", "aproveitar", "cuidado"],
+                "description": "PARTE 2. A porta aberta agora, e ela e a MELHOR NOTICIA da carta: a area onde existe energia sobrando nesta semana. NUNCA diga que ela olhou para o lugar errado e NUNCA escreva a porta como algo que cede, resta ou sobra.",
+                "properties": {
+                    "abertura": {
+                        "type": "string",
+                        "description": "UMA frase de ate 12 palavras que ANUNCIA O QUE ESTA ABERTO, em voz de boa noticia. Nao cite aqui a area que ela escolheu: isso e trabalho do paragrafo. PROIBIDO verbo de concessao (cede, resta, sobra, abrir mao, o jeito e). Sem numero de casa.",
+                    },
+                    "paragrafos": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "items": {"type": "string"},
+                        "description": "UM SO, de no maximo 32 palavras. Por que essa area destrava o que ela quer trabalhar, em termos praticos. RESPONDE A FRASE DO ESPELHO que ela escolheu: duas pessoas na mesma casa com frases diferentes nao podem receber o mesmo paragrafo. Nada de explicacao longa: as acoes abaixo fazem o trabalho.",
+                    },
+                    "aproveitar": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": {"type": "string"},
+                        "description": "TRES acoes, cada uma com no maximo 14 palavras, comecando por VERBO. Coisas que dao para fazer nesta semana e que qualquer pessoa saberia executar sem perguntar nada. ELAS SAEM DA FRASE DO ESPELHO, NAO SO DA CASA: a casa da o territorio, a frase dela decide QUAL acao. Quem disse que da mais do que recebe e quem disse que tem opcoes demais recebem acoes diferentes na mesma casa. Se as tres serviriam para qualquer frase do quiz, esta generica demais.",
+                    },
+                    "cuidado": {
+                        "type": ["string", "null"],
+                        "description": "Uma frase de ate 16 palavras sobre onde a mesma energia atrapalha. null quando nao houver cuidado relevante.",
+                    },
+                },
             },
             "janela": {
                 "type": "string",
-                "description": "SOMENTE o fragmento de tempo, em minusculas, sem verbo e sem ponto final. Exemplos corretos: 'ate meados de marco', 'nas proximas duas ou tres semanas'. NAO escreva frase completa como 'Essa configuracao perde forca ate marco'. Use a janela estimada que veio nos FATOS.",
+                "description": "SOMENTE o fragmento de tempo, em minusculas, sem verbo e sem ponto final. Exemplos corretos: 'ate meados de marco', 'nas proximas duas ou tres semanas'. NAO escreva frase completa. Use a janela estimada que veio nos FATOS.",
             },
         },
     },
 }
+
 
 _cliente: Optional[AsyncOpenAI] = None
 
@@ -80,8 +121,10 @@ def _sistema() -> str:
 
 def montar_user(fatos: dict, correcao: Optional[list[str]] = None) -> str:
     partes = [
-        "<FATOS>", fatos["bloco_fatos"], "</FATOS>", "",
-        "<VEREDITO>", fatos["bloco_veredito"], "</VEREDITO>", "",
+        "<PARTE_1_IDENTIFICACAO>", fatos.get("bloco_identificacao", ""),
+        "</PARTE_1_IDENTIFICACAO>", "",
+        "<PARTE_2_PORTA>", fatos.get("bloco_porta", ""),
+        "</PARTE_2_PORTA>", "",
         "<QUIZ>", fatos["bloco_quiz"], "</QUIZ>", "",
     ]
     if correcao:
@@ -164,7 +207,11 @@ async def escrever(fatos: dict, veredito, quiz: dict, precisao: dict) -> dict:
             corpo = texto_da_carta(carta)
             # duas guardas: nao inventar astrologia, e nao usar jargao no corpo.
             # A prova tecnica vive na nota ao pe da carta, montada por codigo.
-            problemas = auditar(corpo, permitido) + auditar_simplicidade(corpo)
+            problemas = (auditar(corpo, permitido)
+                         + auditar_simplicidade(corpo)
+                         + auditar_porta(carta)
+                         + auditar_registro(carta)
+                         + auditar_destaque(carta))
             if not problemas:
                 meta["validacao"] = "ok" if tentativa == 1 else "regenerado"
                 meta["ms_llm"] = int((time.time() - t0) * 1000)

@@ -32,6 +32,8 @@ class Integracao(unittest.TestCase):
     def test_original_preservado(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
+        # a manchete da tela 0 - o teste existe para provar que a pagina
+        # servida e a pagina de verdade, entao a frase muda quando a copy muda
         self.assertIn('Uma das suas <em>12 portas</em> está aberta agora.', response.text)
         self.assertIn('Na Astrologia chamamos de casas.', response.text)
         self.assertIn("fetch('/api/leitura'", response.text)
@@ -106,7 +108,15 @@ class Integracao(unittest.TestCase):
         self.assertIn('Muitas vezes. É quase um padrão', prompt_a)
         self.assertIn('Não sei dizer', prompt_b)
         self.assertNotEqual(prompt_a, prompt_b)
-        self.assertIn(result_a[-2]['bloco_fatos'], prompt_a)
+        # O prompt passou a levar as DUAS PARTES, e nao mais o bloco_fatos.
+        # bloco_fatos carrega o veredito da heuristica antiga (casa eleita,
+        # casa fechada), e o modelo misturava aquilo na Parte 1 - que deve
+        # falar so do transito de identificacao. Conferido numa leitura real:
+        # a Parte 1 citava "recursos compartilhados" (casa 8) sem que o
+        # transito eleito tivesse nada a ver com isso.
+        self.assertIn(result_a[-2]['bloco_identificacao'], prompt_a)
+        self.assertIn(result_a[-2]['bloco_porta'], prompt_a)
+        self.assertNotIn(result_a[-2]['bloco_fatos'], prompt_a)
 
     def test_fuso_transito(self):
         data = pedido()

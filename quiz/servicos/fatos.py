@@ -16,11 +16,19 @@ from typing import Optional
 
 from .aspectos import AspectoNorm, PresencaNorm
 from .heuristica import Placar
-from .nomes import (ASPECTO_HUMANO, ASPECTO_PT, CASA_VIDA, MES_PT,
-                    PLANETA_PT, PLANETA_VIDA, SIGNO_PT)
+from .nomes import (ASPECTO_HUMANO, ASPECTO_PT, CASA_PORTA, CASA_VIDA,
+                    MES_PT, PLANETA_MODO, PLANETA_PORTA, PLANETA_PT,
+                    PLANETA_VIDA, SIGNO_PT)
 from .veredito import CASA_NOME, Veredito
 
 MAX_ASPECTOS = 5
+
+# como a area escolhida e chamada dentro do texto
+AREA_TEMA = {
+    "dinheiro": "o dinheiro", "amor": "o amor", "carreira": "a carreira",
+    "casa": "a casa e a familia", "corpo": "o corpo e a rotina",
+    "caminhos": "a direcao dela",
+}
 
 
 def _pt_planeta(n: Optional[str]) -> str:
@@ -124,6 +132,8 @@ def montar(
     quiz: dict,
     precisao: dict,
     hoje: date,
+    ident=None,
+    porta=None,
 ) -> dict:
     casas_ok = bool(precisao.get("casas_confiaveis"))
     principais = [a for a, _ in placar.ordenados[:MAX_ASPECTOS]]
@@ -207,16 +217,26 @@ def montar(
         f"resposta sobre insistencia: {quiz.get('quebra_texto','')}",
     ])
 
+    solares = bool(precisao.get("casas_solares"))
     return {
         "bloco_fatos": bloco_fatos,
         "bloco_veredito": bloco_veredito,
         "bloco_quiz": bloco_quiz,
-        "janela": janela,
+        # as duas partes da leitura nova
+        "bloco_identificacao": bloco_identificacao(ident, hoje),
+        "bloco_porta": bloco_porta(porta, solares, veredito.casa_demanda,
+                                   AREA_TEMA.get(quiz.get("area", ""), "")),
+        "selo_identificacao": selo_identificacao(ident),
+        "selo_porta": selo_porta(porta, solares),
+        # a janela e a do movimento que a Parte 1 elegeu, nao a do placar
+        "janela": (janela_em_palavras(ident.aspecto, hoje)
+                   if (ident is not None and ident.aspecto is not None) else janela),
         "aspecto_principal": _serializar(principal, casas_ok),
         "aspectos": [_serializar(a, casas_ok) for a in principais],
         # a prova que vai ao pe da carta, pronta e verificada por construcao
         "notas": [nota_tecnica(a) for a in principais],
-        "permitido": _allow_list(principais, presencas, placar, veredito, casas_ok),
+        "permitido": _allow_list(principais, presencas, placar, veredito,
+                                 casas_ok, ident, porta),
     }
 
 
@@ -234,7 +254,8 @@ def _serializar(a: Optional[AspectoNorm], casas_ok: bool) -> Optional[dict]:
     }
 
 
-def _allow_list(aspectos, presencas, placar, veredito, casas_ok: bool) -> dict:
+def _allow_list(aspectos, presencas, placar, veredito, casas_ok: bool,
+                ident=None, porta=None) -> dict:
     """O que o texto tem permissão de citar. Tudo fora disso é invenção.
 
     Quando as casas não são confiáveis a lista de casas fica VAZIA de propósito,
@@ -271,8 +292,196 @@ def _allow_list(aspectos, presencas, placar, veredito, casas_ok: bool) -> dict:
             if s:
                 signos.add(_pt_signo(s))
 
+    if ident is not None:
+        planetas.add(_pt_planeta(ident.planeta))
+        if ident.aspecto is not None:
+            planetas.add(_pt_planeta(ident.aspecto.natal))
+            for s in (ident.aspecto.signo_transito, ident.aspecto.signo_natal):
+                if s:
+                    signos.add(_pt_signo(s))
+        if casas_ok and ident.casa:
+            casas.add(ident.casa)
+    if porta is not None and casas_ok:
+        casas.add(porta.casa)
+
     return {
         "planetas_pt": sorted(x for x in planetas if x),
         "signos_pt": sorted(x for x in signos if x),
         "casas": sorted(casas) if casas_ok else [],
     }
+
+
+# ======================================================================
+# A LEITURA EM DUAS PARTES
+#
+# Parte 1 compra credibilidade ("isso e sobre mim"); Parte 2 gasta essa
+# credibilidade em direcao ("e a porta aberta agora e essa"). Separar os dois
+# trabalhos e o que remove a deflacao do veredito antigo, que comparava a casa
+# eleita com a area escolhida no quiz e frequentemente respondia "voce olhou
+# para o lugar errado" tres telas antes da oferta.
+# ======================================================================
+
+CRITERIO_HUMANO = {
+    1: "esta apertando agora",
+    2: "acabou de entrar nessa area da vida",
+    3: "ja passou o pico e agora e assimilacao",
+    4: "ainda esta se formando, vai apertar nas proximas semanas",
+}
+
+
+def selo_identificacao(ident) -> str:
+    """A prova da Parte 1. Montada por codigo: o modelo nao escreve selo."""
+    if ident is None:
+        return ""
+    p = _pt_planeta(ident.planeta)
+    if ident.aspecto is not None:
+        a = ident.aspecto
+        partes = [p]
+        if a.signo_transito:
+            partes[0] += f" em {_pt_signo(a.signo_transito)}"
+        if a.retrogrado:
+            partes[0] += ", retrógrado"
+        partes.append(f"{ASPECTO_PT.get(a.aspecto, a.aspecto)} com "
+                      f"{_pt_planeta(a.natal)} natal")
+        partes.append(f"orbe {abs(a.orbe):.1f}°")
+        partes.append({"Applying": "aplicando", "Separating": "separando",
+                       "Static": "estacionário"}.get(a.movimento, a.movimento))
+        return " · ".join(partes)
+    if ident.casa:
+        g = f" há {ident.graus_na_casa:.1f}°" if ident.graus_na_casa is not None else ""
+        return f"{p} entrando na casa {ident.casa}{g} · {CASA_NOME.get(ident.casa, '')}"
+    return p
+
+
+def selo_porta(porta, solares: bool = False) -> str:
+    """A prova da Parte 2."""
+    if porta is None:
+        return ""
+    nomes = [_pt_planeta(x) for x in porta.planetas]
+    if len(nomes) == 1:
+        quem = nomes[0]
+    else:
+        quem = ", ".join(nomes[:-1]) + " e " + nomes[-1]
+    fim = " · casa solar" if solares else ""
+    return (f"{quem} atravessando a sua casa {porta.casa} · "
+            f"{CASA_NOME.get(porta.casa, '')}{fim}")
+
+
+def bloco_identificacao(ident, hoje: Optional[date] = None) -> str:
+    """Os FATOS da Parte 1, ja traduzidos para linguagem de vida.
+
+    O modelo recebe o SIGNIFICADO, nunca o rotulo. Sem isto ele simplifica
+    cortando conteudo; com isto ele troca o termo pela descricao que carrega o
+    mesmo peso.
+    """
+    if ident is None:
+        return ("NAO ha transito lento tocando Sol ou Lua agora. NAO invente um.\n"
+                "Escreva a Parte 1 curta, sobre o momento estar mais silencioso "
+                "do que costuma ser, sem prometer nada e sem dramatizar.")
+
+    linhas = [f"momento: {CRITERIO_HUMANO.get(ident.criterio, '')}"]
+    t = PLANETA_VIDA.get(ident.planeta, _pt_planeta(ident.planeta))
+    linhas.append(f"o que chega de fora: {t}")
+
+    a = ident.aspecto
+    if a is not None:
+        linhas.append(f"toca em voce: {PLANETA_VIDA.get(a.natal, _pt_planeta(a.natal))}")
+        linhas.append(f"como se encontram: {ASPECTO_HUMANO.get(a.aspecto, '')}")
+        linhas.append(
+            "forca: " + ("muito fechado, pesa bastante" if abs(a.orbe) <= 2
+                         else "fechado" if abs(a.orbe) <= 4 else "ainda largo"))
+        if a.retrogrado:
+            linhas.append("VOLTANDO sobre o proprio caminho: e hora de rever, "
+                          "retomar e renegociar, nunca de comecar do zero")
+    elif ident.casa:
+        linhas.append(f"area da vida em que acabou de entrar: "
+                      f"{CASA_VIDA.get(ident.casa, '')}")
+    if hoje is not None and a is not None:
+        linhas.append(f"janela deste movimento: {janela_em_palavras(a, hoje)}")
+    return "\n".join(f"  - {x}" for x in linhas)
+
+
+def bloco_porta(porta, solares: bool = False, casa_do_tema=None, tema: str = "") -> str:
+    """Os FATOS da Parte 2: a oportunidade concreta e o cuidado.
+
+    A porta NAO e uma area que cede. E onde os rapidos estao se acumulando
+    agora, ou seja, onde existe energia disponivel - e o curso de transitos do
+    Crassus define cada um deles exatamente assim: o Sol coloca um holofote,
+    Mercurio movimenta, Venus facilita, Marte da forca. Escrever a revelacao
+    com verbo de concessao ("o que cede e...") inverte o sentido do calculo e
+    entrega como consolo o que e a melhor noticia da carta.
+    """
+    if porta is None:
+        return ("NAO foi possivel eleger uma porta. Escreva a Parte 2 sobre o "
+                "assunto que ela escolheu no quiz, sem citar area nenhuma como "
+                "'aberta', e sem inventar.")
+
+    aproveitar, cuidado = CASA_PORTA.get(porta.casa, ("", ""))
+
+    # o que cada rapido presente torna disponivel, e onde ele atrapalha
+    disponivel, cuidados_planeta = [], []
+    for p in porta.planetas:
+        d, c = PLANETA_PORTA.get(p, ("", ""))
+        if d:
+            disponivel.append(d)
+        if c:
+            cuidados_planeta.append(c)
+
+    # o tom das acoes muda conforme quem esta ali: Marte empurra, Venus atrai
+    tem_marte, tem_venus = "Mars" in porta.planetas, "Venus" in porta.planetas
+    if tem_marte and tem_venus:
+        modo = PLANETA_MODO["ambos"]
+    elif tem_marte:
+        modo = PLANETA_MODO["Mars"]
+    elif tem_venus:
+        modo = PLANETA_MODO["Venus"]
+    else:
+        modo = ""
+
+    # A RELACAO ENTRE O QUE ELA QUER TRABALHAR E A PORTA ABERTA.
+    # Ela nao escolheu um assunto sobre o qual quer resposta: escolheu uma area
+    # que quer TRABALHAR. Entao a porta nunca compete com a escolha dela - ou
+    # confirma, ou e o caminho de entrada. Sem esta linha o modelo tratava a
+    # porta como assunto concorrente e o texto se contorcia para ligar os dois.
+    if casa_do_tema and casa_do_tema == porta.casa:
+        relacao = (f"ELA QUER TRABALHAR {tema.upper()} E A PORTA ABERTA E EXATAMENTE "
+                   "ESSA AREA. Diga isso com todas as letras, e sem soar surpreso: "
+                   "aqui o esforco dela rende, e e hora de empurrar. "
+                   "A ABERTURA ja anuncia isso, entao o PARAGRAFO nao repete que "
+                   "e a mesma area: ele diz o que muda na pratica por causa "
+                   "disso.")
+    elif casa_do_tema:
+        relacao = (f"ela quer trabalhar {tema}, e a porta aberta e OUTRA area. "
+                   "Isso e BOA NOTICIA e se escreve como boa noticia: e ali que "
+                   "existe energia sobrando agora, e por isso e por ali que se "
+                   f"destrava {tema} gastando menos forca. "
+                   "ABRA ANUNCIANDO O QUE ESTA ABERTO, nao a escolha dela: "
+                   "primeiro a oportunidade, e so depois, no paragrafo, a ponte "
+                   f"com {tema}. PROIBIDO verbo de concessao - nada de 'o que "
+                   "cede', 'o que resta', 'o jeito e', 'abrir mao'. PROIBIDO "
+                   "dizer que ela olhou para o lugar errado. E PROIBIDO inventar "
+                   "elo astrologico entre as duas: a ligacao e pratica, de por "
+                   "onde comecar, nao de causa e efeito.")
+    else:
+        relacao = ""
+
+    linhas = [
+        f"area da vida que esta aberta: {CASA_VIDA.get(porta.casa, '')}",
+        f"por que ela esta aberta agora: {'; '.join(disponivel)}",
+        f"o que da para FAZER nas proximas semanas: {aproveitar}",
+        f"onde a mesma energia atrapalha: {cuidado}",
+    ]
+    if cuidados_planeta:
+        linhas.append(f"cuidado que vem de quem esta ali: {'; '.join(cuidados_planeta)}")
+    if modo:
+        linhas.append(modo)
+    if relacao:
+        linhas.insert(0, relacao)
+    if porta.empate:
+        linhas.append("houve empate na contagem e o criterio foi o Sol: o tema "
+                      "esta atravessado com outra area, pode dizer isso")
+    if solares:
+        linhas.append("ATENCAO: casas SOLARES, porque nao ha hora de nascimento "
+                      "confiavel. Diga isso com honestidade e sem drama: a "
+                      "leitura fecha mais com o horario exato.")
+    return "\n".join(f"  - {x}" for x in linhas)

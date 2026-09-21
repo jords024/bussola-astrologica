@@ -34,7 +34,29 @@ def formatar_mensagem(nome: str, carta: dict) -> str:
     if carta.get("destaque"):
         partes.append(f"_{carta['destaque']}_")
 
-    if carta.get("paragrafos") and isinstance(carta["paragrafos"], list):
+    # A carta vem em duas partes. Se vier so no formato antigo - ou pela carta
+    # de reserva -, `paragrafos` continua sendo a saida e nada aqui quebra.
+    ident = carta.get("identificacao") or {}
+    porta = carta.get("porta") or {}
+    tem_partes = bool(ident.get("paragrafos") or porta.get("paragrafos"))
+
+    if tem_partes:
+        if ident.get("selo"):
+            partes.append(f"✦ {ident['selo']}")
+        if ident.get("abertura"):
+            partes.append(f"*{ident['abertura']}*")
+        partes.extend(ident.get("paragrafos") or [])
+
+        if porta.get("selo"):
+            partes.append(f"✦ A PORTA ABERTA AGORA\n{porta['selo']}")
+        if porta.get("abertura"):
+            partes.append(f"*{porta['abertura']}*")
+        partes.extend(porta.get("paragrafos") or [])
+        if porta.get("aproveitar"):
+            partes.append("\n".join(f"• {x}" for x in porta["aproveitar"]))
+        if porta.get("cuidado"):
+            partes.append(f"⚠️ {porta['cuidado']}")
+    elif carta.get("paragrafos") and isinstance(carta["paragrafos"], list):
         partes.extend(carta["paragrafos"])
 
     espera = carta.get("espera") or ""

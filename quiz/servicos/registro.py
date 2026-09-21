@@ -141,6 +141,45 @@ def gravar_lead(leitura_id: str, dados: dict) -> None:
         logger.error("FALHA AO GRAVAR LEAD %s: %s", leitura_id, e)
 
 
+def anexar_feedback(leitura_id: str, estrelas: Optional[int] = None,
+                    pulou: bool = False) -> bool:
+    """Guarda a nota que a pessoa deu para a carta, ao lado da carta.
+
+    A nota tambem viaja como evento, que e onde o painel a agrega. Aqui ela
+    fica junto do texto que a gerou - e e isso que permite LER as piores em vez
+    de so saber quantas existem.
+
+    So a primeira resposta conta: quem volta na tela nao reescreve a nota.
+    """
+    import re
+    from datetime import timezone
+    if not leitura_id or not re.fullmatch(r"\d{8}-\d{6}-[a-f0-9]{8}", leitura_id):
+        return False
+    caminho = _dir_leituras() / f"{leitura_id}.json"
+    if not caminho.exists():
+        return False
+    try:
+        d = json.loads(caminho.read_text(encoding="utf-8"))
+        if d.get("feedback_em"):
+            return False
+        if pulou:
+            d["feedback_pulou"] = True
+        else:
+            try:
+                n = int(estrelas)
+            except (TypeError, ValueError):
+                return False
+            if not (1 <= n <= 5):
+                return False
+            d["feedback_estrelas"] = n
+        d["feedback_em"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        caminho.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.warning("falha ao anexar feedback em %s: %s", leitura_id, e)
+    return False
+
+
 def atualizar_progresso(leitura_id: str, tela: Optional[int] = None, checkout: Optional[bool] = None) -> bool:
     """Atualiza a etapa máxima alcançada e se o lead foi ao checkout."""
     import re
