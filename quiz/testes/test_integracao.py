@@ -34,8 +34,8 @@ class Integracao(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # a manchete da tela 0 - o teste existe para provar que a pagina
         # servida e a pagina de verdade, entao a frase muda quando a copy muda
-        self.assertIn('Uma das suas <em>12 portas</em> está aberta agora.', response.text)
-        self.assertIn('Na Astrologia chamamos de casas.', response.text)
+        self.assertIn('Uma das suas <em>12 portas astrológicas</em> está aberta agora.', response.text)
+        self.assertIn('essas áreas são as 12 casas do seu mapa', response.text)
         self.assertIn("fetch('/api/leitura'", response.text)
         self.assertNotIn('sk-proj-', response.text)
 
