@@ -1253,6 +1253,14 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   let tTela = Date.now();
   function go(n){
     const de = i;            /* capturado ANTES da reatribuicao logo abaixo */
+    /* Ao sair da preparação, o vídeo não acompanha a leitura em segundo plano. */
+    if(de === 6 && n !== 6){
+      clearInterval(vslRelogio);
+      const player = vslPlayer();
+      if(player && typeof player.pause === 'function'){
+        try{ player.pause(); }catch(e){}
+      }
+    }
     scr[i].classList.remove('on');
     i = Math.max(0, Math.min(scr.length-1, n));
     scr[i].classList.add('on');
