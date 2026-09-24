@@ -3,3 +3,10 @@
 __pycache__/
 *.pyc
 dados/
+
+# o mp4 da VSL mora na VTurb; a copia local so serve para teste e tem 38 MB
+publico/video/
+# capturas de tela sao regeneraveis pelo testes/check-vsl.cjs
+testes/vsl-*.png
+# cache de ferramenta
+.21st/

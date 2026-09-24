@@ -23,6 +23,7 @@ import config
 from api.evento import router as router_evento
 from api.leitura import router as router_leitura
 from api.painel import router as router_painel
+from api.pulso import router as router_pulso
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +35,7 @@ app = FastAPI(title="Bússola Astrológica", docs_url="/api/docs")
 app.include_router(router_leitura)
 app.include_router(router_evento)
 app.include_router(router_painel)
+app.include_router(router_pulso)
 
 if config.DIR_PUBLICO.exists():
     app.mount("/estatico", StaticFiles(directory=str(config.DIR_PUBLICO)), name="estatico")
