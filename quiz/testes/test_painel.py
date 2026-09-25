@@ -5,7 +5,7 @@ Cada teste aqui corresponde a um jeito concreto de o painel mentir.
 """
 import json
 import unittest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
@@ -17,7 +17,13 @@ from servicos import eventos
 from servicos.agregador import MIN_PARA_PORCENTAGEM, agregar
 
 HOJE = date.today()
-T0 = datetime.now().astimezone() - timedelta(hours=2)
+
+# Duas horas atras costuma cair no mesmo dia - menos entre meia-noite e as 2h,
+# quando cai em ONTEM e todo teste que filtra por HOJE passa a ver zero sessao.
+# A suite inteira ficava vermelha de madrugada por isso. Quando a subtracao
+# atravessa a virada do dia, ancora logo depois da meia-noite.
+_BASE = datetime.now().astimezone() - timedelta(hours=2)
+T0 = _BASE if _BASE.date() == HOJE else datetime.combine(HOJE, time(0, 5)).astimezone()
 
 
 def ev(sid, seq, evt, props=None, off=0, **kw):

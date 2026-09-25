@@ -549,23 +549,6 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   .ticket-urgencia{font-size:12px;line-height:1.5;color:var(--amber);margin-top:12px;}
   /* Os numeros do dossie. Uma linha, sem cartao e sem selo: o que sustenta
      nao e o enfeite, e o fato de serem verdadeiros. */
-  /* O pulso: quem acabou de passar por aqui. Canto inferior esquerdo para
-     nao brigar com o botao do WhatsApp, que mora no direito. */
-  .pulso{position:fixed;left:14px;bottom:18px;z-index:70;max-width:min(292px,78vw);
-    display:flex;align-items:center;gap:11px;padding:11px 14px 11px 12px;
-    background:rgba(32,29,25,.96);border:1px solid var(--line);border-radius:12px;
-    box-shadow:0 14px 34px -14px rgba(0,0,0,.85);backdrop-filter:blur(4px);
-    opacity:0;transform:translateY(14px);pointer-events:none;
-    transition:opacity .45s ease,transform .45s cubic-bezier(.2,.9,.3,1);}
-  .pulso.on{opacity:1;transform:translateY(0);}
-  .pulso .ponto{width:8px;height:8px;border-radius:50%;background:var(--green);
-    flex-shrink:0;box-shadow:0 0 0 3px rgba(62,145,102,.18);}
-  .pulso p{margin:0;font-size:12.5px;line-height:1.4;color:var(--sand);text-align:left;}
-  .pulso b{font-weight:600;}
-  .pulso small{display:block;font-size:10.5px;color:var(--sand-3);margin-top:2px;}
-  @media(max-width:380px){.pulso{left:10px;bottom:14px;padding:10px 12px;}
-    .pulso p{font-size:11.5px;}}
-  @media (prefers-reduced-motion:reduce){.pulso{transition:none;}}
   .oferta-numeros{display:flex;justify-content:center;gap:10px;width:100%;
     margin:0 0 18px;padding:14px 10px;border:1px solid var(--line);
     border-radius:12px;background:var(--card);}
@@ -1004,12 +987,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   </div>
 </section>
 
-<!-- o pulso da oferta: preenchido por /api/pulso, so na tela 10 -->
-<div class="pulso" id="pulso" role="status" aria-live="polite" hidden>
-  <span class="ponto" aria-hidden="true"></span>
-  <p id="pulsoTexto"></p>
-</div>
-
 <!-- a nota da carta, sobre a tela 7 -->
 <div class="nota-fundo" id="notaFundo" role="dialog" aria-modal="true" aria-labelledby="notaTitulo">
   <div class="nota-caixa">
@@ -1337,7 +1314,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     <div class="ticket-corte" aria-hidden="true"></div>
     <p class="ticket-referencia">R$405 em valores de referência dos conteúdos</p>
     <div class="big"><small>pacote completo por</small>12<i>x</i> R$6,93</div>
-    <p class="pix">no cartão <span>(total de R$83,16)</span></p>
+    <p class="pix">no cartão</p>
     <p class="ticket-parcelas">ou <b>R$67</b> à vista no Pix</p>
     <button class="go green" id="buy" style="margin-top:18px;">Quero garantir essa condição</button>
     <p class="ticket-urgencia">Essa condição está no ar agora. Não garantimos até quando.</p>
@@ -1627,7 +1604,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if (i === 6) spin();
     if (i === 8) portas();
     if (i === 9) bridge();
-    if(de === 10 && i !== 10){ vslOfertaDesmontar(); pulsoParar(); }
+    if(de === 10 && i !== 10) vslOfertaDesmontar();
     if(i === 10){
       vslOfertaMontar();
       $('#ofertaVslTitulo').focus({preventScroll:true});
@@ -1661,6 +1638,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     origem: 'https://turb-front.aryaraj.shop',
     video: 'c6818306-fbe3-4919-b404-2f5b99424bc1',
     pitchSegundos: 231,   /* 3min51, momento exato que a fala do pitch comeca */
+    local: '/estatico/video/vsl-web-720p.mp4',  /* copia de socorro, se existir */
     esperaSonda: 3500,     /* o dominio tem ate aqui para dar sinal de vida */
     esperaCarregar: 10000, /* rede de seguranca, se ate a sonda travar */
     teto: 240000,          /* 240s = 4min maximo absoluto: revela de todo jeito */
@@ -1710,7 +1688,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       el.style.display = 'block';
     });
     A.ev('oferta_vsl', {estado:'revelou', motivo:motivo}, true);
-    pulsoIniciar();
     /* so rola sozinho quando foi o video que mandou ou alcancou tempo de pitch:
        nas saidas de erro ou ja_viu a pessoa nao e puxada */
     if((motivo === 'pitch' || motivo === 'pitch_tempo' || motivo === 'teto') && alvo){
@@ -1751,6 +1728,26 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       ifr.addEventListener('load', () => { vslOfertaCarregou = true; });
       ifr.src = ifr.dataset.src;
       A.ev('oferta_vsl', {estado:'montou'});
+
+      /* com limite proprio: quando o DNS some, o navegador leva quase dez
+         segundos para desistir sozinho, e esse tempo inteiro a pessoa fica
+         olhando a pagina de erro. Um dominio de pe responde um favicon em
+         muito menos que isso. */
+      const corta = new AbortController();
+      setTimeout(() => corta.abort(), VSL_OFERTA.esperaSonda);
+      fetch(VSL_OFERTA.origem + '/favicon.svg',
+            {mode:'no-cors', cache:'no-store', signal:corta.signal})
+        .then(() => {
+          vslOfertaAlcancavel = true;
+          const erro = document.getElementById('ofertaVideoErro');
+          if(erro) erro.hidden = true;
+        })
+        .catch(() => {
+          vslOfertaAlcancavel = false;
+          A.ev('oferta_vsl', {estado:'dominio_fora'}, true);
+          /* antes de desistir do video, tenta a copia servida por nos mesmos */
+          vslOfertaSocorro();
+        });
     } else if(ifr.getAttribute('src')) {
       vslOfertaCarregou = true;
       if(!ifr.dataset.src) ifr.dataset.src = ifr.getAttribute('src');
@@ -1780,6 +1777,61 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         ifr.contentWindow.postMessage({ type: 'VTURB_COMMAND', action: 'pause' }, '*');
       }catch(e){}
     }
+    const vLocal = document.getElementById('ofertaVideoLocal');
+    if(vLocal){ try{ vLocal.pause(); }catch(e){} }
+  }
+
+  /* Plano B: o mesmo video, servido por nos.
+
+     Quando o dominio do player nao responde - foi o que aconteceu quando o
+     DNS da maquina parou de resolver aryaraj.shop -, a VSL nao precisa sumir
+     junto. Se existir uma copia em publico/video/, ela entra no lugar do
+     iframe e o portao do pitch passa a ser cronometrado pelo proprio video,
+     nos mesmos 231 segundos.
+
+     Em producao esse arquivo nao existe (esta no .gitignore, porque sao 38 MB
+     e quem serve o video e a VTurb), entao o HEAD devolve 404 e a tela cai no
+     aviso de sempre. Nada muda la. */
+  async function vslOfertaSocorro(){
+    const box = document.getElementById('vslBox') || document.querySelector('.oferta-vsl');
+    const quadro = document.querySelector('.oferta-vsl-quadro');
+    const erro = document.getElementById('ofertaVideoErro');
+    const ajuda = document.querySelector('.oferta-video-ajuda');
+
+    let existe = false;
+    try{
+      const r = await fetch(VSL_OFERTA.local, {method:'HEAD', cache:'no-store'});
+      existe = r.ok;
+    }catch(e){ existe = false; }
+
+    if(!existe || !quadro){
+      if(erro) erro.hidden = false;
+      vslOfertaRevelar('dominio_fora');
+      return;
+    }
+
+    const v = document.createElement('video');
+    v.id = 'ofertaVideoLocal';
+    v.src = VSL_OFERTA.local;
+    v.controls = true;
+    v.playsInline = true;
+    v.preload = 'metadata';
+    v.setAttribute('aria-label',
+      'Conheça a Bússola Astrológica com Crassus Gobbi. Vídeo com legendas.');
+    Object.assign(v.style, {position:'absolute', inset:'0', width:'100%',
+                            height:'100%', objectFit:'contain', background:'#100d16'});
+    quadro.replaceChildren(v);
+    if(erro) erro.hidden = true;
+    if(ajuda) ajuda.textContent = 'Dê o play e ative o som para acompanhar.';
+    if(box) box.hidden = false;
+
+    /* o portao do pitch, cronometrado pelo proprio video */
+    v.addEventListener('timeupdate', () => {
+      if(v.currentTime >= VSL_OFERTA.pitchSegundos) vslOfertaRevelar('pitch');
+    });
+    v.addEventListener('ended', () => vslOfertaRevelar('pitch'));
+
+    A.ev('oferta_vsl', {estado:'copia_local'}, true);
   }
 
   function vslOfertaDesmontar(){
@@ -1835,104 +1887,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   ['click','touchstart','scroll','keydown'].forEach(evt =>
     window.addEventListener(evt, vslOfertaDestravarAudio, {once:true, passive:true}));
 
-  /* =====================  O PULSO  =====================
-
-     Quem passou por aqui ha pouco, no canto da tela de oferta. Cada linha
-     corresponde a uma leitura que existe em disco: nome e cidade sao de
-     gente real, e a rota /api/pulso nao devolve mais nada alem disso.
-
-     Cadencia sorteada de proposito. Intervalo fixo vira metronomo, o olho
-     aprende o ritmo em duas voltas e para de ver.                          */
-  const PULSO = {
-    entrada: 2500,      /* espera antes do primeiro, para nao atropelar a oferta */
-    visivel: 6000,      /* quanto tempo cada um fica */
-    minIntervalo: 18000,
-    maxIntervalo: 34000,
-  };
-
-  let pulsoItens = [];
-  let pulsoIndice = 0;
-  let pulsoRelogio = null;
-  let pulsoLigado = false;
-
-  function pulsoFrase(item){
-    const onde = item.uf ? `${item.cidade}/${item.uf}` : item.cidade;
-    const m = Number(item.ha_minutos);
-    let quando;
-    if(m < 2) quando = 'agora mesmo';
-    else if(m < 60) quando = `há ${m} minutos`;
-    else if(m < 120) quando = 'há cerca de uma hora';
-    else if(m < 1440) quando = `há ${Math.round(m/60)} horas`;
-    else quando = 'ontem';
-    return {onde, quando};
-  }
-
-  function pulsoMostrar(){
-    if(!pulsoLigado || !pulsoItens.length) return;
-    const caixa = document.getElementById('pulso');
-    const texto = document.getElementById('pulsoTexto');
-    if(!caixa || !texto) return;
-
-    const item = pulsoItens[pulsoIndice % pulsoItens.length];
-    pulsoIndice++;
-    const {onde, quando} = pulsoFrase(item);
-    texto.replaceChildren();
-    const b = document.createElement('b');
-    b.textContent = `${item.nome}, de ${onde}`;
-    const s = document.createElement('small');
-    s.textContent = `recebeu a leitura dela ${quando}`;
-    texto.append(b, s);
-
-    caixa.hidden = false;
-    /* reflow forcado em vez de requestAnimationFrame: rAF nao dispara com a
-       aba em segundo plano, e o aviso ficava presente porem invisivel - sem
-       a classe que faz a transicao. */
-    void caixa.offsetWidth;
-    caixa.classList.add('on');
-    pulsoRelogio = setTimeout(() => {
-      caixa.classList.remove('on');
-      pulsoRelogio = setTimeout(() => {
-        caixa.hidden = true;
-        const espera = PULSO.minIntervalo +
-          Math.random() * (PULSO.maxIntervalo - PULSO.minIntervalo);
-        pulsoRelogio = setTimeout(pulsoMostrar, espera);
-      }, 500);
-    }, PULSO.visivel);
-  }
-
-  async function pulsoIniciar(){
-    if(pulsoLigado) return;
-    pulsoLigado = true;
-    if(!pulsoItens.length){
-      try{
-        const r = await fetch('/api/pulso', {headers:{'Accept':'application/json'}});
-        if(!r.ok) throw new Error('pulso indisponivel');
-        const d = await r.json();
-        pulsoItens = Array.isArray(d.itens) ? d.itens : [];
-      }catch(e){
-        pulsoItens = [];
-      }
-    }
-    /* a propria pessoa nao pode se ver no rodizio: ela acabou de digitar o
-       nome tres telas atras e reconheceria na hora */
-    const meu = String(S.nomeCompleto || '').trim().split(/\s+/)[0].toLowerCase();
-    if(meu) pulsoItens = pulsoItens.filter(x =>
-      String(x.nome || '').toLowerCase() !== meu);
-
-    /* sem gente de verdade para mostrar, nao mostra nada. Nao ha plano B
-       inventado aqui. */
-    if(!pulsoItens.length){ pulsoLigado = false; return; }
-    pulsoRelogio = setTimeout(pulsoMostrar, PULSO.entrada);
-  }
-
-  function pulsoParar(){
-    pulsoLigado = false;
-    clearTimeout(pulsoRelogio);
-    pulsoRelogio = null;
-    const caixa = document.getElementById('pulso');
-    if(caixa){ caixa.classList.remove('on'); caixa.hidden = true; }
-  }
-
   const ofertaRetry = document.getElementById('ofertaVideoRetry');
   if(ofertaRetry) ofertaRetry.addEventListener('click', () => {
     const erro = document.getElementById('ofertaVideoErro');
@@ -1947,14 +1901,11 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     const naOferta = scr[i] && scr[i].getAttribute('data-s') === '10';
     if(document.hidden){
       if(naOferta) vslOfertaPausar();
-      pulsoParar();
       return;
     }
-    /* voltou para a aba: se estiver na oferta, garante o player montado e religa o pulso se ja revelado */
+    /* voltou para a aba: se estiver na oferta, garante o player montado */
     if(naOferta){
       vslOfertaMontar();
-      const revelado = document.getElementById('oferta-pitch');
-      if(revelado && revelado.classList.contains('revelado')) pulsoIniciar();
     }
   });
 
