@@ -88,13 +88,18 @@ def disparar_webhook_leitura(
     clean_digits = re.sub(r"\D", "", whatsapp or "")
     mensagem_formatada = formatar_mensagem(nome_completo, carta)
 
+    meta_dados = meta or {}
+    nascimento = meta_dados.get("nascimento") or {}
+    cidade = meta_dados.get("cidade") or {}
+    quiz = meta_dados.get("quiz") or {}
+
     payload = {
         "event": "PURCHASE_OUT_OF_SHOPPING_CART",
         "tipo": "leitura_concluida",
         "origem": "quiz_bussola",
         "leitura_id": leitura_id,
         "data_hora_brasilia": data_hora_fmt,
-        # Campos solicitados explicitamente:
+        # Dados do usuário preenchidos:
         "nome_completo": nome_completo,
         "nome": nome_completo,
         "name": nome_completo,
@@ -102,6 +107,10 @@ def disparar_webhook_leitura(
         "whatsapp": whatsapp,
         "telefone": whatsapp,
         "phone": clean_digits or whatsapp,
+        "nascimento": nascimento,
+        "cidade": cidade,
+        "quiz": quiz,
+        # Leitura e mensagem secreta completa:
         "mensagem": mensagem_formatada,
         "message": mensagem_formatada,
         "texto": mensagem_formatada,
@@ -124,13 +133,16 @@ def disparar_webhook_leitura(
                 "mensagem": mensagem_formatada,
                 "titulo": carta.get("titulo", ""),
                 "destaque": carta.get("destaque", ""),
-                **(meta or {}),
+                **meta_dados,
             },
             "custom_fields": {
                 "nome_completo": nome_completo,
                 "numero": whatsapp,
                 "mensagem": mensagem_formatada,
                 "leitura_id": leitura_id,
+                "nascimento": nascimento,
+                "cidade": cidade,
+                "quiz": quiz,
             },
         },
     }

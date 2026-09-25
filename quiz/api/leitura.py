@@ -426,7 +426,7 @@ async def gerar(p: Pedido):
         "total_ao_vivo": len(rastreador_presenca.obter_ativos(90.0))
     })
 
-    # Disparo assíncrono do webhook para ZapVoice (nome completo, número e mensagem da leitura)
+    # Disparo assíncrono do webhook para ZapVoice / automação (nome completo, número, mensagem e dados completos)
     if p.whatsapp:
         asyncio.create_task(asyncio.to_thread(
             webhook.disparar_webhook_leitura,
@@ -434,7 +434,13 @@ async def gerar(p: Pedido):
             p.whatsapp,
             resposta["carta"],
             leitura_id,
-            {"casa_aberta": veredito.casa_aberta, "area": p.quiz.area},
+            {
+                "casa_aberta": veredito.casa_aberta,
+                "area": p.quiz.area,
+                "nascimento": p.nascimento.model_dump(),
+                "cidade": p.cidade.model_dump(),
+                "quiz": p.quiz.model_dump(),
+            },
         ))
 
     return resposta

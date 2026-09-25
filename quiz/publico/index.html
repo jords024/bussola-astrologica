@@ -1075,22 +1075,249 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     <h2 class="big" id="ofertaVslTitulo" tabindex="-1">Uma direção para agora.<br><em>Uma bússola para o que vem.</em></h2>
     <p class="sub">Se a sua mensagem fez sentido, veja como levar essa clareza para outras áreas da sua vida.</p>
   </header>
-  <figure class="oferta-vsl" aria-labelledby="ofertaVslTitulo">
-    <!-- O src so e preenchido ao entrar nesta tela, em vslOfertaMontar(). Deixar
-         aqui faria todo visitante baixar o player mesmo sem nunca chegar na
-         oferta, e a maior perda do funil acontece bem antes daqui. -->
-    <div class="oferta-vsl-quadro">
-      <iframe id="ofertaVsl" title="Conheça a Bússola Astrológica com Crassus Gobbi. Vídeo com legendas, duração de 4 minutos e 40 segundos."
-        data-src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1"
-        allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen loading="lazy"></iframe>
+  <div id="vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1" style="max-width:640px;width:100%;margin:0 auto 20px;background:#0d0c0a;border-radius:12px;overflow:hidden;">
+    <div style="position:relative;width:100%;padding-top:177.77%;background:#0d0c0a;">
+      <iframe id="ofertaVsl" data-src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:1px;background:#0d0c0a;color-scheme:dark;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
     </div>
-    <figcaption>CRASSUS GOBBI <span>COM LEGENDAS</span></figcaption>
-  </figure>
-  <p class="oferta-video-ajuda">Toque na tela para ativar o som.</p>
-  <div class="oferta-video-erro" id="ofertaVideoErro" role="status" hidden>
-    <p>O vídeo não carregou aqui. A oferta continua logo abaixo.</p>
-    <button type="button" class="go" id="ofertaVideoRetry">Tentar novamente</button>
   </div>
+  <script>
+  (function() {
+    var videoId = 'c6818306-fbe3-4919-b404-2f5b99424bc1';
+    var videoRatio = '9:16';
+    var isFloatingConfig = true;
+    var floatingPos = 'bottom-right';
+    var floatingWidth = 320;
+    var isCloseable = true;
+
+    var isFloatingDismissed = false;
+    var isVideoPlaying = false;
+    var isIntersecting = true;
+
+    window.addEventListener('message', function(e) {
+      if (!e.data) return;
+      if (e.data.type === 'VTURB_PLAY_STATE') {
+        isVideoPlaying = Boolean(e.data.isPlaying);
+        if (typeof window.updateFloatingState === 'function') window.updateFloatingState();
+        if (typeof window.vslOfertaNotificarPlayState === 'function') window.vslOfertaNotificarPlayState(isVideoPlaying);
+      }
+      if (e.data.type === 'VTURB_PITCH_REACHED') {
+        var sel = e.data.targetSelector || '.delay-pitch, #oferta-pitch';
+        document.querySelectorAll(sel).forEach(function(el) { el.style.display = 'block'; });
+        if (typeof window.vslOfertaRevelar === 'function') {
+          window.vslOfertaRevelar('pitch');
+        } else if (typeof vslOfertaRevelar === 'function') {
+          vslOfertaRevelar('pitch');
+        }
+        if (e.data.autoScroll) {
+          var first = document.querySelector(sel);
+          if (first) {
+            var top = first.getBoundingClientRect().top + window.pageYOffset - (e.data.scrollOffset || 50);
+            window.scrollTo({ top: top, behavior: 'smooth' });
+          }
+        }
+        if (e.data.persistence && e.data.videoId) {
+          try { localStorage.setItem('vturb_pitch_' + e.data.videoId, '1'); } catch(err) {}
+        }
+      }
+      if (e.data.type === 'VTURB_PIXEL_TRACK') {
+        var evt = e.data.eventName;
+        if (typeof window.fbq === 'function') window.fbq('trackCustom', evt, { video_id: e.data.videoId });
+        if (typeof window.gtag === 'function') window.gtag('event', evt, { video_id: e.data.videoId });
+        if (typeof window.ttq === 'function' && typeof window.ttq.track === 'function') window.ttq.track(evt, { video_id: e.data.videoId });
+        if (typeof A !== 'undefined' && A.ev) A.ev('oferta_vsl', {estado:'marco', marco:String(evt).slice(0,40)});
+        if (evt === 'PitchReached' || e.data.trigger === 'pitch') {
+          if (typeof window.vslOfertaRevelar === 'function') window.vslOfertaRevelar('pitch');
+        }
+        if (evt === 'ViewContent_75' || e.data.trigger === 'percent_75') {
+          if (typeof window.vslOfertaCalibrarProgresso === 'function') window.vslOfertaCalibrarProgresso(210);
+        }
+        if (evt === 'ViewContent_100' || e.data.trigger === 'percent_100') {
+          if (typeof window.vslOfertaRevelar === 'function') window.vslOfertaRevelar('fim_video');
+        }
+      }
+    });
+
+    // Inicialização autônoma de Pixels de Rastreamento (Facebook, Google, TikTok) se configurados
+    var trackingConfig = {"enabled":true,"facebook_pixel_id":"776532458708522","google_analytics_id":"","tiktok_pixel_id":"","events":[{"trigger":"percent_25","event_name":"ViewContent_25","enabled":true},{"trigger":"percent_50","event_name":"ViewContent_50","enabled":true},{"trigger":"percent_75","event_name":"ViewContent_75","enabled":true},{"trigger":"percent_100","event_name":"ViewContent_100","enabled":true},{"trigger":"pitch","event_name":"PitchReached","enabled":true}]};
+    if (trackingConfig && trackingConfig.enabled) {
+      if (trackingConfig.facebook_pixel_id && !window.fbq) {
+        (function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        window.fbq('init', trackingConfig.facebook_pixel_id);
+        window.fbq('track', 'PageView');
+      }
+      if (trackingConfig.google_analytics_id && !window.gtag) {
+        var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(trackingConfig.google_analytics_id); document.head.appendChild(gs);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function(){window.dataLayer.push(arguments);};
+        window.gtag('js', new Date());
+        window.gtag('config', trackingConfig.google_analytics_id);
+      }
+      if (trackingConfig.tiktok_pixel_id && !window.ttq) {
+        (function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];ttq._i[e]._u=i;ttq._t=ttq._t||{};ttq._t[e]=+new Date;ttq._o=ttq._o||{};ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript";o.async=!0;o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load(trackingConfig.tiktok_pixel_id);ttq.page();})(window,document,'ttq');
+      }
+    }
+
+    // Listener para desbloquear áudio de imediato na menor interação
+    var unlocked = false;
+    function notifyIframe() {
+      if (unlocked) return;
+      unlocked = true;
+      var ifr = document.getElementById('ofertaVsl') || document.querySelector('iframe[src*="' + videoId + '"]');
+      if (ifr && ifr.contentWindow) {
+        try { ifr.contentWindow.postMessage({ type: 'VTURB_PARENT_INTERACTION' }, '*'); } catch(e) {}
+      }
+    }
+    ['click', 'touchstart', 'scroll', 'keydown'].forEach(function(evt) {
+      window.addEventListener(evt, notifyIframe, { once: true, passive: true });
+    });
+
+    try {
+      if (localStorage.getItem('vturb_pitch_' + videoId) === '1') {
+        var sel = '.delay-pitch, #oferta-pitch';
+        document.querySelectorAll(sel).forEach(function(el) { el.style.display = 'block'; });
+        if (typeof window.vslOfertaRevelar === 'function') {
+          window.vslOfertaRevelar('ja_viu');
+        } else if (typeof vslOfertaRevelar === 'function') {
+          vslOfertaRevelar('ja_viu');
+        }
+      }
+    } catch(err) {}
+
+    // Lógica do Player Flutuante (Picture-in-Picture no site externo)
+    function setupFloatingObserver() {
+      if (!isFloatingConfig) return;
+      var wrapper = document.getElementById('vturb-wrapper-' + videoId);
+      var ifr = document.getElementById('ofertaVsl') || document.querySelector('iframe[src*="' + videoId + '"]');
+      if (!wrapper || !ifr) return;
+
+      // Cria botão de fechar flutuante se não existir
+      var closeBtn = document.getElementById('vturb-close-floating-' + videoId);
+      if (!closeBtn && isCloseable) {
+        closeBtn = document.createElement('button');
+        closeBtn.id = 'vturb-close-floating-' + videoId;
+        closeBtn.innerHTML = '&#x2715;';
+        closeBtn.title = 'Fechar mini player';
+        closeBtn.style.position = 'fixed';
+        closeBtn.style.zIndex = '100000';
+        closeBtn.style.width = '28px';
+        closeBtn.style.height = '28px';
+        closeBtn.style.borderRadius = '50%';
+        closeBtn.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        closeBtn.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+        closeBtn.style.color = '#ffffff';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.display = 'none';
+        closeBtn.style.alignItems = 'center';
+        closeBtn.style.justifyContent = 'center';
+        closeBtn.style.fontSize = '14px';
+        closeBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.4)';
+        closeBtn.onclick = function(ev) {
+          ev.stopPropagation();
+          isFloatingDismissed = true;
+          if (typeof window.updateFloatingState === 'function') window.updateFloatingState(false);
+          try {
+            if (ifr && ifr.contentWindow) {
+              ifr.contentWindow.postMessage({ type: 'VTURB_COMMAND', action: 'pause' }, '*');
+            }
+          } catch(err) {}
+        };
+        document.body.appendChild(closeBtn);
+      }
+
+      var isCurrentlyFloating = false;
+
+      window.updateFloatingState = function(forceState) {
+        if (!wrapper || !ifr) return;
+        var scr10 = wrapper.closest('.scr[data-s="10"]');
+        var isScreen10Active = !scr10 || scr10.classList.contains('on');
+        var shouldFloat = (typeof forceState === 'boolean' ? forceState : isCurrentlyFloating) && isFloatingConfig && !isFloatingDismissed && isScreen10Active;
+        isCurrentlyFloating = shouldFloat;
+
+        if (shouldFloat) {
+          var isVertical = videoRatio === '9:16';
+          var actualWidth = isVertical ? Math.min(floatingWidth, 250) : floatingWidth;
+          var floatHeight = isVertical ? Math.round((actualWidth * 16) / 9) : Math.round((actualWidth * 9) / 16);
+          var marginEdge = 32;
+          var marginEdgeRight = 56;
+          ifr.style.position = 'fixed';
+          ifr.style.top = 'auto';
+          ifr.style.bottom = marginEdge + 'px';
+          if (floatingPos === 'bottom-left') {
+            ifr.style.left = marginEdge + 'px';
+            ifr.style.right = 'auto';
+          } else {
+            ifr.style.right = marginEdgeRight + 'px';
+            ifr.style.left = 'auto';
+          }
+          ifr.style.width = actualWidth + 'px';
+          ifr.style.height = floatHeight + 'px';
+          ifr.style.zIndex = '99999';
+          ifr.style.backgroundColor = '#000000';
+          ifr.style.borderRadius = '12px';
+          ifr.style.boxShadow = '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.15)';
+          ifr.style.transition = 'box-shadow 0.2s ease, border-radius 0.2s ease';
+
+          if (closeBtn) {
+            closeBtn.style.display = 'flex';
+            closeBtn.style.top = 'auto';
+            closeBtn.style.bottom = (marginEdge + floatHeight - 14) + 'px';
+            if (floatingPos === 'bottom-left') {
+              closeBtn.style.left = (marginEdge + actualWidth - 14) + 'px';
+              closeBtn.style.right = 'auto';
+            } else {
+              closeBtn.style.right = (marginEdgeRight - 12) + 'px';
+              closeBtn.style.left = 'auto';
+            }
+          }
+        } else {
+          ifr.style.transition = 'none';
+          ifr.style.position = 'absolute';
+          ifr.style.top = '0';
+          ifr.style.left = '0';
+          ifr.style.right = 'auto';
+          ifr.style.bottom = 'auto';
+          ifr.style.width = '100%';
+          ifr.style.height = '100%';
+          ifr.style.zIndex = '1';
+          ifr.style.borderRadius = '1px';
+          ifr.style.boxShadow = 'none';
+
+          if (closeBtn) {
+            closeBtn.style.display = 'none';
+          }
+        }
+      };
+
+      if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            var rect = entry.boundingClientRect;
+            var pastTop = rect.bottom < 80;
+            if (!pastTop || entry.intersectionRatio > 0.35) {
+              isFloatingDismissed = false;
+            }
+            if (!isCurrentlyFloating) {
+              if (pastTop && entry.intersectionRatio < 0.15 && isVideoPlaying) {
+                window.updateFloatingState(true);
+              }
+            } else {
+              if (!pastTop || entry.intersectionRatio > 0.35) {
+                window.updateFloatingState(false);
+              }
+            }
+          });
+        }, { threshold: [0, 0.1, 0.2, 0.35, 0.5] });
+        observer.observe(wrapper);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupFloatingObserver);
+    } else {
+      setupFloatingObserver();
+    }
+  })();
+  </script>
   <!-- Tudo daqui para baixo so aparece quando o video chega no pitch, aos
        3min50. Um invólucro só, e nao uma classe em cada bloco, porque o
        script do embed revela com display:block - o que quebraria .kit e
@@ -1433,36 +1660,80 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   const VSL_OFERTA = {
     origem: 'https://turb-front.aryaraj.shop',
     video: 'c6818306-fbe3-4919-b404-2f5b99424bc1',
-    pitchSegundos: 231,   /* 3min51, como configurado no painel da VTurb */
+    pitchSegundos: 231,   /* 3min51, momento exato que a fala do pitch comeca */
     esperaSonda: 3500,     /* o dominio tem ate aqui para dar sinal de vida */
     esperaCarregar: 10000, /* rede de seguranca, se ate a sonda travar */
-    teto: 270000,          /* 40s de folga depois do pitch: revela de todo jeito */
+    teto: 240000,          /* 240s = 4min maximo absoluto: revela de todo jeito */
   };
 
   let vslOfertaRevelada = false;
   let vslOfertaCarregou = false;
   let vslOfertaAlcancavel = null;   /* null = ainda sondando */
   let vslOfertaRelogios = [];
+  let vslTempoReproducao = 0;       /* segundos acumulados de video reproduzido */
+  let vslPlayTicker = null;
+
+  function vslOfertaIniciarTicker(){
+    if(vslPlayTicker || vslOfertaRevelada) return;
+    vslPlayTicker = setInterval(() => {
+      if(vslOfertaRevelada){
+        clearInterval(vslPlayTicker);
+        vslPlayTicker = null;
+        return;
+      }
+      vslTempoReproducao++;
+      if(vslTempoReproducao >= VSL_OFERTA.pitchSegundos){
+        vslOfertaRevelar('pitch_tempo');
+      }
+    }, 1000);
+  }
+
+  function vslOfertaPararTicker(){
+    if(vslPlayTicker){
+      clearInterval(vslPlayTicker);
+      vslPlayTicker = null;
+    }
+  }
 
   function vslOfertaRevelar(motivo){
     if(vslOfertaRevelada) return;
     vslOfertaRevelada = true;
+    vslOfertaPararTicker();
     vslOfertaRelogios.forEach(clearTimeout);
     vslOfertaRelogios = [];
     const alvo = document.getElementById('oferta-pitch');
-    if(alvo) alvo.classList.add('revelado');
+    if(alvo){
+      alvo.classList.add('revelado');
+      alvo.style.display = 'block';
+    }
+    document.querySelectorAll('.delay-pitch').forEach(function(el){
+      el.style.display = 'block';
+    });
     A.ev('oferta_vsl', {estado:'revelou', motivo:motivo}, true);
     pulsoIniciar();
-    /* so rola sozinho quando foi o video que mandou: nas saidas de
-       emergencia a pessoa nao pediu nada e nao pode ser puxada da tela */
-    if(motivo === 'pitch' && alvo){
+    /* so rola sozinho quando foi o video que mandou ou alcancou tempo de pitch:
+       nas saidas de erro ou ja_viu a pessoa nao e puxada */
+    if((motivo === 'pitch' || motivo === 'pitch_tempo' || motivo === 'teto') && alvo){
       const topo = alvo.getBoundingClientRect().top + window.pageYOffset - 50;
       window.scrollTo({top: topo, behavior: 'smooth'});
     }
-    if(motivo === 'pitch'){
-      try{ localStorage.setItem('vturb_pitch_' + VSL_OFERTA.video, '1'); }catch(e){}
-    }
+    try{ localStorage.setItem('vturb_pitch_' + VSL_OFERTA.video, '1'); }catch(e){}
   }
+
+  window.vslOfertaRevelar = vslOfertaRevelar;
+  window.vslOfertaNotificarPlayState = function(isPlaying){
+    if(isPlaying){
+      vslOfertaIniciarTicker();
+    } else {
+      vslOfertaPararTicker();
+    }
+  };
+  window.vslOfertaCalibrarProgresso = function(segundos){
+    vslTempoReproducao = Math.max(vslTempoReproducao, segundos || 0);
+    if(vslTempoReproducao >= VSL_OFERTA.pitchSegundos){
+      vslOfertaRevelar('pitch_tempo');
+    }
+  };
 
   function vslOfertaMontar(){
     const ifr = document.getElementById('ofertaVsl');
@@ -1472,46 +1743,21 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     try{
       if(localStorage.getItem('vturb_pitch_' + VSL_OFERTA.video) === '1'){
         vslOfertaRevelar('ja_viu');
+        return;
       }
     }catch(e){}
 
-    if(!ifr.getAttribute('src')){
-      /* O evento `load` NAO prova que o player subiu. Quando o dominio nao
-         resolve, o Chrome desenha a propria pagina de erro DENTRO do iframe
-         e dispara `load` do mesmo jeito - foi o que aconteceu quando o
-         aryaraj.shop saiu do ar: a pessoa via "nao foi possivel encontrar o
-         endereco IP" e a oferta so aparecia no teto, quatro minutos depois.
-
-         Entao quem decide e uma sonda de rede no proprio dominio. Em falha
-         de DNS ou de conexao, o fetch rejeita, e ai a saida de emergencia
-         dispara na hora em vez de esperar. */
+    if(!ifr.getAttribute('src') && ifr.dataset.src){
       ifr.addEventListener('load', () => { vslOfertaCarregou = true; });
       ifr.src = ifr.dataset.src;
       A.ev('oferta_vsl', {estado:'montou'});
-
-      /* com limite proprio: quando o DNS some, o navegador leva quase dez
-         segundos para desistir sozinho, e esse tempo inteiro a pessoa fica
-         olhando a pagina de erro. Um dominio de pe responde um favicon em
-         muito menos que isso. */
-      const corta = new AbortController();
-      setTimeout(() => corta.abort(), VSL_OFERTA.esperaSonda);
-      fetch(VSL_OFERTA.origem + '/favicon.svg',
-            {mode:'no-cors', cache:'no-store', signal:corta.signal})
-        .then(() => {
-          vslOfertaAlcancavel = true;
-          const erro = document.getElementById('ofertaVideoErro');
-          if(erro) erro.hidden = true;
-        })
-        .catch(() => {
-          vslOfertaAlcancavel = false;
-          const erro = document.getElementById('ofertaVideoErro');
-          if(erro) erro.hidden = false;
-          A.ev('oferta_vsl', {estado:'dominio_fora'}, true);
-          vslOfertaRevelar('dominio_fora');
-        });
+    } else if(ifr.getAttribute('src')) {
+      vslOfertaCarregou = true;
+      if(!ifr.dataset.src) ifr.dataset.src = ifr.getAttribute('src');
     }
 
     vslOfertaRelogios.forEach(clearTimeout);
+    const tempoRestanteTeto = Math.max(5000, VSL_OFERTA.teto - (vslTempoReproducao * 1000));
     vslOfertaRelogios = [
       /* saida 1: o player nem ficou de pe */
       setTimeout(() => {
@@ -1522,23 +1768,27 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         A.ev('oferta_vsl', {estado:'sem_player'}, true);
         vslOfertaRevelar('sem_player');
       }, VSL_OFERTA.esperaCarregar),
-      /* saida 2: o teto. Se a pessoa demorou a dar play, a oferta aparece
-         antes do pitch - que e o estado final desejado de qualquer forma, e
-         incomparavelmente melhor do que nao aparecer. */
-      setTimeout(() => vslOfertaRevelar('teto'), VSL_OFERTA.teto),
+      /* saida 2: o teto de 240s (4 minutos). Se o usuario demorar ou nao der play, a oferta aparece */
+      setTimeout(() => vslOfertaRevelar('teto'), tempoRestanteTeto),
     ];
   }
 
+  function vslOfertaPausar(){
+    const ifr = document.getElementById('ofertaVsl') || document.querySelector('iframe[src*="turb"]');
+    if(ifr && ifr.contentWindow){
+      try{
+        ifr.contentWindow.postMessage({ type: 'VTURB_COMMAND', action: 'pause' }, '*');
+      }catch(e){}
+    }
+  }
+
   function vslOfertaDesmontar(){
-    /* nao da para chamar pause() num iframe, entao o src e limpo: perde a
-       posicao, e e melhor que audio tocando por cima de outra tela */
+    /* ao sair da tela, pausa o video via postMessage para nao tocar audio por cima,
+       mas mantem o iframe montado e com src para nao piscar em branco nem reiniciar */
+    vslOfertaPararTicker();
     vslOfertaRelogios.forEach(clearTimeout);
     vslOfertaRelogios = [];
-    const ifr = document.getElementById('ofertaVsl');
-    if(ifr && ifr.getAttribute('src')){
-      ifr.removeAttribute('src');
-      vslOfertaCarregou = false;
-    }
+    vslOfertaPausar();
   }
 
   /* saida 3, a principal: o proprio video avisa que chegou no pitch */
@@ -1547,8 +1797,11 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     /* a origem e conferida porque este ouvinte aceita mensagem de qualquer
        janela. Um acerto errado aqui nao derruba o funil: as duas saidas de
        tempo continuam de pe. */
-    if(e.origin !== VSL_OFERTA.origem) return;
+    if(e.origin !== VSL_OFERTA.origem && (!e.origin || e.origin.indexOf('turb-front') === -1)) return;
 
+    if(e.data.type === 'VTURB_PLAY_STATE'){
+      window.vslOfertaNotificarPlayState(Boolean(e.data.isPlaying));
+    }
     if(e.data.type === 'VTURB_PITCH_REACHED'){
       vslOfertaRevelar('pitch');
     }
@@ -1556,6 +1809,15 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       A.ev('oferta_vsl', {estado:'marco', marco:String(e.data.eventName).slice(0,40)});
       if(typeof window.fbq === 'function'){
         try{ window.fbq('trackCustom', e.data.eventName, {video_id: e.data.videoId}); }catch(err){}
+      }
+      if(e.data.eventName === 'PitchReached' || e.data.trigger === 'pitch'){
+        vslOfertaRevelar('pitch');
+      }
+      if(e.data.eventName === 'ViewContent_75' || e.data.trigger === 'percent_75'){
+        window.vslOfertaCalibrarProgresso(210);
+      }
+      if(e.data.eventName === 'ViewContent_100' || e.data.trigger === 'percent_100'){
+        vslOfertaRevelar('fim_video');
       }
     }
   });
@@ -1682,13 +1944,18 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   });
 
   document.addEventListener('visibilitychange', () => {
-    if(document.hidden){ vslOfertaDesmontar(); pulsoParar(); return; }
-    /* voltou para a aba: se ela ainda esta na oferta e o pitch ja passou, o
-       rodizio precisa religar. Sem isto, uma troca de aba matava o pulso
-       ate o fim da sessao. */
     const naOferta = scr[i] && scr[i].getAttribute('data-s') === '10';
-    const revelado = document.getElementById('oferta-pitch');
-    if(naOferta && revelado && revelado.classList.contains('revelado')) pulsoIniciar();
+    if(document.hidden){
+      if(naOferta) vslOfertaPausar();
+      pulsoParar();
+      return;
+    }
+    /* voltou para a aba: se estiver na oferta, garante o player montado e religa o pulso se ja revelado */
+    if(naOferta){
+      vslOfertaMontar();
+      const revelado = document.getElementById('oferta-pitch');
+      if(revelado && revelado.classList.contains('revelado')) pulsoIniciar();
+    }
   });
 
   atualizarBtnWhatsApp(i);
@@ -2313,7 +2580,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     conta:  '223abe8e-2d2e-49cd-918d-557c6d31f4f3',
     player: '6aae980148ba928c1d0d6efb',
     fonte:  '6aae97f09446f4c41ce4eb52',
-    segundos: 20,        /* quando o botao pode aparecer */
+    segundos: 18,        /* quando o botao pode aparecer (18 segundos) */
     esperaMontar: 2500,  /* sem NADA desenhado ate aqui, a bussola volta */
     esperaPlayer: 9000,  /* sem video ate aqui, seguimos sem ele */
     travaMs: 6000,       /* relogio do video parado por tanto tempo = travou */
@@ -2497,7 +2764,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
       if(tempo > ultimoTempo + 0.05){ ultimoTempo = tempo; ultimoAvanco = Date.now(); }
 
-      /* Duas formas de nao chegar aos vinte segundos, e as duas tem saida.
+      /* Duas formas de nao chegar aos dezoito segundos, e as duas tem saida.
 
          A pessoa pode pausar de proposito. E o video pode simplesmente
          travar: num dos testes o relogio andou 9 segundos em 21 por engasgo
@@ -2506,7 +2773,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
          provam que nao vale mais esperar. */
       const travou = (Date.now() - ultimoAvanco) > VSL.travaMs;
       const fim = v.duration ? (tempo >= Number(v.duration) - 0.4) : false;
-      const chegou = v.ended === true || fim || tempo >= VSL.segundos;
+      const chegou = v.ended === true || fim || tempo >= VSL.segundos || decorrido >= (VSL.segundos * 1000);
       if(chegou || travou || decorrido > VSL.tetoEspera){
         clearInterval(vslRelogio);
         vslEstado = 'fim';

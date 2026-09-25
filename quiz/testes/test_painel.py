@@ -2135,3 +2135,201 @@ class NotaDaCarta(unittest.TestCase):
                 d3 = json.loads((dir_leituras / f"{lid2}.json").read_text(encoding="utf-8"))
                 self.assertTrue(d3["feedback_pulou"])
                 self.assertNotIn("feedback_estrelas", d3)
+
+
+class TestFeedbackNoPainel(unittest.TestCase):
+    """Testes da métrica de avaliação da leitura no Painel Admin (Tabela, Filtros, Detalhes e Exportação)."""
+
+    def setUp(self):
+        from main import app
+        self.c = TestClient(app)
+
+    def test_formatador_badge_avaliacao(self):
+        from api.painel import _formatar_badge_avaliacao
+        # Estrelas válidas
+        b5 = _formatar_badge_avaliacao(5)
+        self.assertIn("★★★★★", b5)
+        self.assertIn("(5/5)", b5)
+        b4 = _formatar_badge_avaliacao(4)
+        self.assertIn("★★★★☆", b4)
+        self.assertIn("(4/5)", b4)
+        b3 = _formatar_badge_avaliacao(3)
+        self.assertIn("★★★☆☆", b3)
+        self.assertIn("(3/5)", b3)
+        b1 = _formatar_badge_avaliacao(1)
+        self.assertIn("★☆☆☆☆", b1)
+        self.assertIn("(1/5)", b1)
+        # Pulo
+        self.assertIn("Pulou", _formatar_badge_avaliacao(None, pulou=True))
+        # Sem avaliação / inválido
+        b_nenhum = _formatar_badge_avaliacao(None, pulou=False)
+        self.assertIn("tag-avaliacao pendente", b_nenhum)
+        self.assertIn("—", b_nenhum)
+        b_inv = _formatar_badge_avaliacao(99, pulou=False)
+        self.assertIn("tag-avaliacao pendente", b_inv)
+        self.assertIn("—", b_inv)
+
+    def test_elementos_frontend_feedback(self):
+        from api.painel import ESTILO, JS_PAINEL
+        self.assertIn(".tag-avaliacao", ESTILO)
+        self.assertIn(".btn-filtro-leituras.avaliados", ESTILO)
+        self.assertIn('msg.tipo === "feedback"', JS_PAINEL)
+        self.assertIn('filtro === "avaliados"', JS_PAINEL)
+
+    def test_painel_e_leituras_exibem_avaliacao_e_kpi(self):
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            leituras = [
+                (f"{hoje_pfx}-100000-00000001", "Maria Estrela", "11988880001", 5, False),
+                (f"{hoje_pfx}-110000-00000002", "Pedro Pulo", "11988880002", None, True),
+                (f"{hoje_pfx}-120000-00000003", "Lucas Neutro", "11988880003", None, False),
+            ]
+            for lid, nome, wa, est, pul in leituras:
+                dados = {
+                    "nome_completo": nome,
+                    "whatsapp": wa,
+                    "cidade": {"nome": "São Paulo", "uf": "SP"},
+                    "nascimento": {"dia": 1, "mes": 1, "ano": 1995},
+                    "checkout": False,
+                }
+                if est is not None:
+                    dados["feedback_estrelas"] = est
+                if pul:
+                    dados["feedback_pulou"] = True
+                (dir_leituras / f"{lid}.json").write_text(json.dumps(dados), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Página principal do /painel
+                r_painel = self.c.get("/painel", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_painel.status_code, 200)
+                html_p = r_painel.text
+                self.assertIn("avaliação da carta", html_p.lower())
+                self.assertIn("Avaliação", html_p)
+                self.assertIn("★★★★★", html_p)
+                self.assertIn("(5/5)", html_p)
+                self.assertIn("Pulou", html_p)
+                self.assertIn("Maria Estrela", html_p)
+                self.assertIn("Pedro Pulo", html_p)
+                self.assertIn("Lucas Neutro", html_p)
+
+                # 2. Fragmento /painel/leituras
+                r_leit = self.c.get("/painel/leituras", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_leit.status_code, 200)
+                html_l = r_leit.text
+                self.assertIn('data-avaliado="1"', html_l)
+                self.assertIn('data-avaliado="0"', html_l)
+
+    def test_filtro_so_avaliados_painel_e_csv(self):
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            leituras = [
+                (f"{hoje_pfx}-100000-00000001", "Maria Estrela", "11988880001", 5, False),
+                (f"{hoje_pfx}-110000-00000002", "Pedro Pulo", "11988880002", None, True),
+                (f"{hoje_pfx}-120000-00000003", "Lucas Neutro", "11988880003", None, False),
+            ]
+            for lid, nome, wa, est, pul in leituras:
+                dados = {
+                    "nome_completo": nome,
+                    "whatsapp": wa,
+                    "cidade": {"nome": "São Paulo", "uf": "SP"},
+                    "nascimento": {"dia": 1, "mes": 1, "ano": 1995},
+                    "checkout": False,
+                }
+                if est is not None:
+                    dados["feedback_estrelas"] = est
+                if pul:
+                    dados["feedback_pulou"] = True
+                (dir_leituras / f"{lid}.json").write_text(json.dumps(dados), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # Fragmento filtrado
+                r_filt = self.c.get("/painel/leituras?so_avaliados=1", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_filt.status_code, 200)
+                html_f = r_filt.text
+                self.assertIn("Maria Estrela", html_f)
+                self.assertIn("Pedro Pulo", html_f)
+                self.assertNotIn("Lucas Neutro", html_f)
+
+                # Exportar CSV geral
+                r_csv = self.c.get("/painel/exportar-csv", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_csv.status_code, 200)
+                csv_txt = r_csv.text
+                self.assertIn("Avaliação da Leitura", csv_txt)
+                self.assertIn("5/5", csv_txt)
+                self.assertIn("Pulou", csv_txt)
+
+                # Exportar CSV filtrado por avaliados
+                r_csv_f = self.c.get("/painel/exportar-csv?so_avaliados=1", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_csv_f.status_code, 200)
+                csv_f_txt = r_csv_f.text
+                self.assertIn("Maria Estrela", csv_f_txt)
+                self.assertIn("Pedro Pulo", csv_f_txt)
+                self.assertNotIn("Lucas Neutro", csv_f_txt)
+
+    def test_detalhe_leitura_exibe_card_avaliacao(self):
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        lid_com = f"{hoje_pfx}-100000-00000001"
+        lid_sem = f"{hoje_pfx}-200000-00000002"
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            (dir_leituras / f"{lid_com}.json").write_text(json.dumps({
+                "nome_completo": "Cliente Avaliador",
+                "feedback_estrelas": 5,
+                "nascimento": {"dia": 1, "mes": 1, "ano": 1990},
+                "carta": {"selo": "Selo Teste", "titulo": "Titulo Teste"}
+            }), encoding="utf-8")
+            (dir_leituras / f"{lid_sem}.json").write_text(json.dumps({
+                "nome_completo": "Cliente Silencioso",
+                "nascimento": {"dia": 1, "mes": 1, "ano": 1990},
+                "carta": {"selo": "Selo Teste", "titulo": "Titulo Teste"}
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # Com feedback
+                r1 = self.c.get(f"/painel/leitura/{lid_com}", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r1.status_code, 200)
+                self.assertIn("Avaliação do Usuário", r1.text)
+                self.assertIn("★★★★★", r1.text)
+                self.assertIn("(5/5)", r1.text)
+
+                # Sem feedback
+                r2 = self.c.get(f"/painel/leitura/{lid_sem}", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r2.status_code, 200)
+                self.assertNotIn("Avaliação do Usuário", r2.text)
+                self.assertIn("avaliação:", r2.text)
+                self.assertIn("tag-avaliacao pendente", r2.text)
+
+    def test_api_evento_feedback_anexa_e_notifica(self):
+        from servicos.tempo_real import rastreador_presenca
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        lid = f"{hoje_pfx}-100000-00000001"
+        sid = "sid-teste-feedback-1234"
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            (dir_leituras / f"{lid}.json").write_text(json.dumps({
+                "nome_completo": "Cliente Via Evento",
+                "nascimento": {"dia": 1, "mes": 1, "ano": 1990}
+            }), encoding="utf-8")
+
+            rastreador_presenca.registrar_atividade(sid=sid, leitura_id=lid, tela=7)
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # Envio do evento feedback com estrelas
+                lote = {
+                    "sid": sid,
+                    "aid": "aid-1234",
+                    "eventos": [
+                        {"seq": 1, "evt": "feedback", "props": {"estrelas": 5}}
+                    ]
+                }
+                r = self.c.post("/api/evento", json=lote)
+                self.assertEqual(r.status_code, 204)
+
+                # Verifica se salvou no arquivo JSON
+                salvo = json.loads((dir_leituras / f"{lid}.json").read_text(encoding="utf-8"))
+                self.assertEqual(salvo.get("feedback_estrelas"), 5)
+                self.assertIn("feedback_em", salvo)

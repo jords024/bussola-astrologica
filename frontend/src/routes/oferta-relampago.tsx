@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { fbqTrack, fbqTrackCustom, trackPageView } from "../lib/fbq";
 import heroAsset from "../assets/bussola-hero.png.asset.json";
@@ -25,11 +25,11 @@ import WhatsappButton from "../components/bussola/whatsapp-button";
 // CONFIGURACOES DA OFERTA RELAMPAGO
 // Voce pode alterar o valor, parcelamento e link de checkout aqui:
 // =========================================================================
-export const PRECO_A_VISTA = "R$37";
-export const PRECO_PARCELADO = "12x de R$3,83";
+export const PRECO_A_VISTA = "R$47";
+export const PRECO_PARCELADO = "12x de R$4,86";
 
 export const HOTMART_CHECKOUT_URL =
-  "https://pay.hotmart.com/Q107238351O?off=tem8qshd&checkoutMode=10";
+  "https://pay.hotmart.com/Q107238351O?off=ya381gy5&checkoutMode=10";
 
 export function buildHotmartCheckoutUrl(search?: string): string {
   const url = new URL(HOTMART_CHECKOUT_URL);

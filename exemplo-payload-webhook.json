@@ -1,0 +1,140 @@
+{
+  "event": "PURCHASE_OUT_OF_SHOPPING_CART",
+  "tipo": "leitura_concluida",
+  "origem": "quiz_bussola",
+  "leitura_id": "20260925-115000-a1b2c3d4",
+  "data_hora_brasilia": "25/09/2026, 11:50:00",
+  "nome_completo": "Aryaraj Alves Fernandes",
+  "nome": "Aryaraj Alves Fernandes",
+  "name": "Aryaraj Alves Fernandes",
+  "numero": "+55 (85) 99999-8888",
+  "whatsapp": "+55 (85) 99999-8888",
+  "telefone": "+55 (85) 99999-8888",
+  "phone": "5585999998888",
+  "nascimento": {
+    "ano": 1995,
+    "mes": 5,
+    "dia": 20,
+    "hora": 14,
+    "minuto": 30,
+    "precisao": "exata",
+    "periodo": null,
+    "is_dst": null
+  },
+  "cidade": {
+    "nome": "São Paulo",
+    "uf": "SP",
+    "pais": "Brasil",
+    "cc": "BR",
+    "lat": -23.5505,
+    "lng": -46.6333,
+    "tz": "America/Sao_Paulo"
+  },
+  "quiz": {
+    "area": "dinheiro",
+    "espelho": "Insegurança ao cobrar",
+    "espelho_idx": 2,
+    "quebra": "sim"
+  },
+  "mensagem": "Olá, Aryaraj! Aqui está a sua leitura da Bússola Astrológica:\n\n✦ SATURNO EM ÁRIES, RETRÓGRADO · TRÍGONO COM LUA NATAL · ORBE 0.8° · SEPARANDO\n\n*A SOLIDÃO VOLTOU A MISTURAR ESCOLHA COM MEDO.*\n\n_A solidão pode estar protegendo uma escolha que você ainda não examinou._\n\n✦ CASA 12 · A SUA PORTA ABERTA AGORA\nSaturno em trânsito pela Casa 12\n\n*Seu tempo a sós está mais forte e produtivo agora.*\n\nUma aproximação aparece, você recua antes de tentar e depois fica sem saber se escolheu ou se se protegeu.\n\nA decisão de ficar só volta à mesa, com tempo para separar proteção de vontade.\n\n• Aproveite momentos de introspecção para reorganizar suas prioridades financeiras\n• Evite isolar-se completamente das conversas de trabalho\n\n⚠️ Cuidado para não transformar prudência em paralisia.\n\n⏳ até por volta de novembro",
+  "message": "Olá, Aryaraj! Aqui está a sua leitura da Bússola Astrológica:\n\n✦ SATURNO EM ÁRIES, RETRÓGRADO · TRÍGONO COM LUA NATAL · ORBE 0.8° · SEPARANDO\n\n*A SOLIDÃO VOLTOU A MISTURAR ESCOLHA COM MEDO.*\n\n_A solidão pode estar protegendo uma escolha que você ainda não examinou._\n\n✦ CASA 12 · A SUA PORTA ABERTA AGORA\nSaturno em trânsito pela Casa 12\n\n*Seu tempo a sós está mais forte e produtivo agora.*\n\nUma aproximação aparece, você recua antes de tentar e depois fica sem saber se escolheu ou se se protegeu.\n\nA decisão de ficar só volta à mesa, com tempo para separar proteção de vontade.\n\n• Aproveite momentos de introspecção para reorganizar suas prioridades financeiras\n• Evite isolar-se completamente das conversas de trabalho\n\n⚠️ Cuidado para não transformar prudência em paralisia.\n\n⏳ até por volta de novembro",
+  "texto": "Olá, Aryaraj! Aqui está a sua leitura da Bússola Astrológica:\n\n✦ SATURNO EM ÁRIES, RETRÓGRADO · TRÍGONO COM LUA NATAL · ORBE 0.8° · SEPARANDO\n\n*A SOLIDÃO VOLTOU A MISTURAR ESCOLHA COM MEDO.*\n\n_A solidão pode estar protegendo uma escolha que você ainda não examinou._\n\n✦ CASA 12 · A SUA PORTA ABERTA AGORA\nSaturno em trânsito pela Casa 12\n\n*Seu tempo a sós está mais forte e produtivo agora.*\n\nUma aproximação aparece, você recua antes de tentar e depois fica sem saber se escolheu ou se se protegeu.\n\nA decisão de ficar só volta à mesa, com tempo para separar proteção de vontade.\n\n• Aproveite momentos de introspecção para reorganizar suas prioridades financeiras\n• Evite isolar-se completamente das conversas de trabalho\n\n⚠️ Cuidado para não transformar prudência em paralisia.\n\n⏳ até por volta de novembro",
+  "carta": {
+    "titulo": "A solidão voltou a misturar escolha com medo.",
+    "direcao": "A solidão voltou a misturar escolha com medo.",
+    "destaque": "A solidão pode estar protegendo uma escolha que você ainda não examinou.",
+    "selo": "Saturno em Áries · Trígono Lua Natal",
+    "saudacao": "Aryaraj,",
+    "identificacao": {
+      "selo": "SATURNO EM ÁRIES, RETRÓGRADO · TRÍGONO COM LUA NATAL",
+      "abertura": "A solidão voltou a misturar escolha com medo.",
+      "paragrafos": [
+        "Uma aproximação aparece, você recua antes de tentar e depois fica sem saber se escolheu ou se se protegeu."
+      ]
+    },
+    "porta": {
+      "selo": "CASA 12 · A SUA PORTA ABERTA AGORA",
+      "abertura": "Seu tempo a sós está mais forte e produtivo agora.",
+      "paragrafos": [
+        "A decisão de ficar só volta à mesa, com tempo para separar proteção de vontade."
+      ],
+      "aproveitar": [
+        "Aproveite momentos de introspecção para reorganizar suas prioridades financeiras",
+        "Evite isolar-se completamente das conversas de trabalho"
+      ],
+      "cuidado": "Cuidado para não transformar prudência em paralisia."
+    },
+    "paragrafos": [
+      "A solidão voltou a misturar escolha com medo.",
+      "Uma aproximação aparece, você recua antes de tentar e depois fica sem saber se escolheu ou se se protegeu.",
+      "Seu tempo a sós está mais forte e produtivo agora.",
+      "A decisão de ficar só volta à mesa, com tempo para separar proteção de vontade.",
+      "Aproveite momentos de introspecção para reorganizar suas prioridades financeiras Evite isolar-se completamente das conversas de trabalho",
+      "Cuidado para não transformar prudência em paralisia."
+    ],
+    "espera": "O que pede espera: agir por impulso.",
+    "janela": "até por volta de novembro",
+    "assinatura": "Crassus Gobbi",
+    "ressalva": null
+  },
+  "data": {
+    "product": {
+      "name": "Bússola Astrológica"
+    },
+    "buyer": {
+      "name": "Aryaraj Alves Fernandes",
+      "phone": "+55 (85) 99999-8888",
+      "checkout_phone": "5585999998888"
+    },
+    "purchase": {
+      "order_date": 1790347800000,
+      "order_date_brasilia": "25/09/2026, 11:50:00"
+    },
+    "reading": {
+      "leitura_id": "20260925-115000-a1b2c3d4",
+      "mensagem": "Olá, Aryaraj! Aqui está a sua leitura da Bússola Astrológica:\n\n✦ SATURNO EM ÁRIES...",
+      "titulo": "A solidão voltou a misturar escolha com medo.",
+      "destaque": "A solidão pode estar protegendo uma escolha que você ainda não examinou.",
+      "casa_aberta": 12,
+      "area": "dinheiro",
+      "nascimento": {
+        "ano": 1995,
+        "mes": 5,
+        "dia": 20,
+        "hora": 14,
+        "minuto": 30
+      },
+      "cidade": {
+        "nome": "São Paulo",
+        "uf": "SP"
+      },
+      "quiz": {
+        "area": "dinheiro",
+        "espelho": "Insegurança ao cobrar",
+        "quebra": "sim"
+      }
+    },
+    "custom_fields": {
+      "nome_completo": "Aryaraj Alves Fernandes",
+      "numero": "+55 (85) 99999-8888",
+      "mensagem": "Olá, Aryaraj! Aqui está a sua leitura da Bússola Astrológica:\n\n✦ SATURNO EM ÁRIES...",
+      "leitura_id": "20260925-115000-a1b2c3d4",
+      "nascimento": {
+        "ano": 1995,
+        "mes": 5,
+        "dia": 20,
+        "hora": 14,
+        "minuto": 30
+      },
+      "cidade": {
+        "nome": "São Paulo",
+        "uf": "SP"
+      },
+      "quiz": {
+        "area": "dinheiro",
+        "espelho": "Insegurança ao cobrar",
+        "quebra": "sim"
+      }
+    }
+  }
+}

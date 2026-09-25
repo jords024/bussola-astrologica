@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import json
 import unittest
 from unittest.mock import MagicMock, patch
@@ -35,17 +35,25 @@ class TestWebhook(unittest.TestCase):
 
     @patch("urllib.request.urlopen")
     def test_disparar_webhook_sucesso(self, mock_urlopen):
-        # Simula resposta 200 do ZapVoice
+        # Simula resposta 200 do ZapVoice / automação
         mock_resp = MagicMock()
         mock_resp.getcode.return_value = 200
         mock_resp.read.return_value = b'{"status":"success","history_id":999}'
         mock_urlopen.return_value.__enter__.return_value = mock_resp
 
+        meta_exemplo = {
+            "nascimento": {"ano": 1995, "mes": 5, "dia": 20, "hora": 14, "minuto": 30},
+            "cidade": {"nome": "São Paulo", "uf": "SP"},
+            "quiz": {"area": "dinheiro", "espelho": "Insegurança", "quebra": "sim"},
+            "casa_aberta": 12,
+        }
+
         ok = disparar_webhook_leitura(
             nome_completo="Aryaraj Alves Fernandes",
             whatsapp="+55 (85) 99999-8888",
             carta=self.carta_exemplo,
-            leitura_id="leitura-teste-001"
+            leitura_id="leitura-teste-001",
+            meta=meta_exemplo,
         )
         self.assertTrue(ok)
 
@@ -59,9 +67,20 @@ class TestWebhook(unittest.TestCase):
         self.assertEqual(dados_enviados["numero"], "+55 (85) 99999-8888")
         self.assertEqual(dados_enviados["phone"], "5585999998888")
         self.assertIn("VER O PADRÃO", dados_enviados["mensagem"])
+        # Validação do envio conjunto de nascimento, cidade e quiz
+        self.assertEqual(dados_enviados["nascimento"]["ano"], 1995)
+        self.assertEqual(dados_enviados["cidade"]["nome"], "São Paulo")
+        self.assertEqual(dados_enviados["quiz"]["area"], "dinheiro")
         self.assertEqual(dados_enviados["data"]["buyer"]["name"], "Aryaraj Alves Fernandes")
         self.assertEqual(dados_enviados["data"]["buyer"]["phone"], "+55 (85) 99999-8888")
         self.assertEqual(dados_enviados["data"]["custom_fields"]["mensagem"], dados_enviados["mensagem"])
+        self.assertEqual(dados_enviados["data"]["custom_fields"]["nascimento"]["ano"], 1995)
+        self.assertEqual(dados_enviados["data"]["custom_fields"]["cidade"]["uf"], "SP")
+
+    def test_webhook_leitura_url_configurada(self):
+        import config
+        self.assertTrue(hasattr(config, "WEBHOOK_LEITURA_URL"))
+        self.assertTrue(len(config.WEBHOOK_LEITURA_URL) > 0)
 
     @patch("urllib.request.urlopen")
     def test_disparar_webhook_falha_resiliente(self, mock_urlopen):

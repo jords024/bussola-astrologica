@@ -38,10 +38,14 @@ EVENTOS_RETENCAO_DIAS = int(os.environ.get("EVENTOS_RETENCAO_DIAS", "180"))
 LEITURAS_RETENCAO_DIAS = int(os.environ.get("LEITURAS_RETENCAO_DIAS", "180"))
 
 # ---- webhook ----
-WEBHOOK_HOTMART_URL = os.environ.get(
-    "WEBHOOK_HOTMART_URL",
-    "https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart",
+WEBHOOK_LEITURA_URL = os.environ.get(
+    "WEBHOOK_LEITURA_URL",
+    os.environ.get(
+        "WEBHOOK_HOTMART_URL",
+        "https://zapvoicecrassos.aryaraj.shop/api/webhooks/bussula-hotmart",
+    ),
 ).strip()
+WEBHOOK_HOTMART_URL = WEBHOOK_LEITURA_URL
 
 # ---- caminhos ----
 # O projeto vive dentro do OneDrive. Pasta sincronizada trava arquivo durante a

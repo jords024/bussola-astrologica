@@ -13,7 +13,7 @@ O ecossistema da **Bússola Astrológica** é composto por duas aplicações int
 2. **Landing Pages & Vendas (`frontend/`)**:
    - Desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**.
    - **Página Principal da Bússola (`/bussola` e `/`)**: Apresentação das 12 casas (as 12 portas da vida), narrativa astrológica imersiva, animações em Framer Motion/GSAP e checkout integrado.
-   - **Página de Oferta Relâmpago (`/oferta-relampago`)**: Página de alta conversão para remarketing com **cronômetro regressivo dinâmico** (`TimerOferta`), ancoragem de preço flexível (ex: R$37 à vista ou 12x de R$3,83), destaque para bônus exclusivos e botão flutuante de suporte via WhatsApp.
+   - **Página de Oferta Relâmpago (`/oferta-relampago`)**: Página de alta conversão para remarketing com **cronômetro regressivo dinâmico** (`TimerOferta`), ancoragem de preço flexível (ex: R$47 à vista ou 12x de R$4,86), destaque para bônus exclusivos e botão flutuante de suporte via WhatsApp.
    - **Painel Administrativo (`/admin`)**: Gestão de leads capturados, autenticação JWT (`jose`/`bcryptjs`) e integração com PostgreSQL.
 
 ---

@@ -55,14 +55,6 @@ async def receber(request: Request) -> Response:
                 if lid and (tela is not None or checkout is not None):
                     await asyncio.to_thread(registro.atualizar_progresso, lid, tela, checkout)
 
-                # a nota da carta anda pelo mesmo cano do resto: o painel a le
-                # do arquivo de eventos, e aqui ela e copiada para o lado da
-                # carta que a gerou
-                if lid and evt == "feedback":
-                    await asyncio.to_thread(
-                        registro.anexar_feedback, lid,
-                        props.get("estrelas"), bool(props.get("pulou")))
-
                 sessao_atual = rastreador_presenca.registrar_atividade(
                     sid=sid,
                     aid=aid,
@@ -71,6 +63,23 @@ async def receber(request: Request) -> Response:
                     checkout=checkout,
                     oculto=oculto
                 )
+
+                # a nota da carta anda pelo mesmo cano do resto: o painel a le
+                # do arquivo de eventos, e aqui ela e copiada para o lado da
+                # carta que a gerou
+                if evt == "feedback":
+                    leitura_id_fb = lid or sessao_atual.get("leitura_id")
+                    if leitura_id_fb:
+                        await asyncio.to_thread(
+                            registro.anexar_feedback, leitura_id_fb,
+                            props.get("estrelas"), bool(props.get("pulou")))
+                    ws_manager.broadcast_sync({
+                        "tipo": "feedback",
+                        "leitura_id": leitura_id_fb,
+                        "sid": sid,
+                        "estrelas": props.get("estrelas"),
+                        "pulou": bool(props.get("pulou")),
+                    })
 
                 if evt in ("tela", "oferta_clique", "ping", "visibilidade"):
                     ws_manager.broadcast_sync({

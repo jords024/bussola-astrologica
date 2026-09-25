@@ -3,7 +3,7 @@ services:
   # Serviço da Aplicação Web (Landing Page & Painel Astrowake / Bússola)
   # ============================================================================
   landing_crassus:
-    image: aryalvesfernandes/landing-crassus:1.2.7
+    image: aryalvesfernandes/landing-crassus:1.2.8
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     
     networks:
@@ -88,6 +88,9 @@ services:
       # Política de retenção de dados (dias)
       - EVENTOS_RETENCAO_DIAS=180
       - LEITURAS_RETENCAO_DIAS=180
+
+      # Webhook para envio dos dados do lead e da leitura
+      - WEBHOOK_LEITURA_URL=https://api.aryaraj.shop/api/webhooks/bussola-quiz-mensagem
 
     deploy:
       mode: replicated

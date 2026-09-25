@@ -509,6 +509,12 @@ a{color:var(--amber)}
 .select-filtro-uf{background:#1B1815;border:1px solid rgba(229,169,60,.3);color:var(--sand);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;outline:none;transition:all .15s ease}
 .select-filtro-uf:hover,.select-filtro-uf:focus{border-color:var(--amber);color:#FFF;box-shadow:0 0 8px rgba(229,169,60,.25)}
 .select-filtro-uf option{background:#1B1815;color:var(--sand);padding:4px}
+.btn-filtro-leituras.avaliados:hover{border-color:var(--amber);color:var(--amber);background:rgba(229,169,60,.08)}
+.btn-filtro-leituras.avaliados.on{border-color:var(--amber);background:rgba(229,169,60,.18);color:var(--amber);font-weight:700}
+.btn-filtro-leituras.avaliados.on .badge-count{background:rgba(229,169,60,.25);color:var(--amber)}
+.tag-avaliacao{display:inline-flex;align-items:center;gap:3px;font-size:12.5px;letter-spacing:.5px;}
+.tag-avaliacao.pulou{font-style:italic;opacity:.65;font-size:11.5px;}
+.tag-avaliacao.pendente{opacity:.35;font-size:12px;}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
@@ -655,6 +661,8 @@ function filtrarTabelaClient(filtro, btn, evt){
         mostrarModo = comprou;
       } else if(filtro === "whatsapp"){
         mostrarModo = wa;
+      } else if(filtro === "avaliados"){
+        mostrarModo = r.getAttribute("data-avaliado") === "1";
       }
       var mostrarUF = (!ufNorm || rowUF === ufNorm);
       var mostrar = mostrarModo && mostrarUF;
@@ -677,6 +685,7 @@ function filtrarTabelaClient(filtro, btn, evt){
       else if(filtro === "ao_vivo") tipo = "pessoas ativas navegando agora";
       else if(filtro === "comprou") tipo = "pessoas que compraram o produto";
       else if(filtro === "whatsapp") tipo = "pessoas que deixaram WhatsApp";
+      else if(filtro === "avaliados") tipo = "pessoas que avaliaram a leitura";
       var ufTxt = (selUF && selUF.value) ? (" (UF: " + selUF.value + ")") : "";
       sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + ufTxt + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
     }
@@ -734,6 +743,7 @@ function filtrarPorUFClient(ufValor){
     else if(modo === "ao_vivo") atendeModo = vivo;
     else if(modo === "comprou") atendeModo = comprou;
     else if(modo === "whatsapp") atendeModo = wa;
+    else if(modo === "avaliados") atendeModo = r.getAttribute("data-avaliado") === "1";
 
     var atendeUF = (!ufNorm || rowUF === ufNorm);
     var mostrar = atendeModo && atendeUF;
@@ -1052,11 +1062,13 @@ function exportarTodosViaServidor(){
     else if(modo === "ao_vivo") exportUrl.searchParams.set("so_ao_vivo", "1");
     else if(modo === "comprou") exportUrl.searchParams.set("so_comprou", "1");
     else if(modo === "whatsapp") exportUrl.searchParams.set("so_whatsapp", "1");
+    else if(modo === "avaliados") exportUrl.searchParams.set("so_avaliados", "1");
     else if(modo === "todos"){
       exportUrl.searchParams.delete("so_checkout");
       exportUrl.searchParams.delete("so_ao_vivo");
       exportUrl.searchParams.delete("so_comprou");
       exportUrl.searchParams.delete("so_whatsapp");
+      exportUrl.searchParams.delete("so_avaliados");
     }
   }
 
@@ -1112,6 +1124,7 @@ function exportarContatosCSV(){
     "Preencheu Dados (BSB)",
     "Etapa Alcançada",
     "Fez Checkout",
+    "Avaliação da Leitura",
     "Comprou",
     "Nome Completo",
     "WhatsApp",
@@ -1143,6 +1156,7 @@ function exportarContatosCSV(){
       esc(d.gravado_em_bsb || "—"),
       esc(d.etapa || "—"),
       esc(d.checkout || "NÃO"),
+      esc(d.avaliacao || "—"),
       esc(d.comprou || "NÃO"),
       esc(d.nome || "—"),
       esc(d.whatsapp || "—"),
@@ -1728,6 +1742,38 @@ function processarMensagemTempoReal(msg){
     return;
   }
 
+  if(msg.tipo === "feedback"){
+    var lid = msg.leitura_id;
+    if(lid){
+      var tagAv = document.getElementById("tag-avaliacao-" + lid);
+      if(tagAv){
+        if(msg.estrelas){
+          var n = parseInt(msg.estrelas, 10);
+          var estrelasStr = "★".repeat(n) + "☆".repeat(5 - n);
+          var cor = n >= 4 ? "var(--amber)" : (n === 3 ? "#f59e0b" : "#ef4444");
+          tagAv.innerHTML = estrelasStr + ' <span style="font-size:11.5px;opacity:0.85;">(' + n + '/5)</span>';
+          tagAv.style.color = cor;
+          tagAv.className = "tag-avaliacao";
+          tagAv.title = n + " de 5 estrelas";
+        }else if(msg.pulou){
+          tagAv.textContent = "Pulou";
+          tagAv.style.color = "var(--sand3)";
+          tagAv.className = "tag-avaliacao pulou";
+          tagAv.title = "Usuário pulou a avaliação";
+        }
+      }
+      var row = document.getElementById("row-pessoa-" + lid) || document.getElementById("row-leitura-" + lid);
+      if(row){
+        row.setAttribute("data-avaliado", "1");
+        flashElemento(row);
+      }
+      if(window._contatosExportacao && window._contatosExportacao[lid]){
+        window._contatosExportacao[lid].avaliacao = msg.estrelas ? (msg.estrelas + "/5") : (msg.pulou ? "Pulou" : "—");
+      }
+    }
+    return;
+  }
+
   var bVivo = document.getElementById("badge-count-vivo");
   if(bVivo && msg.total_ao_vivo !== undefined){
     bVivo.textContent = msg.total_ao_vivo;
@@ -2249,6 +2295,21 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
                     nome_consolidado = n_alt
                     break
 
+        # Feedback consolidado
+        fb_estrelas = d_principal.get("feedback_estrelas")
+        fb_pulou = bool(d_principal.get("feedback_pulou"))
+        fb_em = d_principal.get("feedback_em")
+        if fb_estrelas is None and not fb_pulou:
+            for s in stems_ordenados[1:]:
+                sub_d = mapa_dados[s]
+                if sub_d.get("feedback_estrelas") is not None:
+                    fb_estrelas = sub_d.get("feedback_estrelas")
+                    fb_em = sub_d.get("feedback_em")
+                    break
+                if sub_d.get("feedback_pulou"):
+                    fb_pulou = True
+                    fb_em = sub_d.get("feedback_em")
+
         grupos.append({
             "id_grupo": principal_stem,
             "stem_principal": principal_stem,
@@ -2262,6 +2323,9 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
             "comprou": comprou,
             "max_tela": max_tela,
             "rotulo_etapa": rotulo_etapa,
+            "feedback_estrelas": fb_estrelas,
+            "feedback_pulou": fb_pulou,
+            "feedback_em": fb_em,
             "total_envios": len(stems_ordenados),
             "todos_ids": stems_ordenados,
             "outras_leituras": [(s, mapa_dados[s]) for s in stems_ordenados[1:]],
@@ -2269,6 +2333,28 @@ def _agrupar_leituras_por_pessoa(todos_dados: list[tuple[str, dict]],
 
     grupos.sort(key=lambda g: g["stem_principal"], reverse=True)
     return grupos
+
+
+def _formatar_badge_avaliacao(estrelas: Optional[int], pulou: bool = False, stem: str = "") -> str:
+    """Renderiza a avaliação (1 a 5 estrelas ou pulou) de forma elegante."""
+    if estrelas is not None:
+        try:
+            n = int(estrelas)
+            if 1 <= n <= 5:
+                estrelas_str = "★" * n + "☆" * (5 - n)
+                cor = "var(--amber)" if n >= 4 else ("#f59e0b" if n == 3 else "#ef4444")
+                return (f'<span class="tag-avaliacao" id="tag-avaliacao-{stem}" '
+                        f'style="color:{cor};font-weight:600;white-space:nowrap;" '
+                        f'title="{n} de 5 estrelas">{estrelas_str} '
+                        f'<span style="font-size:11.5px;opacity:0.85;">({n}/5)</span></span>')
+        except (ValueError, TypeError):
+            pass
+    if pulou:
+        return (f'<span class="tag-avaliacao pulou" id="tag-avaliacao-{stem}" '
+                f'style="color:var(--sand3);font-size:12px;opacity:0.65;" '
+                f'title="Usuário pulou a avaliação">Pulou</span>')
+    return (f'<span class="tag-avaliacao pendente" id="tag-avaliacao-{stem}" '
+            f'style="color:var(--sand3);opacity:0.35;" title="Sem avaliação ainda">—</span>')
 
 
 def _contagens_leituras_dados(dados: list[tuple[str, dict]]) -> tuple[dict[str, int], int]:
@@ -2291,13 +2377,14 @@ def _contagens_leituras(arquivos: list[Path]) -> tuple[dict[str, int], int]:
 
 
 class ResultadoTabela(tuple):
-    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0, total_whatsapp=0, lista_ufs=None):
+    def __new__(cls, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0, total_whatsapp=0, total_avaliados=0, lista_ufs=None):
         return super().__new__(cls, (corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral))
 
-    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0, total_whatsapp=0, lista_ufs=None):
+    def __init__(self, corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral, total_ao_vivo=0, total_comprou=0, total_whatsapp=0, total_avaliados=0, lista_ufs=None):
         self.total_ao_vivo = total_ao_vivo
         self.total_comprou = total_comprou
         self.total_whatsapp = total_whatsapp
+        self.total_avaliados = total_avaliados
         self.lista_ufs = lista_ufs or []
 
 
@@ -2306,6 +2393,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                      so_ao_vivo: bool = False,
                      so_comprou: bool = False,
                      so_whatsapp: bool = False,
+                     so_avaliados: bool = False,
                      uf: Optional[str] = None,
                      de: Optional[date] = None,
                      ate: Optional[date] = None) -> ResultadoTabela:
@@ -2364,6 +2452,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
     total_pessoas_ao_vivo = sum(1 for g in todos_grupos if g["ao_vivo"])
     total_pessoas_comprou = sum(1 for g in todos_grupos if g.get("comprou"))
     total_pessoas_whatsapp = sum(1 for g in todos_grupos if g.get("tem_whatsapp"))
+    total_pessoas_avaliados = sum(1 for g in todos_grupos if (g.get("feedback_estrelas") is not None or g.get("feedback_pulou")))
 
     if so_whatsapp:
         grupos_filtrados = [g for g in todos_grupos if g.get("tem_whatsapp")]
@@ -2373,6 +2462,8 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         grupos_filtrados = [g for g in todos_grupos if g["ao_vivo"]]
     elif so_checkout:
         grupos_filtrados = [g for g in todos_grupos if g["teve_checkout"]]
+    elif so_avaliados:
+        grupos_filtrados = [g for g in todos_grupos if (g.get("feedback_estrelas") is not None or g.get("feedback_pulou"))]
     else:
         grupos_filtrados = todos_grupos
 
@@ -2439,9 +2530,14 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         )
         acoes_principal = f'<div style="display:flex;gap:5px;align-items:center;">{btn_compra_principal}{btn_del_principal}</div>'
 
+        fb_estrelas = g.get("feedback_estrelas")
+        fb_pulou = g.get("feedback_pulou")
+        tag_avaliacao = _formatar_badge_avaliacao(fb_estrelas, fb_pulou, stem)
+        aval_attr = "1" if (fb_estrelas is not None or fb_pulou) else "0"
+
         cid_str = html.escape(str(g["d_principal"].get("cliente_id") or ""))
         uf_attr = html.escape(str(cid.get("uf") or cid.get("nome") or "").strip().lower())
-        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-uf="{uf_attr}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-whatsapp="{"1" if g.get("tem_whatsapp") else "0"}" data-sid="{cid_str}"')
+        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-uf="{uf_attr}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-whatsapp="{"1" if g.get("tem_whatsapp") else "0"}" data-avaliado="{aval_attr}" data-sid="{cid_str}"')
         
         chk_principal = f'<input type="checkbox" class="chk-selecao chk-contato" data-id="{html.escape(stem)}" data-nome="{nome_js}" onchange="toggleContatoIndividual(this)" title="Selecionar {nome_js}">'
         linhas.append([
@@ -2451,6 +2547,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             f'<span style="white-space:nowrap;">{html.escape(gerada_bsb)}</span>',
             tag_etapa,
             tag_chk,
+            tag_avaliacao,
             nome_cell,
             f_wa(g["whatsapp"]),
             f_data(nasc),
@@ -2469,6 +2566,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "gravado_em_bsb": gerada_bsb,
             "etapa": rotulo_etapa,
             "checkout": "SIM" if g["teve_checkout"] else "NÃO",
+            "avaliacao": f"{fb_estrelas}/5" if fb_estrelas is not None else ("Pulou" if fb_pulou else "—"),
             "comprou": "SIM" if g_comprou else "NÃO",
             "nome": g["nome_completo"],
             "whatsapp": g["whatsapp"] or "—",
@@ -2518,8 +2616,13 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             sub_wa_digitos = re.sub(r"\D", "", str(sub_d.get("whatsapp") or ""))
             sub_tem_wa = bool(sub_d.get("whatsapp") and len(sub_wa_digitos) >= 8)
 
+            sub_fb_estrelas = sub_d.get("feedback_estrelas")
+            sub_fb_pulou = bool(sub_d.get("feedback_pulou"))
+            sub_tag_avaliacao = _formatar_badge_avaliacao(sub_fb_estrelas, sub_fb_pulou, sub_stem)
+            sub_aval_attr = "1" if (sub_fb_estrelas is not None or sub_fb_pulou) else "0"
+
             sub_uf_attr = html.escape(str(sub_cid.get("uf") or sub_cid.get("nome") or "").strip().lower())
-            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" data-uf="{sub_uf_attr}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-whatsapp="{"1" if sub_tem_wa else "0"}" data-sid="{sub_cid_str}"')
+            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" data-uf="{sub_uf_attr}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-whatsapp="{"1" if sub_tem_wa else "0"}" data-avaliado="{sub_aval_attr}" data-sid="{sub_cid_str}"')
             linhas.append([
                 '<span style="opacity:0.25;font-size:11px;display:inline-block;padding-left:4px;">↳</span>',
                 f'<span style="padding-left:14px;"><a href="/painel/leitura/{html.escape(sub_stem)}" style="color:var(--sand2);">↳ {html.escape(sub_stem[:15])}</a></span>',
@@ -2527,6 +2630,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_gerada_bsb)}</span>',
                 sub_tag_etapa,
                 sub_tag_chk,
+                sub_tag_avaliacao,
                 '<span style="color:var(--sand2);font-size:11.5px;padding-left:8px;">↳ tentativa anterior</span>',
                 f_wa(sub_d.get("whatsapp")),
                 f_data(sub_nasc),
@@ -2623,10 +2727,10 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         )
         corpo = barra_acoes + _tabela([
             "[sel]", "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
-            "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
+            "avaliação", "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
         ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras", wrap_class="tbl-wrap tbl-wrap-leituras") + script_export
 
-    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou, total_pessoas_whatsapp, lista_ufs)
+    return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou, total_pessoas_whatsapp, total_pessoas_avaliados, lista_ufs)
 
 
 def _dropdown_filtro_uf(lista_ufs: list[tuple[str, int]], uf_selecionado: Optional[str] = None) -> str:
@@ -2723,6 +2827,7 @@ def painel(request: Request, _=Depends(exigir_senha),
            so_ao_vivo: int = 0,
            so_comprou: int = 0,
            so_whatsapp: int = 0,
+           so_avaliados: int = 0,
            uf: Optional[str] = None):
     dias_int = dias.default if hasattr(dias, "default") else int(dias)
     pag_leituras_int = pag_leituras.default if hasattr(pag_leituras, "default") else int(pag_leituras)
@@ -2767,6 +2872,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_comprou"] = 1
         if so_whatsapp:
             q["so_whatsapp"] = 1
+        if so_avaliados:
+            q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
         qs = "&".join(f"{k}={v}" for k, v in q.items())
@@ -2795,6 +2902,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_comprou"] = 1
         if so_whatsapp:
             q["so_whatsapp"] = 1
+        if so_avaliados:
+            q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
         qs = "&".join(f"{k}={v}" for k, v in q.items())
@@ -2808,6 +2917,7 @@ def painel(request: Request, _=Depends(exigir_senha),
         + (f'<input type="hidden" name="so_ao_vivo" value="1">' if so_ao_vivo else '')
         + (f'<input type="hidden" name="so_comprou" value="1">' if so_comprou else '')
         + (f'<input type="hidden" name="so_whatsapp" value="1">' if so_whatsapp else '')
+        + (f'<input type="hidden" name="so_avaliados" value="1">' if so_avaliados else '')
         + (f'<input type="hidden" name="uf" value="{html.escape(uf)}">' if uf else '')
         + '<span class="lbl-datas">📅 Personalizado:</span>'
         + f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
@@ -2853,6 +2963,12 @@ def painel(request: Request, _=Depends(exigir_senha),
     chegaram_dados_pessoas = dados_item.get("pessoas", chegaram_dados_sessoes) if dados_item else 0
 
     tempos = d.get("tempos") or {}
+    fb = d.get("feedback") or {}
+    fb_media = fb.get("media")
+    fb_respostas = fb.get("respostas", 0)
+    card_aval_val = (f"★ {fb_media:.2f}".replace(".", ",") if fb_media is not None else "—")
+    card_aval_rot = f"avaliação da carta ({fb_respostas} aval.)" if fb_respostas > 0 else "avaliação da carta"
+
     p.append('<div class="cards">')
     for valor, rot in [
         (d.get("pessoas_unicas", d["sessoes"]), "pessoas únicas"),
@@ -2862,6 +2978,7 @@ def painel(request: Request, _=Depends(exigir_senha),
         (chegaram_dados_pessoas,
          f"chegaram aos dados ({chegaram_dados_sessoes} sessões)" if chegaram_dados_pessoas != chegaram_dados_sessoes else "chegaram aos dados"),
         (g["total"], "cartas entregues"),
+        (card_aval_val, card_aval_rot),
         (chegaram_oferta_pessoas,
          f"chegaram à oferta ({chegaram_oferta_sessoes} sessões)" if chegaram_oferta_pessoas != chegaram_oferta_sessoes else "chegaram à oferta"),
         (clicaram_checkout_pessoas,
@@ -2914,6 +3031,7 @@ def painel(request: Request, _=Depends(exigir_senha),
         so_ao_vivo=bool(so_ao_vivo),
         so_comprou=bool(so_comprou),
         so_whatsapp=bool(so_whatsapp),
+        so_avaliados=bool(so_avaliados),
         uf=uf,
         de=d1, ate=d2
     )
@@ -2921,6 +3039,7 @@ def painel(request: Request, _=Depends(exigir_senha),
     total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
     total_comprou = getattr(res_leituras, "total_comprou", 0)
     total_whatsapp = getattr(res_leituras, "total_whatsapp", 0)
+    total_avaliados = getattr(res_leituras, "total_avaliados", 0)
 
     def link_filtro_leituras(modo: str) -> str:
         q = {"dias": dias_int}
@@ -2940,6 +3059,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_comprou"] = 1
         elif modo == "whatsapp":
             q["so_whatsapp"] = 1
+        elif modo == "avaliados":
+            q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
         qs = "&".join(f"{k}={v}" for k, v in q.items())
@@ -2968,9 +3089,15 @@ def painel(request: Request, _=Depends(exigir_senha),
             rotulo = "📱 Só com WhatsApp"
             badge_id = "badge-count-wa"
             cnt = total_whatsapp
+        elif modo == "avaliados":
+            cls = " avaliados"
+            on = " on" if so_avaliados else ""
+            rotulo = "⭐ Só avaliados"
+            badge_id = "badge-count-avaliados"
+            cnt = total_avaliados
         else:
             cls = ""
-            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp) else ""
+            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp and not so_avaliados) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
             cnt = total_geral
@@ -2984,6 +3111,7 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append('<div class="filtros-leituras">'
              + link_filtro_leituras("todos")
              + link_filtro_leituras("whatsapp")
+             + link_filtro_leituras("avaliados")
              + link_filtro_leituras("checkout")
              + link_filtro_leituras("ao_vivo")
              + link_filtro_leituras("comprou")
@@ -3001,6 +3129,7 @@ def painel(request: Request, _=Depends(exigir_senha),
         "so_ao_vivo": 1 if so_ao_vivo else None,
         "so_comprou": 1 if so_comprou else None,
         "so_whatsapp": 1 if so_whatsapp else None,
+        "so_avaliados": 1 if so_avaliados else None,
         "uf": uf if uf else None,
     }
     if so_whatsapp:
@@ -3011,6 +3140,8 @@ def painel(request: Request, _=Depends(exigir_senha),
         rotulo_pag = "pessoas ativas ao vivo"
     elif so_checkout:
         rotulo_pag = "pessoas com checkout"
+    elif so_avaliados:
+        rotulo_pag = "pessoas com avaliação"
     else:
         rotulo_pag = "pessoas únicas"
 
@@ -3025,6 +3156,8 @@ def painel(request: Request, _=Depends(exigir_senha),
         sub_tipo = "ativas navegando agora"
     elif so_checkout:
         sub_tipo = "com checkout"
+    elif so_avaliados:
+        sub_tipo = "que avaliaram a leitura"
     else:
         sub_tipo = "no total"
 
@@ -3154,6 +3287,7 @@ def painel(request: Request, _=Depends(exigir_senha),
 def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
           de: Optional[str] = None, ate: Optional[str] = None, dias: int = 7,
           so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0, so_whatsapp: int = 0,
+          so_avaliados: int = 0,
           uf: Optional[str] = None):
     d1, d2 = _periodo(de, ate, dias) if (de or ate or dias) else (None, None)
     res_leituras = _tabela_leituras(
@@ -3162,6 +3296,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         so_ao_vivo=bool(so_ao_vivo),
         so_comprou=bool(so_comprou),
         so_whatsapp=bool(so_whatsapp),
+        so_avaliados=bool(so_avaliados),
         uf=uf,
         de=d1, ate=d2
     )
@@ -3169,6 +3304,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
     total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
     total_comprou = getattr(res_leituras, "total_comprou", 0)
     total_whatsapp = getattr(res_leituras, "total_whatsapp", 0)
+    total_avaliados = getattr(res_leituras, "total_avaliados", 0)
 
     p_params = {
         "dias": dias,
@@ -3178,6 +3314,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         "so_ao_vivo": 1 if so_ao_vivo else None,
         "so_comprou": 1 if so_comprou else None,
         "so_whatsapp": 1 if so_whatsapp else None,
+        "so_avaliados": 1 if so_avaliados else None,
         "uf": uf if uf else None,
     }
     if so_whatsapp:
@@ -3188,6 +3325,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         rotulo_pag = "pessoas ativas ao vivo"
     elif so_checkout:
         rotulo_pag = "pessoas com checkout"
+    elif so_avaliados:
+        rotulo_pag = "pessoas com avaliação"
     else:
         rotulo_pag = "pessoas únicas"
 
@@ -3210,6 +3349,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
             q["so_comprou"] = 1
         elif modo == "whatsapp":
             q["so_whatsapp"] = 1
+        elif modo == "avaliados":
+            q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
         qs = ("?" + "&".join(f"{k}={v}" for k, v in q.items())) if q else ""
@@ -3238,9 +3379,15 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
             rotulo = "📱 Só com WhatsApp"
             badge_id = "badge-count-wa"
             cnt = total_whatsapp
+        elif modo == "avaliados":
+            cls = " avaliados"
+            on = " on" if so_avaliados else ""
+            rotulo = "⭐ Só avaliados"
+            badge_id = "badge-count-avaliados"
+            cnt = total_avaliados
         else:
             cls = ""
-            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp) else ""
+            on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp and not so_avaliados) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
             cnt = total_geral
@@ -3254,6 +3401,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
     botoes_filtro = ('<div class="filtros-leituras">'
                      + link_filtro_lista("todos")
                      + link_filtro_lista("whatsapp")
+                     + link_filtro_lista("avaliados")
                      + link_filtro_lista("checkout")
                      + link_filtro_lista("ao_vivo")
                      + link_filtro_lista("comprou")
@@ -3269,6 +3417,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         sub_tipo = "ativas navegando agora"
     elif so_checkout:
         sub_tipo = "com checkout"
+    elif so_avaliados:
+        sub_tipo = "que avaliaram a leitura"
     else:
         sub_tipo = "no total"
 
@@ -3633,6 +3783,7 @@ async def importar_csv(
 def exportar_csv(_=Depends(exigir_senha),
                  de: Optional[str] = None, ate: Optional[str] = None, dias: int = 7,
                  so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0, so_whatsapp: int = 0,
+                 so_avaliados: int = 0,
                  uf: Optional[str] = None,
                  ids: Optional[str] = None):
     """Gera planilha CSV estruturada com as leituras filtradas ou selecionadas."""
@@ -3682,6 +3833,8 @@ def exportar_csv(_=Depends(exigir_senha),
             todos_grupos = [g for g in todos_grupos if g["ao_vivo"]]
         elif so_checkout:
             todos_grupos = [g for g in todos_grupos if g["teve_checkout"]]
+        elif so_avaliados:
+            todos_grupos = [g for g in todos_grupos if (g.get("feedback_estrelas") is not None or g.get("feedback_pulou"))]
 
         if uf and uf.strip():
             uf_norm = uf.strip().lower()
@@ -3699,6 +3852,7 @@ def exportar_csv(_=Depends(exigir_senha),
         "Preencheu Dados (BSB)",
         "Etapa Alcançada",
         "Fez Checkout",
+        "Avaliação da Leitura",
         "Comprou",
         "Nome Completo",
         "WhatsApp",
@@ -3721,12 +3875,16 @@ def exportar_csv(_=Depends(exigir_senha),
         nasc = g["nascimento"]
         cid = g["cidade"]
         chegada_bsb, gerada_bsb = f_chegada_bsb(d, stem)
+        fb_estrelas = g.get("feedback_estrelas")
+        fb_pulou = g.get("feedback_pulou")
+        txt_aval = f"{fb_estrelas}/5" if fb_estrelas is not None else ("Pulou" if fb_pulou else "—")
         writer.writerow([
             stem,
             chegada_bsb,
             gerada_bsb,
             g["rotulo_etapa"],
             "SIM" if g["teve_checkout"] else "NÃO",
+            txt_aval,
             "SIM" if g.get("comprou") else "NÃO",
             g["nome_completo"],
             g["whatsapp"] or "—",
@@ -3791,7 +3949,12 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
                f'onclick="abrirModalExcluir(\'{html.escape(leitura_id)}\', \'{nome_js}\');">'
                f'🗑️ Excluir Leitura</button>')
 
+    fb_est = d.get("feedback_estrelas")
+    fb_pul = bool(d.get("feedback_pulou"))
+    badge_avaliacao = _formatar_badge_avaliacao(fb_est, fb_pul, leitura_id)
+
     ident = (f'{html.escape(nome_puro)}{tag_rep_detalhe} · '
+             f'avaliação: {badge_avaliacao} · '
              f'chegou ao quiz: <b style="color:var(--amber);">{html.escape(chegada_bsb)} (BSB)</b> · '
              f'preencheu dados: <b style="color:var(--amber);">{html.escape(gerada_bsb)} (BSB)</b> · '
              f'etapa: <b style="color:var(--amber);">{html.escape(prog["rotulo"])}</b> · '
@@ -3801,12 +3964,24 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
              f'{f_wa(d.get("whatsapp"))}'
              f'{t_quiz_str}')
 
+    avaliacao_bloco = ""
+    if fb_est is not None or fb_pul:
+        avaliacao_bloco = (
+            f'<div style="background:var(--card-bg, #1a1917);border:1px solid rgba(212,162,76,0.3);'
+            f'border-radius:8px;padding:12px 16px;margin:16px 0;display:flex;align-items:center;gap:12px;">'
+            f'<span style="font-size:22px;">⭐</span>'
+            f'<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--sand2);">Avaliação do Usuário</div>'
+            f'<div style="font-size:16px;margin-top:2px;">{badge_avaliacao}</div></div>'
+            f'</div>'
+        )
+
     ps = "".join(f"<p>{html.escape(x)}</p>" for x in (c.get("paragrafos") or []))
     notas = "".join(f"<li>{html.escape(x)}</li>" for x in (c.get("notas") or []))
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>{html.escape(leitura_id)}</title><div class=w>"
         f'<h1>{html.escape(leitura_id)}</h1><p class="sub">{ident} · '
         f'<a href="/painel#aba-leituras">voltar ao painel</a> {btn_compra} {btn_del}</p>'
+        f'{avaliacao_bloco}'
         f'<h2>{html.escape(c.get("selo",""))}</h2>'
         f'<p><b>{html.escape(c.get("titulo",""))}</b></p>'
         f'<p style="color:var(--amber)">{html.escape(c.get("destaque",""))}</p>'

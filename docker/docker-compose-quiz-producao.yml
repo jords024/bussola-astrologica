@@ -38,6 +38,9 @@ services:
       - EVENTOS_RETENCAO_DIAS=180
       - LEITURAS_RETENCAO_DIAS=180
 
+      # Webhook para envio automático dos dados do lead e da leitura gerada
+      - WEBHOOK_LEITURA_URL=https://api.aryaraj.shop/api/webhooks/bussola-quiz-mensagem
+
     deploy:
       # Modo de implantação replicado no Swarm
       mode: replicated
