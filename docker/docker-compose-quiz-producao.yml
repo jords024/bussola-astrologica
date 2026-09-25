@@ -6,7 +6,7 @@ services:
   # ============================================================================
   quiz_crassus:
     # Imagem de produção do Quiz da Bússola
-    image: aryalvesfernandes/quiz-crassus:1.0.0
+    image: aryalvesfernandes/quiz-crassus:1.3.0
 
     # Configura o Hostname para identificação única da réplica no Swarm
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
