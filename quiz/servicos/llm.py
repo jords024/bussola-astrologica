@@ -184,7 +184,27 @@ async def _chamar(modelo: str, sistema: str, usuario: str,
             f"tokens={getattr(uso, 'completion_tokens', '?')}/{MAX_TOKENS_SAIDA}). "
             "Provavelmente o teto de tokens nao cobriu raciocinio + saida."
         )
-    return json.loads(conteudo)
+    dados = json.loads(conteudo)
+    if isinstance(dados, dict) and uso is not None:
+        dados["_uso_tokens"] = {
+            "prompt_tokens": getattr(uso, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(uso, "completion_tokens", 0) or 0,
+            "total_tokens": getattr(uso, "total_tokens", 0) or 0,
+        }
+    return dados
+
+
+def _finalizar_meta(meta: dict, t0: float) -> dict:
+    meta["ms_llm"] = int((time.time() - t0) * 1000)
+    p_tok = meta.get("prompt_tokens")
+    c_tok = meta.get("completion_tokens")
+    if p_tok is not None and c_tok is not None:
+        try:
+            from .financeiro import calcular_custo_tokens
+            meta["custo_usd"] = round(calcular_custo_tokens(meta.get("modelo") or "gpt-5.6-luna", p_tok, c_tok), 6)
+        except Exception as e:
+            logger.warning("Falha ao calcular custo de tokens: %s", e)
+    return meta
 
 
 async def escrever(fatos: dict, veredito, quiz: dict, precisao: dict) -> dict:
@@ -244,6 +264,12 @@ async def escrever(fatos: dict, veredito, quiz: dict, precisao: dict) -> dict:
                 continue
 
             meta["modelo"] = modelo
+            if isinstance(carta, dict) and "_uso_tokens" in carta:
+                u_tok = carta.pop("_uso_tokens")
+                meta["prompt_tokens"] = meta.get("prompt_tokens", 0) + u_tok.get("prompt_tokens", 0)
+                meta["completion_tokens"] = meta.get("completion_tokens", 0) + u_tok.get("completion_tokens", 0)
+                meta["total_tokens"] = meta.get("total_tokens", 0) + u_tok.get("total_tokens", 0)
+
             corpo = texto_da_carta(carta)
             # duas guardas: nao inventar astrologia, e nao usar jargao no corpo.
             # A prova tecnica vive na nota ao pe da carta, montada por codigo.
@@ -261,7 +287,7 @@ async def escrever(fatos: dict, veredito, quiz: dict, precisao: dict) -> dict:
             problemas = duras + estilo
             if not problemas:
                 meta["validacao"] = "ok" if tentativa == 1 else "regenerado"
-                meta["ms_llm"] = int((time.time() - t0) * 1000)
+                _finalizar_meta(meta, t0)
                 return {"carta": carta, "meta": meta}
 
             logger.warning("carta reprovada na auditoria (tentativa %d): %s",
@@ -271,7 +297,7 @@ async def escrever(fatos: dict, veredito, quiz: dict, precisao: dict) -> dict:
             correcao = problemas
             break  # troca de tentativa, não de modelo
 
-    meta["ms_llm"] = int((time.time() - t0) * 1000)
+    _finalizar_meta(meta, t0)
 
     # A RESERVA E O ULTIMO RECURSO, NAO O SEGUNDO.
     #

@@ -161,13 +161,17 @@ class Integracao(unittest.TestCase):
         self.assertIn("slice(0, 2)", html)
         self.assertIn("slice(0, 4)", html)
 
-    def test_vsl_video_tempo_delay_18_segundos(self):
+    def test_vsl_video_tempo_delay_20_segundos(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         html = response.text
-        self.assertIn("segundos: 18", html)
+        self.assertIn("segundos: 20", html)
         self.assertIn("decorrido >= (VSL.segundos * 1000)", html)
+        self.assertIn("decorrido < (VSL.segundos * 1000)", html)
         self.assertIn('id="vslGo"', html)
+        self.assertIn('id="vturb-wrapper-65cb9c18-e117-4734-a983-2fc6275c2061"', html)
+        self.assertIn('turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061', html)
+        self.assertIn("videoId = '65cb9c18-e117-4734-a983-2fc6275c2061'", html)
 
     def test_docker_compose_quiz_producao_valido(self):
         import yaml
@@ -286,6 +290,8 @@ class Integracao(unittest.TestCase):
         with patch.object(llm, 'OPENAI_API_KEY', ''):
             response = self.client.post('/api/leitura', json=dados)
         self.assertEqual(response.status_code, 200)
+        import time
+        time.sleep(0.1)
         mock_webhook.assert_called_once()
         args, kwargs = mock_webhook.call_args
         self.assertEqual(args[0], 'Aryaraj Alves Fernandes')
@@ -327,17 +333,47 @@ class Integracao(unittest.TestCase):
         self.assertIn('function vslOfertaPausar()', html)
         self.assertIn('vslOfertaPausar();', html)
         self.assertIn('vslOfertaMontar();', html)
-        # Mecanismos robustos de revelacao do pitch da oferta aos 4 minutos / 231s
+        # Mecanismos robustos de revelacao do pitch da oferta aos 3min50 / 230s
         self.assertIn('window.vslOfertaRevelar = vslOfertaRevelar;', html)
         self.assertIn('window.vslOfertaNotificarPlayState', html)
         self.assertIn('window.vslOfertaCalibrarProgresso', html)
+        self.assertIn('window.vslOfertaAvisarPitch', html)
         self.assertIn('function vslOfertaIniciarTicker()', html)
         self.assertIn('function vslOfertaPararTicker()', html)
-        self.assertIn('pitchSegundos: 231', html)
-        self.assertIn('teto: 240000', html)
+        self.assertIn('pitchSegundos: 230', html)
+        self.assertIn('teto: 300000', html)
         self.assertIn('PitchReached', html)
         self.assertIn('ViewContent_75', html)
         self.assertIn('ViewContent_100', html)
+        # Ocultamento rigoroso da oferta e do bloco de pitch
+        self.assertIn('#oferta-pitch, .delay-pitch{display:none !important;}', html)
+        self.assertIn('#oferta-pitch.revelado, .delay-pitch.revelado{display:block !important;', html)
+
+    def test_vsl_oferta_revelacao_minuto_3_50(self):
+        """Valida que todos os blocos abaixo do video (oferta-pitch, ticketTitulo, numeros, garantia)
+        estao ocultos por padrao e estao condicionados aos 230 segundos (3min50)."""
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+
+        # 1. Elementos da oferta abaixo do video devem estar dentro de #oferta-pitch
+        self.assertIn('<div id="oferta-pitch" class="delay-pitch">', html)
+        self.assertIn('ticketTitulo', html)
+        self.assertIn('+700', html)
+        self.assertIn('Quero garantir essa condição', html)
+
+        # 2. Timing deve ser configurado precisamente para 230s (3 minutos e 50 segundos)
+        self.assertIn('pitchSegundos: 230', html)
+        # Nao deve conter o valor anterior (231s / 3min51)
+        self.assertNotIn('pitchSegundos: 231', html)
+
+        # 3. Nao deve haver auto-revelacao prematura no carregamento via localStorage
+        self.assertNotIn("localStorage.getItem('vturb_pitch_' + videoId) === '1'", html)
+        self.assertNotIn("localStorage.getItem('vturb_pitch_' + VSL_OFERTA.video) === '1'", html)
+
+        # 4. Deve conter a rotina de calibracao e ticker para 230s
+        self.assertIn('vslTempoReproducao >= VSL_OFERTA.pitchSegundos', html)
+        self.assertIn("vslOfertaRevelar('pitch_tempo')", html)
 
 if __name__ == '__main__':
     unittest.main()

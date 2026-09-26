@@ -22,7 +22,7 @@ from typing import Optional
 import pytz
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 import config
@@ -145,6 +145,37 @@ def f_data(nasc: dict) -> str:
         return f"{dia}/{mes}/{ano_2d}"
 
 
+def f_idade(nasc: dict, ref: Optional[date] = None) -> str:
+    """Calcula a idade em anos a partir do dicionário de nascimento."""
+    if not nasc:
+        return "—"
+    dia = nasc.get("dia")
+    mes = nasc.get("mes")
+    ano = nasc.get("ano")
+    if dia is None or mes is None or not ano:
+        return "—"
+    try:
+        d = int(dia)
+        m = int(mes)
+        y = int(ano)
+        hoje = ref or hoje_bsb()
+        if y < 100:
+            limite_sec = hoje.year % 100
+            y = (2000 + y) if y <= limite_sec else (1900 + y)
+        if not (1900 <= y <= hoje.year):
+            return "—"
+        try:
+            dt_nasc = date(y, m, d)
+            idade = hoje.year - dt_nasc.year - ((hoje.month, hoje.day) < (dt_nasc.month, dt_nasc.day))
+        except ValueError:
+            idade = hoje.year - y - ((hoje.month, hoje.day) < (m, d))
+        if idade < 0 or idade > 130:
+            return "—"
+        return f"{idade} anos" if idade != 1 else "1 ano"
+    except (ValueError, TypeError):
+        return "—"
+
+
 def f_hora(nasc: dict, pr: Optional[dict] = None) -> str:
     """Horário e minuto de nascimento (ex.: 18h35), ou período/modo quando não houver hora exata."""
     if not nasc:
@@ -166,7 +197,26 @@ def f_tempo(ms: Optional[float]) -> str:
         return f"{seg}s"
     m = seg // 60
     s = seg % 60
-    return f"{m}m {s:0>2}s" if s else f"{m}m"
+    if m < 60:
+        return f"{m}m {s:0>2}s" if s else f"{m}m"
+    h = m // 60
+    m = m % 60
+    return f"{h}h {m:0>2}m"
+
+
+def f_tempo_quiz_duplo(tempo_ativo_ms: Optional[float], tempo_total_ms: Optional[float]) -> str:
+    """Formata tempo ativo e tempo total de sessão para exibição no painel."""
+    if tempo_ativo_ms is not None and tempo_ativo_ms >= 0:
+        str_ativo = f_tempo(tempo_ativo_ms)
+        str_total = f_tempo(tempo_total_ms)
+        if str_total != "—" and str_total != str_ativo:
+            return (f'<span class="tempo-ativo" title="Tempo ativo interagindo no quiz">{html.escape(str_ativo)}</span>'
+                    f'<span class="tempo-total-sub" style="display:block;font-size:11px;color:var(--sand2);" '
+                    f'title="Tempo total com a aba aberta (sessão)">total: {html.escape(str_total)}</span>')
+        return f'<span class="tempo-ativo" title="Tempo ativo no quiz">{html.escape(str_ativo)}</span>'
+    elif tempo_total_ms is not None and tempo_total_ms >= 0:
+        return html.escape(f_tempo(tempo_total_ms))
+    return "—"
 
 
 def f_wa(w: Optional[str]) -> str:
@@ -339,9 +389,52 @@ def _barra(v: Optional[float]) -> str:
 ESTILO = """
 :root{--bg:#131313;--card:#1B1917;--line:#332E27;--sand:#F2EFE9;--sand2:rgba(242,239,233,.62);
 --amber:#E5A93C;--red:#C4564A;--green:#4E9D6E}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--sand);
-font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;padding:26px 18px 70px}
-.w{max-width:1000px;margin:0 auto}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--sand);
+font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif}
+body:not(:has(.layout-painel)){padding:26px 18px 70px}
+.w{max-width:1050px;margin:0 auto}
+
+.layout-painel{display:flex;min-height:100vh}
+.sidebar-painel{width:220px;background:#171615;border-right:1px solid var(--line);flex-shrink:0;padding:24px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;z-index:100;user-select:none}
+.sidebar-marca{display:flex;align-items:center;gap:10px;padding:0 8px 20px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.sidebar-logo{font-size:24px;line-height:1}
+.sidebar-marca-texto{display:flex;flex-direction:column}
+.sidebar-titulo{font-size:15px;font-weight:700;color:var(--sand);line-height:1.2}
+.sidebar-subtitulo{font-size:10.5px;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.sidebar-nav{display:flex;flex-direction:column;gap:6px;flex:1}
+.sidebar-btn{display:flex;align-items:center;gap:11px;padding:11px 14px;border-radius:9px;color:var(--sand2);text-decoration:none;font-size:13.5px;font-weight:600;background:none;border:1px solid transparent;cursor:pointer;transition:all .15s ease;width:100%;text-align:left;font-family:inherit}
+.sidebar-btn:hover{background:rgba(255,255,255,.05);color:var(--sand)}
+.sidebar-btn.on{background:rgba(229,169,60,.12);border-color:rgba(229,169,60,.35);color:var(--amber);font-weight:700}
+.sidebar-icon{font-size:17px;line-height:1;display:inline-block}
+.sidebar-footer{padding:14px 8px 0;border-top:1px solid var(--line);font-size:11px;color:var(--sand2);opacity:.6}
+.conteudo-painel{flex:1;min-width:0;padding:26px 24px 70px}
+.conteudo-painel .w{max-width:1050px;margin:0 auto}
+
+@media(max-width:850px){
+  .layout-painel{flex-direction:column}
+  .sidebar-painel{width:100%;height:auto;position:sticky;top:0;flex-direction:row;align-items:center;justify-content:space-between;padding:10px 14px;border-right:none;border-bottom:1px solid var(--line);background:rgba(23,22,21,.96);backdrop-filter:blur(10px)}
+  .sidebar-marca{padding:0;border-bottom:none;margin-bottom:0}
+  .sidebar-nav{flex-direction:row;gap:6px;flex:none}
+  .sidebar-btn{padding:8px 13px;font-size:12.5px;width:auto}
+  .sidebar-footer{display:none}
+  .conteudo-painel{padding:16px 12px 60px}
+}
+
+.visao-painel{display:none}
+.visao-painel.on{display:block;animation:fadein .2s ease}
+
+/* Tags e utilitários da tela financeira */
+.tag-fin-modelo{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap}
+.tag-fin-modelo.llm{background:rgba(229,169,60,.15);color:var(--amber);border:1px solid rgba(229,169,60,.35)}
+.tag-fin-modelo.cache{background:rgba(78,157,110,.15);color:#58B982;border:1px solid rgba(78,157,110,.35)}
+.tag-fin-modelo.reserva{background:rgba(255,255,255,.05);color:var(--sand2);border:1px solid var(--line)}
+.fin-topo-tabela{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 12px;flex-wrap:wrap}
+.fin-busca-wrap{display:inline-flex;align-items:center;gap:6px;background:#1B1917;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px}
+.fin-busca-wrap input{background:none;border:none;color:var(--sand);font-size:12px;outline:none;width:180px}
+.fin-busca-wrap input::placeholder{color:var(--sand2)}
+.btn-exportar-fin{background:rgba(229,169,60,.12);color:var(--amber);border:1px solid rgba(229,169,60,.35);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease}
+.btn-exportar-fin:hover{background:rgba(229,169,60,.22);color:#FFF}
 h1{font-size:20px;margin:0 0 3px;letter-spacing:-.01em}
 h2{font-size:13px;text-transform:uppercase;letter-spacing:.13em;color:var(--amber);
 margin:34px 0 12px;font-weight:600}
@@ -515,12 +608,224 @@ a{color:var(--amber)}
 .tag-avaliacao{display:inline-flex;align-items:center;gap:3px;font-size:12.5px;letter-spacing:.5px;}
 .tag-avaliacao.pulou{font-style:italic;opacity:.65;font-size:11.5px;}
 .tag-avaliacao.pendente{opacity:.35;font-size:12px;}
+.btn-ver-msg-acao{background:rgba(229,169,60,.12);color:var(--amber);border:1px solid rgba(229,169,60,.35);border-radius:6px;padding:3px 9px;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.btn-ver-msg-acao:hover{background:var(--amber);color:#12100C;font-weight:700;box-shadow:0 0 10px rgba(229,169,60,.3)}
+.btn-ver-msg-acao.sub{padding:2px 6px;font-size:11px}
+.btn-ver-msg-id{background:none;border:none;padding:2px 4px;font-size:13px;cursor:pointer;border-radius:4px;line-height:1;transition:transform .15s ease,background .15s ease;color:var(--amber)}
+.btn-ver-msg-id:hover{transform:scale(1.2);background:rgba(229,169,60,.18)}
+.modal-card-mensagem{max-width:720px;width:95%;max-height:88vh;display:flex;flex-direction:column;padding:22px 24px;background:#181614;border:1px solid rgba(229,169,60,.4);box-shadow:0 25px 60px rgba(0,0,0,.9),0 0 35px rgba(229,169,60,.12);text-align:left;position:relative}
+.modal-msg-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-right:28px}
+.modal-msg-tag-origem{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--amber);margin-bottom:4px}
+.modal-msg-nome{font-size:18px;font-weight:700;color:var(--sand);margin:0;line-height:1.25}
+.modal-msg-subinfo{font-size:12px;color:var(--sand2);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.modal-msg-subinfo a{color:#58B982;text-decoration:underline}
+.modal-msg-corpo{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:16px 0;padding-right:8px;min-height:160px}
+.modal-msg-loading{text-align:center;padding:40px 20px;color:var(--sand2);font-size:14px}
+.modal-msg-selo{font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--amber);font-weight:600;margin-bottom:6px}
+.modal-msg-titulo-carta{font-size:17px;font-weight:700;color:var(--sand);margin-bottom:10px;line-height:1.35}
+.modal-msg-destaque{background:rgba(229,169,60,.12);border-left:3px solid var(--amber);padding:10px 14px;border-radius:0 8px 8px 0;color:#F8D696;font-size:13.5px;font-weight:600;line-height:1.5;margin-bottom:16px}
+.modal-msg-paragrafos p{font-size:13.5px;line-height:1.7;color:#DDD6CA;margin:0 0 12px}
+.modal-msg-janela{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--sand2);margin-top:14px}
+.modal-msg-assinatura{font-size:11.5px;color:rgba(235,230,222,.5);font-style:italic;margin-top:14px;white-space:pre-line}
+.modal-msg-rodape{display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid var(--line);flex-wrap:wrap;gap:10px}
+.modal-msg-link-detalhe{color:var(--amber);font-size:12px;text-decoration:underline}
+.modal-msg-link-detalhe:hover{color:#FFF}
+.btn-msg-copiar{display:inline-flex;align-items:center;gap:6px;background:rgba(229,169,60,.12);border:1px solid rgba(229,169,60,.35);color:var(--amber);font-size:12px;font-weight:600;border-radius:6px;padding:6px 12px;cursor:pointer;transition:all .15s ease;white-space:nowrap}
+.btn-msg-copiar:hover{background:var(--amber);color:#12100C;font-weight:700}
+.busca-contato-wrap{display:inline-flex;align-items:center;gap:6px;background:#1B1815;border:1px solid rgba(229,169,60,.35);border-radius:8px;padding:3px 10px;margin-left:4px;transition:all .15s ease}
+.busca-contato-wrap:focus-within{border-color:var(--amber);box-shadow:0 0 10px rgba(229,169,60,.25);background:#221E1A}
+.busca-icone{font-size:12px;color:var(--sand2);user-select:none}
+.input-busca-contato{background:transparent;border:none;outline:none;color:var(--sand);font-size:12px;font-weight:600;width:190px;padding:2px 0;transition:width .2s ease}
+.input-busca-contato::placeholder{color:rgba(235,230,222,.4);font-size:11.5px;font-weight:400}
+.input-busca-contato:focus{width:230px;color:#FFF}
+.btn-limpar-busca{background:none;border:none;color:var(--sand2);font-size:12px;cursor:pointer;padding:1px 4px;border-radius:4px;line-height:1;transition:all .15s ease}
+.btn-limpar-busca:hover{color:#D96558;background:rgba(196,86,74,.15)}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 """
 
 JS_PAINEL = r"""
+function trocarVisao(visao){
+  var bDash = document.getElementById("btn-visao-dashboard");
+  var bFin = document.getElementById("btn-visao-financeiro");
+  var vDash = document.getElementById("visao-dashboard");
+  var vFin = document.getElementById("visao-financeiro");
+  if(!vDash || !vFin) return;
+
+  if(visao === "financeiro"){
+    if(bDash) bDash.classList.remove("on");
+    if(bFin) bFin.classList.add("on");
+    vDash.classList.remove("on");
+    vFin.classList.add("on");
+    try{
+      localStorage.setItem("painel_visao_ativa", "financeiro");
+      if(history.replaceState){
+        var u = new URL(window.location.href);
+        u.searchParams.set("view", "financeiro");
+        history.replaceState(null, "", u.pathname + u.search + "#financeiro");
+      }
+    }catch(e){}
+  } else {
+    if(bDash) bDash.classList.add("on");
+    if(bFin) bFin.classList.remove("on");
+    vDash.classList.add("on");
+    vFin.classList.remove("on");
+    try{
+      localStorage.setItem("painel_visao_ativa", "dashboard");
+      var abaAtiva = localStorage.getItem("painel_aba_ativa") || "aba-funil";
+      if(history.replaceState){
+        var u = new URL(window.location.href);
+        u.searchParams.delete("view");
+        history.replaceState(null, "", u.pathname + (u.search || "") + "#" + abaAtiva);
+      }
+    }catch(e){}
+  }
+}
+window.trocarVisao = trocarVisao;
+
+var _pagFinAtual = 1;
+var _porPaginaFin = 20;
+
+function obterLinhasFinanceiro(){
+  var tbody = document.getElementById("tbody-extrato-financeiro");
+  if(!tbody) return [];
+  return Array.from(tbody.querySelectorAll("tr"));
+}
+
+function mudarPaginaFin(novaPagina){
+  _pagFinAtual = parseInt(novaPagina, 10) || 1;
+  atualizarTabelaFinanceiroPaginada();
+  var tbl = document.querySelector(".tbl-extrato-financeiro");
+  if(tbl){
+    var rect = tbl.getBoundingClientRect();
+    if(rect.top < 60){
+      tbl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+}
+window.mudarPaginaFin = mudarPaginaFin;
+
+function filtrarTabelaFinanceiro(termo){
+  _pagFinAtual = 1;
+  atualizarTabelaFinanceiroPaginada(termo);
+}
+window.filtrarTabelaFinanceiro = filtrarTabelaFinanceiro;
+
+function atualizarTabelaFinanceiroPaginada(termoFiltro){
+  var inp = document.getElementById("busca-tabela-financeiro");
+  var termo = (termoFiltro !== undefined ? termoFiltro : (inp ? inp.value : "")).toLowerCase().trim();
+  var linhas = obterLinhasFinanceiro();
+  var wrapPag = document.getElementById("paginacao-financeiro");
+  if(linhas.length === 0){
+    if(wrapPag) wrapPag.innerHTML = '<span class="pag-info">Nenhuma geração registrada neste período.</span>';
+    return;
+  }
+
+  var correspondentes = [];
+  linhas.forEach(function(tr){
+    if(!termo){
+      correspondentes.push(tr);
+    } else {
+      var txt = tr.textContent.toLowerCase();
+      if(txt.indexOf(termo) !== -1){
+        correspondentes.push(tr);
+      } else {
+        tr.style.display = "none";
+      }
+    }
+  });
+
+  var totalFiltrados = correspondentes.length;
+  var totalPags = Math.max(1, Math.ceil(totalFiltrados / _porPaginaFin));
+  if(_pagFinAtual > totalPags) _pagFinAtual = totalPags;
+  if(_pagFinAtual < 1) _pagFinAtual = 1;
+
+  var idxIni = (_pagFinAtual - 1) * _porPaginaFin;
+  var idxFim = idxIni + _porPaginaFin;
+
+  correspondentes.forEach(function(tr, idx){
+    if(idx >= idxIni && idx < idxFim){
+      tr.style.display = "";
+    } else {
+      tr.style.display = "none";
+    }
+  });
+
+  if(!wrapPag) return;
+
+  if(totalFiltrados === 0){
+    wrapPag.innerHTML = '<span class="pag-info">Nenhuma geração encontrada para "' + termo.replace(/</g, "&lt;") + '".</span>';
+    return;
+  }
+
+  var numIni = idxIni + 1;
+  var numFim = Math.min(idxFim, totalFiltrados);
+  var infoTxt = "Mostrando <b>" + numIni + "–" + numFim + "</b> de <b>" + totalFiltrados + "</b> gerações";
+  if(termo && totalFiltrados !== linhas.length){
+    infoTxt += " (filtradas de " + linhas.length + ")";
+  }
+  infoTxt += " · Página " + _pagFinAtual + " de " + totalPags;
+
+  if(totalPags <= 1){
+    wrapPag.innerHTML = '<span class="pag-info">' + infoTxt + '</span>';
+    return;
+  }
+
+  var botoes = [];
+  // Anterior
+  if(_pagFinAtual > 1){
+    botoes.push('<a class="pag-btn" href="#" onclick="mudarPaginaFin(' + (_pagFinAtual - 1) + '); return false;">← Anterior</a>');
+  } else {
+    botoes.push('<span class="pag-btn disabled">← Anterior</span>');
+  }
+
+  // Janela de páginas (até 5 botões)
+  var pIni = Math.max(1, _pagFinAtual - 2);
+  var pFim = Math.min(totalPags, pIni + 4);
+  if(pFim - pIni < 4){
+    pIni = Math.max(1, pFim - 4);
+  }
+
+  if(pIni > 1){
+    botoes.push('<a class="pag-btn" href="#" onclick="mudarPaginaFin(1); return false;">1</a>');
+    if(pIni > 2){
+      botoes.push('<span class="pag-btn disabled">…</span>');
+    }
+  }
+
+  for(var p = pIni; p <= pFim; p++){
+    if(p === _pagFinAtual){
+      botoes.push('<span class="pag-btn on">' + p + '</span>');
+    } else {
+      botoes.push('<a class="pag-btn" href="#" onclick="mudarPaginaFin(' + p + '); return false;">' + p + '</a>');
+    }
+  }
+
+  if(pFim < totalPags){
+    if(pFim < totalPags - 1){
+      botoes.push('<span class="pag-btn disabled">…</span>');
+    }
+    botoes.push('<a class="pag-btn" href="#" onclick="mudarPaginaFin(' + totalPags + '); return false;">' + totalPags + '</a>');
+  }
+
+  // Próxima
+  if(_pagFinAtual < totalPags){
+    botoes.push('<a class="pag-btn" href="#" onclick="mudarPaginaFin(' + (_pagFinAtual + 1) + '); return false;">Próxima →</a>');
+  } else {
+    botoes.push('<span class="pag-btn disabled">Próxima →</span>');
+  }
+
+  wrapPag.innerHTML = '<span class="pag-info">' + infoTxt + '</span><div class="pag-links">' + botoes.join("") + '</div>';
+}
+
+
 function abrirAba(id){
   if(!id) return;
+  if(id.startsWith("aba-")){
+    var vDash = document.getElementById("visao-dashboard");
+    if(vDash && !vDash.classList.contains("on")){
+      trocarVisao("dashboard");
+    }
+  }
   document.querySelectorAll(".aba-btn").forEach(function(b){
     b.classList.toggle("on", b.getAttribute("data-tab") === id);
   });
@@ -539,14 +844,16 @@ window.abrirAba = abrirAba;
 function atualizarLinksPresetsAba(){
   var aba = (location.hash || "").replace("#", "") || "";
   try{ if(!aba) aba = localStorage.getItem("painel_aba_ativa") || ""; }catch(e){}
-  if(!aba) return;
-  document.querySelectorAll(".filtros a").forEach(function(el){
+  if(!aba || aba === "financeiro" || !aba.startsWith("aba-")) return;
+  var vDash = document.getElementById("visao-dashboard");
+  if(!vDash) return;
+  vDash.querySelectorAll(".filtros a").forEach(function(el){
     var href = el.getAttribute("href") || "";
     if(href){
       el.setAttribute("href", href.split("#")[0] + "#" + aba);
     }
   });
-  var formDatas = document.querySelector(".form-filtro-datas");
+  var formDatas = vDash.querySelector(".form-filtro-datas");
   if(formDatas){
     formDatas.action = "/painel#" + aba;
   }
@@ -634,120 +941,65 @@ function toggleAcordeao(grupoId, btn){
     if(seta){ seta.textContent = "▼"; }
   }
 }
-function filtrarTabelaClient(filtro, btn, evt){
-  var tbody = document.getElementById("tbody-leituras");
-  if(!tbody){ return true; }
-  var rows = tbody.querySelectorAll("tr.tr-pessoa");
-  var totalRows = rows.length;
-  if(totalRows > 0 && totalRows <= 20){
-    if(evt && evt.preventDefault){ evt.preventDefault(); }
-    var selUF = document.getElementById("select-filtro-uf");
-    var ufNorm = (selUF && selUF.value) ? selUF.value.trim().toLowerCase() : "";
-    var visiveis = 0;
-    rows.forEach(function(r){
-      var chk = r.getAttribute("data-checkout") === "1";
-      var vivo = r.getAttribute("data-ao-vivo") === "1";
-      var comprou = r.getAttribute("data-comprou") === "1";
-      var wa = r.getAttribute("data-whatsapp") === "1";
-      var rowUF = (r.getAttribute("data-uf") || "").trim().toLowerCase();
-      var idGrupo = r.id.replace("row-pessoa-", "");
-      var subRows = document.querySelectorAll(".grupo-" + idGrupo);
-      var mostrarModo = true;
-      if(filtro === "checkout"){
-        mostrarModo = chk;
-      } else if(filtro === "ao_vivo"){
-        mostrarModo = vivo;
-      } else if(filtro === "comprou"){
-        mostrarModo = comprou;
-      } else if(filtro === "whatsapp"){
-        mostrarModo = wa;
-      } else if(filtro === "avaliados"){
-        mostrarModo = r.getAttribute("data-avaliado") === "1";
-      }
-      var mostrarUF = (!ufNorm || rowUF === ufNorm);
-      var mostrar = mostrarModo && mostrarUF;
-      if(!mostrar){
-        r.style.display = "none";
-        subRows.forEach(function(sr){ sr.style.display = "none"; });
-      } else {
-        r.style.display = "";
-        visiveis++;
-      }
-    });
-    document.querySelectorAll(".btn-filtro-leituras").forEach(function(b){
-      var bFiltro = b.getAttribute("data-filtro") || (b.getAttribute("data-so-checkout") === "1" ? "checkout" : "todos");
-      b.classList.toggle("on", bFiltro === filtro);
-    });
-    var sub = document.getElementById("sub-leituras-info");
-    if(sub){
-      var tipo = "pessoas no total";
-      if(filtro === "checkout") tipo = "pessoas com checkout";
-      else if(filtro === "ao_vivo") tipo = "pessoas ativas navegando agora";
-      else if(filtro === "comprou") tipo = "pessoas que compraram o produto";
-      else if(filtro === "whatsapp") tipo = "pessoas que deixaram WhatsApp";
-      else if(filtro === "avaliados") tipo = "pessoas que avaliaram a leitura";
-      var ufTxt = (selUF && selUF.value) ? (" (UF: " + selUF.value + ")") : "";
-      sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + ufTxt + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
-    }
-    _selecionarTodosFiltro = false;
-    atualizarContadorSelecao();
-    try{
-      var href = btn ? btn.getAttribute("href") : null;
-      if(href){
-        var u = new URL(href, window.location.href);
-        if(selUF && selUF.value){ u.searchParams.set("uf", selUF.value); }
-        else { u.searchParams.delete("uf"); }
-        history.replaceState(null, "", u.toString());
-      }
-    }catch(e){}
-    return false;
-  }
-  return true;
-}
+var _debounceBuscaTimeout = null;
 
-function filtrarPorUFClient(ufValor){
-  var ufNorm = (ufValor || "").trim().toLowerCase();
+function executarFiltroCombinado(filtroModo){
   var tbody = document.getElementById("tbody-leituras");
   if(!tbody){ return; }
   var rows = tbody.querySelectorAll("tr.tr-pessoa");
-  var totalRows = rows.length;
-
-  if(totalRows > 20){
-    try{
-      var u = new URL(window.location.href);
-      if(ufValor){ u.searchParams.set("uf", ufValor); }
-      else { u.searchParams.delete("uf"); }
-      u.searchParams.delete("pag_leituras");
-      window.location.href = u.toString();
-    }catch(e){
-      window.location.search = (ufValor ? ("?uf=" + encodeURIComponent(ufValor)) : "");
-    }
-    return;
-  }
 
   var bAtivo = document.querySelector(".btn-filtro-leituras.on");
-  var modo = bAtivo ? (bAtivo.getAttribute("data-filtro") || "todos") : "todos";
-  var visiveis = 0;
+  var filtro = filtroModo || (bAtivo ? (bAtivo.getAttribute("data-filtro") || "todos") : "todos");
 
+  var selUF = document.getElementById("select-filtro-uf");
+  var ufNorm = (selUF && selUF.value) ? selUF.value.trim().toLowerCase() : "";
+
+  var inpBusca = document.getElementById("input-busca-contato");
+  var buscaPura = (inpBusca && inpBusca.value) ? inpBusca.value.trim().toLowerCase() : "";
+  var buscaDigitos = buscaPura.replace(/\D/g, "");
+
+  var visiveis = 0;
   rows.forEach(function(r){
     var chk = r.getAttribute("data-checkout") === "1";
     var vivo = r.getAttribute("data-ao-vivo") === "1";
     var comprou = r.getAttribute("data-comprou") === "1";
     var wa = r.getAttribute("data-whatsapp") === "1";
     var rowUF = (r.getAttribute("data-uf") || "").trim().toLowerCase();
+    var rowNome = (r.getAttribute("data-nome") || "").toLowerCase();
+    var rowWa = r.getAttribute("data-wa") || "";
+    var rowWaRaw = (r.getAttribute("data-wa-raw") || "").toLowerCase();
+
     var idGrupo = r.id.replace("row-pessoa-", "");
     var subRows = document.querySelectorAll(".grupo-" + idGrupo);
 
-    var atendeModo = true;
-    if(modo === "checkout") atendeModo = chk;
-    else if(modo === "ao_vivo") atendeModo = vivo;
-    else if(modo === "comprou") atendeModo = comprou;
-    else if(modo === "whatsapp") atendeModo = wa;
-    else if(modo === "avaliados") atendeModo = r.getAttribute("data-avaliado") === "1";
+    var mostrarModo = true;
+    if(filtro === "checkout") mostrarModo = chk;
+    else if(filtro === "ao_vivo") mostrarModo = vivo;
+    else if(filtro === "comprou") mostrarModo = comprou;
+    else if(filtro === "whatsapp") mostrarModo = wa;
+    else if(filtro === "avaliados") mostrarModo = (r.getAttribute("data-avaliado") === "1");
 
-    var atendeUF = (!ufNorm || rowUF === ufNorm);
-    var mostrar = atendeModo && atendeUF;
+    var mostrarUF = (!ufNorm || rowUF === ufNorm);
 
+    var mostrarBusca = true;
+    if(buscaPura){
+      var combinaNome = rowNome.indexOf(buscaPura) !== -1;
+      var combinaWaRaw = rowWaRaw.indexOf(buscaPura) !== -1;
+      var combinaWaDig = buscaDigitos.length > 0 && rowWa.indexOf(buscaDigitos) !== -1;
+      var combinaSub = false;
+      if(!combinaNome && !combinaWaRaw && !combinaWaDig){
+        subRows.forEach(function(sr){
+          var srWa = sr.getAttribute("data-wa") || "";
+          var srWaRaw = (sr.getAttribute("data-wa-raw") || "").toLowerCase();
+          if((buscaDigitos.length > 0 && srWa.indexOf(buscaDigitos) !== -1) || srWaRaw.indexOf(buscaPura) !== -1){
+            combinaSub = true;
+          }
+        });
+      }
+      mostrarBusca = (combinaNome || combinaWaRaw || combinaWaDig || combinaSub);
+    }
+
+    var mostrar = mostrarModo && mostrarUF && mostrarBusca;
     if(!mostrar){
       r.style.display = "none";
       subRows.forEach(function(sr){ sr.style.display = "none"; });
@@ -759,28 +1011,326 @@ function filtrarPorUFClient(ufValor){
 
   var sub = document.getElementById("sub-leituras-info");
   if(sub){
-    var tipo = "pessoas exibidas";
-    if(modo === "checkout") tipo = "pessoas com checkout";
-    else if(modo === "ao_vivo") tipo = "pessoas ativas navegando agora";
-    else if(modo === "comprou") tipo = "pessoas que compraram o produto";
-    else if(modo === "whatsapp") tipo = "pessoas que deixaram WhatsApp";
-    var ufTxt = ufValor ? (" (UF: " + ufValor + ")") : "";
-    sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + ufTxt + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
+    var tipo = "pessoas no total";
+    if(filtro === "checkout") tipo = "pessoas com checkout";
+    else if(filtro === "ao_vivo") tipo = "pessoas ativas navegando agora";
+    else if(filtro === "comprou") tipo = "pessoas que compraram o produto";
+    else if(filtro === "whatsapp") tipo = "pessoas que deixaram WhatsApp";
+    else if(filtro === "avaliados") tipo = "pessoas que avaliaram a leitura";
+
+    var extraInfo = [];
+    if(selUF && selUF.value) extraInfo.push("UF: " + selUF.value);
+    if(buscaPura) extraInfo.push('busca: "' + buscaPura + '"');
+    var extraStr = extraInfo.length ? (" (" + extraInfo.join(", ") + ")") : "";
+
+    sub.innerHTML = "<b>" + visiveis + "</b> " + tipo + extraStr + " · mostrando até 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.";
   }
 
   _selecionarTodosFiltro = false;
-  atualizarContadorSelecao();
+  if(typeof atualizarContadorSelecao === "function") atualizarContadorSelecao();
+}
 
+function buscarContatoClient(termo){
+  var btnLimpar = document.getElementById("btn-limpar-busca");
+  if(btnLimpar){
+    btnLimpar.style.display = (termo && termo.trim()) ? "" : "none";
+  }
+  clearTimeout(_debounceBuscaTimeout);
+  _debounceBuscaTimeout = setTimeout(function(){
+    var tbody = document.getElementById("tbody-leituras");
+    var totalRows = tbody ? tbody.querySelectorAll("tr.tr-pessoa").length : 0;
+    if(window._totalLeiturasFiltro > 20 && termo && termo.trim().length >= 3){
+      submeterBuscaContato();
+      return;
+    }
+    executarFiltroCombinado();
+  }, 150);
+}
+
+function carregarTabelaLeiturasAjax(urlDestino, callback){
+  var wrap = document.getElementById("container-tabela-leituras");
+  if(!wrap){
+    if(typeof urlDestino === "string") window.location.href = urlDestino;
+    return false;
+  }
+  try{
+    var u = (typeof urlDestino === "string") ? new URL(urlDestino, window.location.href) : urlDestino;
+
+    if(window.history && window.history.pushState){
+      window.history.pushState(null, "", u.toString());
+    }
+
+    var soChk = u.searchParams.get("so_checkout") === "1";
+    var soWa = u.searchParams.get("so_whatsapp") === "1";
+    var soAval = u.searchParams.get("so_avaliados") === "1";
+    var soVivo = u.searchParams.get("so_ao_vivo") === "1";
+    var soComp = u.searchParams.get("so_comprou") === "1";
+    var ehTodos = (!soChk && !soWa && !soAval && !soVivo && !soComp);
+
+    var botoes = document.querySelectorAll(".filtros-leituras .btn-filtro-leituras");
+    botoes.forEach(function(btn){
+      var f = btn.getAttribute("data-filtro");
+      var ativo = false;
+      if(f === "checkout") ativo = soChk;
+      else if(f === "whatsapp") ativo = soWa;
+      else if(f === "avaliados") ativo = soAval;
+      else if(f === "ao_vivo") ativo = soVivo;
+      else if(f === "comprou") ativo = soComp;
+      else if(f === "todos") ativo = ehTodos;
+      if(ativo) btn.classList.add("on");
+      else btn.classList.remove("on");
+    });
+
+    var inpBusca = document.getElementById("input-busca-contato");
+    if(inpBusca && u.searchParams.has("busca")){
+      inpBusca.value = u.searchParams.get("busca") || "";
+      var btnLimpar = document.getElementById("btn-limpar-busca");
+      if(btnLimpar) btnLimpar.style.display = inpBusca.value ? "inline-block" : "none";
+    }
+    var selUF = document.getElementById("select-filtro-uf");
+    if(selUF && u.searchParams.has("uf")){
+      selUF.value = u.searchParams.get("uf") || "";
+    }
+
+    wrap.style.transition = "opacity 0.15s ease";
+    wrap.style.opacity = "0.45";
+
+    var apiUrl = new URL("/painel/tabela-leituras-ajax", window.location.origin);
+    u.searchParams.forEach(function(val, key){
+      if(key === "pag_leituras") apiUrl.searchParams.set("pagina", val);
+      else apiUrl.searchParams.set(key, val);
+    });
+
+    fetch(apiUrl.toString(), {
+      method: "GET",
+      headers: { "Accept": "application/json" }
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error("Erro " + res.status);
+      return res.json();
+    })
+    .then(function(dados){
+      if(dados && dados.html){
+        wrap.innerHTML = dados.html;
+      }
+      if(dados && dados.badges){
+        for(var bId in dados.badges){
+          var elB = document.getElementById(bId);
+          if(elB) elB.textContent = dados.badges[bId];
+        }
+      }
+      if(typeof iniciarArrastoScroll === "function"){
+        iniciarArrastoScroll();
+      }
+      if(typeof aplicarSelecaoNoDOM === "function"){
+        aplicarSelecaoNoDOM();
+      }
+      if(callback) callback(null, dados);
+    })
+    .catch(function(err){
+      console.error("Falha ao carregar tabela via AJAX:", err);
+      window.location.href = u.toString();
+    })
+    .finally(function(){
+      wrap.style.opacity = "1";
+    });
+
+    return true;
+  }catch(e){
+    console.error("Erro carregarTabelaLeiturasAjax:", e);
+    if(typeof urlDestino === "string") window.location.href = urlDestino;
+    return false;
+  }
+}
+
+function filtrarTabelaClient(filtro, btn, evt){
+  if(evt && evt.preventDefault) evt.preventDefault();
+  var href = btn ? btn.getAttribute("href") : null;
+  if(href){
+    try{
+      var u = new URL(href, window.location.href);
+      var selUF = document.getElementById("select-filtro-uf");
+      if(selUF && selUF.value){ u.searchParams.set("uf", selUF.value); }
+      else { u.searchParams.delete("uf"); }
+      var inpBusca = document.getElementById("input-busca-contato");
+      if(inpBusca && inpBusca.value.trim()){ u.searchParams.set("busca", inpBusca.value.trim()); }
+      else { u.searchParams.delete("busca"); }
+      u.searchParams.delete("pag_leituras");
+      u.searchParams.delete("pagina");
+
+      carregarTabelaLeiturasAjax(u);
+      return false;
+    }catch(e){
+      window.location.href = href;
+      return false;
+    }
+  }
+  return true;
+}
+
+function filtrarPorUFClient(ufValor){
   try{
     var u = new URL(window.location.href);
     if(ufValor){ u.searchParams.set("uf", ufValor); }
     else { u.searchParams.delete("uf"); }
-    history.replaceState(null, "", u.toString());
-  }catch(e){}
+    var inpBusca = document.getElementById("input-busca-contato");
+    if(inpBusca && inpBusca.value.trim()){ u.searchParams.set("busca", inpBusca.value.trim()); }
+    u.searchParams.delete("pag_leituras");
+    u.searchParams.delete("pagina");
+    carregarTabelaLeiturasAjax(u);
+  }catch(e){
+    window.location.search = (ufValor ? ("?uf=" + encodeURIComponent(ufValor)) : "");
+  }
 }
+
 function filtrarCheckoutClient(soChk, btn, evt){
   return filtrarTabelaClient(soChk === 1 ? "checkout" : "todos", btn, evt);
 }
+
+function navegarPaginacaoLeituras(btn, evt){
+  if(evt && evt.preventDefault) evt.preventDefault();
+  var href = btn ? btn.getAttribute("href") : null;
+  if(href){
+    carregarTabelaLeiturasAjax(href);
+    return false;
+  }
+  return true;
+}
+
+function limparBuscaContato(){
+  var inp = document.getElementById("input-busca-contato");
+  if(inp){
+    inp.value = "";
+    var btnLimpar = document.getElementById("btn-limpar-busca");
+    if(btnLimpar) btnLimpar.style.display = "none";
+    try{
+      var u = new URL(window.location.href);
+      if(u.searchParams.has("busca")){
+        u.searchParams.delete("busca");
+        u.searchParams.delete("pag_leituras");
+        u.searchParams.delete("pagina");
+        carregarTabelaLeiturasAjax(u);
+        inp.focus();
+        return;
+      }
+    }catch(e){}
+    executarFiltroCombinado();
+    inp.focus();
+  }
+}
+
+function submeterBuscaContato(){
+  var inp = document.getElementById("input-busca-contato");
+  var termo = (inp && inp.value) ? inp.value.trim() : "";
+  try{
+    var u = new URL(window.location.href);
+    if(termo){ u.searchParams.set("busca", termo); }
+    else { u.searchParams.delete("busca"); }
+    u.searchParams.delete("pag_leituras");
+    u.searchParams.delete("pagina");
+    carregarTabelaLeiturasAjax(u);
+  }catch(e){
+    window.location.search = (termo ? ("?busca=" + encodeURIComponent(termo)) : "");
+  }
+}
+
+function navegarPeriodoAjax(urlDestino, evt){
+  if(evt && evt.preventDefault) evt.preventDefault();
+  if(!urlDestino) return false;
+
+  var u = (typeof urlDestino === "string") ? new URL(urlDestino, window.location.href) : urlDestino;
+  var vDash = document.getElementById("visao-dashboard");
+  var vFin = document.getElementById("visao-financeiro");
+  var ativoView = (vFin && vFin.classList.contains("on")) ? "financeiro" : "dashboard";
+
+  if(u.searchParams.get("view") === "financeiro" || u.hash === "#financeiro"){
+    ativoView = "financeiro";
+  }
+
+  var containerAlvo = (ativoView === "financeiro") ? vFin : vDash;
+  if(containerAlvo){
+    containerAlvo.style.transition = "opacity 0.15s ease";
+    containerAlvo.style.opacity = "0.45";
+  }
+
+  fetch(u.toString(), {
+    method: "GET",
+    headers: { "Accept": "text/html" }
+  })
+  .then(function(res){
+    if(!res.ok) throw new Error("Erro " + res.status);
+    return res.text();
+  })
+  .then(function(htmlTexto){
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(htmlTexto, "text/html");
+
+    if(window.history && window.history.pushState){
+      window.history.pushState(null, "", u.toString());
+    }
+
+    var novoDash = doc.getElementById("visao-dashboard");
+    var novoFin = doc.getElementById("visao-financeiro");
+
+    if(vDash && novoDash){
+      vDash.innerHTML = novoDash.innerHTML;
+    }
+    if(vFin && novoFin){
+      vFin.innerHTML = novoFin.innerHTML;
+    }
+
+    if(typeof window.trocarVisao === "function"){
+      window.trocarVisao(ativoView);
+    }
+
+    if(ativoView === "dashboard" && typeof window.abrirAba === "function"){
+      var abaSalva = localStorage.getItem("painel_aba_ativa") || "aba-funil";
+      if(u.hash && u.hash.indexOf("#aba-") === 0){
+        abaSalva = u.hash.substring(1);
+      }
+      window.abrirAba(abaSalva);
+    }
+
+    if(typeof iniciarArrastoScroll === "function"){
+      iniciarArrastoScroll();
+    }
+    if(typeof aplicarSelecaoNoDOM === "function"){
+      aplicarSelecaoNoDOM();
+    }
+  })
+  .catch(function(err){
+    console.error("Falha ao atualizar período via AJAX:", err);
+    window.location.href = u.toString();
+  })
+  .finally(function(){
+    if(containerAlvo){
+      containerAlvo.style.opacity = "1";
+    }
+  });
+
+  return false;
+}
+
+function submeterFormDatasAjax(form, evt){
+  if(evt && evt.preventDefault) evt.preventDefault();
+  if(!form) return false;
+  try{
+    var formData = new FormData(form);
+    var u = new URL(form.action || window.location.href, window.location.href);
+    formData.forEach(function(val, key){
+      if(val !== null && val !== "") u.searchParams.set(key, val);
+      else u.searchParams.delete(key);
+    });
+    return navegarPeriodoAjax(u.toString(), evt);
+  }catch(e){
+    form.submit();
+    return false;
+  }
+}
+
+window.addEventListener("popstate", function(){
+  navegarPeriodoAjax(window.location.href);
+});
 
 var _selecionarTodosFiltro = false;
 var _idsSelecionados = new Set();
@@ -792,7 +1342,7 @@ function obterAssinaturaFiltro(){
     var temDatas = (u.searchParams.get("de") || u.searchParams.get("ate"));
     var diasVal = u.searchParams.get("dias") || (temDatas ? "" : "7");
     if(diasVal) partes.push("dias=" + diasVal);
-    ["de", "ate", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "uf"].sort().forEach(function(k){
+    ["de", "ate", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "so_avaliados", "uf", "busca"].sort().forEach(function(k){
       var v = u.searchParams.get(k);
       if(v !== null && v !== "") partes.push(k + "=" + v);
     });
@@ -1045,7 +1595,7 @@ function atualizarContadorSelecao(){
 function exportarTodosViaServidor(){
   var u = new URL(window.location.href);
   var exportUrl = new URL("/painel/exportar-csv", window.location.origin);
-  ["de", "ate", "dias", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "uf"].forEach(function(param){
+  ["de", "ate", "dias", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "so_avaliados", "uf", "busca"].forEach(function(param){
     var val = u.searchParams.get(param);
     if(val !== null && val !== "") {
       exportUrl.searchParams.set(param, val);
@@ -1054,6 +1604,10 @@ function exportarTodosViaServidor(){
   var selUF = document.getElementById("select-filtro-uf");
   if(selUF && selUF.value){
     exportUrl.searchParams.set("uf", selUF.value);
+  }
+  var inpBusca = document.getElementById("input-busca-contato");
+  if(inpBusca && inpBusca.value.trim()){
+    exportUrl.searchParams.set("busca", inpBusca.value.trim());
   }
   var bAtivo = document.querySelector(".btn-filtro-leituras.on");
   if(bAtivo){
@@ -1129,6 +1683,7 @@ function exportarContatosCSV(){
     "Nome Completo",
     "WhatsApp",
     "Data de Nascimento",
+    "Idade",
     "Hora de Nascimento",
     "Cidade",
     "UF",
@@ -1161,6 +1716,7 @@ function exportarContatosCSV(){
       esc(d.nome || "—"),
       esc(d.whatsapp || "—"),
       esc(d.nascimento || "—"),
+      esc(d.idade || "—"),
       esc(d.hora_nasc || "—"),
       esc(d.cidade || "—"),
       esc(d.uf || "—"),
@@ -1556,11 +2112,165 @@ function fecharModalExcluir(){
   var modal = document.getElementById("modal-excluir-backdrop");
   if(modal){ modal.classList.remove("on"); }
 }
+var _textoCopiaAtual = "";
+function abrirModalMensagem(id){
+  if(!id) return;
+  var backdrop = document.getElementById("modal-mensagem-backdrop");
+  if(!backdrop) return;
+  var elNome = document.getElementById("modal-msg-nome");
+  var elSubinfo = document.getElementById("modal-msg-subinfo");
+  var elCarregando = document.getElementById("modal-msg-carregando");
+  var elConteudo = document.getElementById("modal-msg-conteudo");
+  var linkDetalhes = document.getElementById("modal-msg-link-detalhes");
+  var btnCopiar = document.getElementById("btn-copiar-mensagem");
+
+  _textoCopiaAtual = "";
+  if(elNome) elNome.textContent = "Carregando...";
+  if(elSubinfo) elSubinfo.innerHTML = "";
+  if(elCarregando){ elCarregando.style.display = "block"; elCarregando.innerHTML = '<span class="spinner-msg">⏳</span> Carregando mensagem do usuário...'; }
+  if(elConteudo) elConteudo.style.display = "none";
+  if(linkDetalhes) linkDetalhes.href = "/painel/leitura/" + encodeURIComponent(id);
+  if(btnCopiar){ btnCopiar.textContent = "📋 Copiar Mensagem"; btnCopiar.disabled = true; }
+
+  backdrop.classList.add("on");
+
+  fetch("/painel/leitura/" + encodeURIComponent(id) + "/mensagem", {
+    headers: { "Accept": "application/json" }
+  })
+  .then(function(res){
+    if(!res.ok){
+      return res.json().then(function(j){ throw new Error(j.detail || ("Erro " + res.status)); })
+             .catch(function(e){ throw new Error(e.message || ("Erro ao carregar (" + res.status + ")")); });
+    }
+    return res.json();
+  })
+  .then(function(dados){
+    if(elCarregando) elCarregando.style.display = "none";
+    if(elConteudo) elConteudo.style.display = "block";
+
+    _textoCopiaAtual = dados.texto_copia || "";
+    if(btnCopiar) btnCopiar.disabled = false;
+
+    if(elNome) elNome.textContent = dados.nome_completo || "Usuário";
+
+    var waHtml = "";
+    if(dados.whatsapp && dados.whatsapp !== "—"){
+      var waDigits = dados.whatsapp.replace(/\D/g, "");
+      var waLink = (waDigits.length === 10 || waDigits.length === 11) ? ("55" + waDigits) : waDigits;
+      waHtml = '<span>📱 <a href="https://wa.me/' + waLink + '" target="_blank" rel="noopener">' + dados.whatsapp + '</a></span>';
+    }
+
+    var subParts = [];
+    if(waHtml) subParts.push(waHtml);
+    if(dados.area && dados.area !== "—") subParts.push('<span>🎯 Área: <b>' + dados.area + '</b></span>');
+    if(dados.cidade && dados.cidade !== "—") subParts.push('<span>📍 ' + dados.cidade + (dados.uf && dados.uf !== "—" ? '/' + dados.uf : '') + '</span>');
+    if(dados.gerada_bsb) subParts.push('<span>🕒 ' + dados.gerada_bsb + ' (BSB)</span>');
+    subParts.push('<span class="modal-id">ID: ' + id.substring(0, 15) + '</span>');
+
+    if(elSubinfo) elSubinfo.innerHTML = subParts.join(' <span style="opacity:0.3;">•</span> ');
+
+    var c = dados.carta || {};
+    var elSelo = document.getElementById("modal-msg-selo");
+    var elTit = document.getElementById("modal-msg-titulo-carta");
+    var elDest = document.getElementById("modal-msg-destaque");
+    var elPar = document.getElementById("modal-msg-paragrafos");
+    var elJan = document.getElementById("modal-msg-janela");
+    var elAss = document.getElementById("modal-msg-assinatura");
+
+    if(elSelo){
+      if(c.selo){ elSelo.textContent = c.selo; elSelo.style.display = "block"; }
+      else { elSelo.style.display = "none"; }
+    }
+    if(elTit){
+      if(c.titulo){ elTit.textContent = c.titulo; elTit.style.display = "block"; }
+      else { elTit.style.display = "none"; }
+    }
+    if(elDest){
+      if(c.destaque){ elDest.textContent = '“' + c.destaque + '”'; elDest.style.display = "block"; }
+      else { elDest.style.display = "none"; }
+    }
+    if(elPar){
+      elPar.innerHTML = "";
+      if(c.saudacao){
+        var pSaud = document.createElement("p");
+        pSaud.style.fontWeight = "700";
+        pSaud.textContent = c.saudacao;
+        elPar.appendChild(pSaud);
+      }
+      (c.paragrafos || []).forEach(function(par){
+        var p = document.createElement("p");
+        p.textContent = par;
+        elPar.appendChild(p);
+      });
+    }
+    if(elJan){
+      var janHtml = "";
+      if(c.janela) janHtml += '<div>⏳ <b>Janela astrológica:</b> ' + c.janela + '</div>';
+      if(c.cuidado) janHtml += '<div style="margin-top:6px;color:#E57373;">⚠️ <b>Ponto de atenção:</b> ' + c.cuidado + '</div>';
+      if(janHtml){ elJan.innerHTML = janHtml; elJan.style.display = "block"; }
+      else { elJan.style.display = "none"; }
+    }
+    if(elAss){
+      if(c.assinatura){ elAss.textContent = c.assinatura; elAss.style.display = "block"; }
+      else { elAss.style.display = "none"; }
+    }
+  })
+  .catch(function(err){
+    if(elCarregando){
+      elCarregando.style.display = "block";
+      elCarregando.innerHTML = '<span style="color:#E57373;">❌ ' + (err.message || "Erro ao carregar mensagem.") + '</span>';
+    }
+  });
+}
+function fecharModalMensagem(){
+  var backdrop = document.getElementById("modal-mensagem-backdrop");
+  if(backdrop){ backdrop.classList.remove("on"); }
+}
+function copiarTextoMensagem(){
+  if(!_textoCopiaAtual) return;
+  var btn = document.getElementById("btn-copiar-mensagem");
+  var txt = _textoCopiaAtual;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){
+      if(btn){
+        var orig = btn.textContent;
+        btn.textContent = "✅ Copiado!";
+        setTimeout(function(){ btn.textContent = orig; }, 2000);
+      }
+      if(typeof mostrarToast === "function") mostrarToast("Mensagem copiada para a área de transferência!");
+    }).catch(function(){
+      copiarTextoFallback(txt, btn);
+    });
+  } else {
+    copiarTextoFallback(txt, btn);
+  }
+}
+function copiarTextoFallback(txt, btn){
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = txt;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    if(btn){
+      var orig = btn.textContent;
+      btn.textContent = "✅ Copiado!";
+      setTimeout(function(){ btn.textContent = orig; }, 2000);
+    }
+    if(typeof mostrarToast === "function") mostrarToast("Mensagem copiada para a área de transferência!");
+  } catch(e) {
+    if(typeof mostrarToast === "function") mostrarToast("Erro ao copiar mensagem.");
+  }
+}
 document.addEventListener("keydown", function(e){
   if(e.key === "Escape"){
     fecharModalExcluir();
     fecharModalCompra();
     fecharModalImportarCSV();
+    fecharModalMensagem();
   }
 });
 function executarExclusao(){
@@ -1905,27 +2615,53 @@ function processarMensagemTempoReal(msg){
         var nasc = d.nascimento || {};
         var cid = d.cidade || {};
         var nascStr = (nasc.dia && nasc.mes) ? (String(nasc.dia).padStart(2,"0") + "/" + String(nasc.mes).padStart(2,"0") + "/" + String(nasc.ano || "").slice(-2)) : "—";
+        var idadeStr = "—";
+        if(nasc.dia && nasc.mes && nasc.ano){
+          var aNasc = parseInt(nasc.ano, 10);
+          if(aNasc < 100){ aNasc = (aNasc <= 26) ? (2000 + aNasc) : (1900 + aNasc); }
+          var dNasc = parseInt(nasc.dia, 10);
+          var mNasc = parseInt(nasc.mes, 10);
+          var hojeD = new Date();
+          var idCalc = hojeD.getFullYear() - aNasc;
+          var mDif = (hojeD.getMonth() + 1) - mNasc;
+          if(mDif < 0 || (mDif === 0 && hojeD.getDate() < dNasc)){ idCalc--; }
+          if(idCalc >= 0 && idCalc <= 130){
+            idadeStr = idCalc + " anos";
+          }
+        }
         var horaStr = nasc.hora !== undefined ? (String(nasc.hora).padStart(2,"0") + "h" + String(nasc.minuto || 0).padStart(2,"0")) : "desconhecida";
 
         var nomeEsc = (d.nome_completo || "—").replace(/</g, "&lt;");
         var nomeJs = nomeEsc.replace(/'/g, "\\'");
 
         tr.innerHTML = '<td class="td-chk"><input type="checkbox" class="chk-selecao chk-contato" data-id="' + newLid + '" data-nome="' + nomeJs + '" onchange="toggleContatoIndividual(this)" title="Selecionar ' + nomeJs + '"></td>'
-          + '<td><a href="/painel/leitura/' + newLid + '">' + newLid.substring(0, 15) + '</a></td>'
+          + '<td><div style="display:flex;align-items:center;gap:6px;"><button type="button" class="btn-ver-msg-id" onclick="abrirModalMensagem(\'' + newLid + '\')" title="Visualizar a mensagem/carta que o usuário recebeu">👁️</button><a href="/painel/leitura/' + newLid + '" onclick="if(!event.ctrlKey&&!event.metaKey){event.preventDefault();abrirModalMensagem(\'' + newLid + '\');}" title="Ver mensagem">' + newLid.substring(0, 15) + '</a></div></td>'
           + '<td><span style="white-space:nowrap;">' + agoraStr + '</span></td>'
           + '<td><span style="white-space:nowrap;">' + agoraStr + '</span></td>'
           + '<td><span class="tag-etapa" id="tag-etapa-' + newLid + '">Tela 7 (Leitura)</span> <span class="tag-ao-vivo" id="live-tag-' + newLid + '">🟢 Ao vivo</span></td>'
           + '<td><span class="tag-checkout nao" id="tag-checkout-' + newLid + '">Não</span></td>'
+          + '<td><span class="tag-avaliacao pendente">Pendente</span></td>'
           + '<td>' + nomeEsc + '</td>'
           + '<td>' + waHtml + '</td>'
           + '<td>' + nascStr + '</td>'
+          + '<td>' + idadeStr + '</td>'
           + '<td>' + (cid.uf || cid.nome || "—") + '</td>'
           + '<td>' + ((d.quiz && d.quiz.area) || "—") + '</td>'
           + '<td>' + (veredito.tipo || "—") + '</td>'
           + '<td>' + (veredito.casa_eleita_real ? ("Casa " + veredito.casa_aberta) : "—") + '</td>'
           + '<td>' + horaStr + '</td>'
-          + '<td>' + (d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—') + '</td>'
-          + '<td><button type="button" class="btn-del" onclick="abrirModalExcluir(\'' + newLid + '\', \'' + nomeJs + '\', 1, \'[]\', false);" title="Excluir">🗑️ Excluir</button></td>';
+          + '<td>' + (function(){
+              if(d.tempo_ativo_ms !== undefined && d.tempo_ativo_ms !== null){
+                var atv = Math.round(d.tempo_ativo_ms/1000) + 's';
+                var tot = d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '';
+                if(tot && tot !== atv){
+                  return '<span class="tempo-ativo" title="Tempo ativo interagindo no quiz">' + atv + '</span><span class="tempo-total-sub" style="display:block;font-size:11px;color:var(--sand2);" title="Tempo total com a aba aberta (sessão)">total: ' + tot + '</span>';
+                }
+                return '<span class="tempo-ativo" title="Tempo ativo no quiz">' + atv + '</span>';
+              }
+              return d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—';
+            })() + '</td>'
+          + '<td><div style="display:flex;gap:5px;align-items:center;"><button type="button" class="btn-ver-msg-acao" onclick="abrirModalMensagem(\'' + newLid + '\')" title="Visualizar a mensagem/carta que o usuário recebeu">👁️ Mensagem</button><button type="button" class="btn-del" onclick="abrirModalExcluir(\'' + newLid + '\', \'' + nomeJs + '\', 1, \'[]\', false);" title="Excluir">🗑️ Excluir</button></div></td>';
 
         if(window._contatosExportacao){
           window._contatosExportacao[newLid] = {
@@ -1938,6 +2674,7 @@ function processarMensagemTempoReal(msg){
             nome: d.nome_completo || "—",
             whatsapp: d.whatsapp || "—",
             nascimento: nascStr,
+            idade: idadeStr,
             hora_nasc: horaStr,
             cidade: cid.nome || "—",
             uf: cid.uf || "—",
@@ -1945,7 +2682,8 @@ function processarMensagemTempoReal(msg){
             area: (d.quiz && d.quiz.area) || "—",
             cenario: veredito.tipo || "—",
             casa: veredito.casa_eleita_real ? ("Casa " + veredito.casa_aberta) : "—",
-            tempo_quiz: d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—',
+            tempo_quiz: (d.tempo_ativo_ms !== undefined && d.tempo_ativo_ms !== null) ? Math.round(d.tempo_ativo_ms/1000) + 's' : (d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—'),
+            tempo_sessao: d.tempo_quiz_ms ? Math.round(d.tempo_quiz_ms/1000) + 's' : '—',
             total_envios: 1
           };
         }
@@ -1961,15 +2699,38 @@ function processarMensagemTempoReal(msg){
 
 (function(){
   vincularAbas();
-  var hash=(location.hash||"").replace("#","");
-  var salva="";try{salva=localStorage.getItem("painel_aba_ativa");}catch(e){}
-  var alvo=hash||salva;
-  if(alvo&&document.getElementById(alvo)){window.abrirAba(alvo);}
+  var u = new URL(window.location.href);
+  var vParam = u.searchParams.get("view");
+  var h = (location.hash || "").replace("#", "");
+  var visaoSalva = "";
+  try{ visaoSalva = localStorage.getItem("painel_visao_ativa"); }catch(e){}
+
+  var deveAbrirFin = (vParam === "financeiro" || h === "financeiro" || (!vParam && visaoSalva === "financeiro" && !h.startsWith("aba-")));
+
+  if(deveAbrirFin){
+    trocarVisao("financeiro");
+  } else {
+    trocarVisao("dashboard");
+    var salvaAba = "";
+    try{ salvaAba = localStorage.getItem("painel_aba_ativa") || "aba-funil"; }catch(e){}
+    var alvo = h.startsWith("aba-") ? h : salvaAba;
+    if(alvo && document.getElementById(alvo)){
+      window.abrirAba(alvo);
+    }
+  }
+
   atualizarLinksPresetsAba();
   iniciarArrastoScroll();
   inicializarDropzoneCSV();
   conectarWebSocketPainel();
   aplicarSelecaoNoDOM();
+  try{
+    var qPagFin = parseInt(new URLSearchParams(window.location.search).get("pag_fin"), 10);
+    if(!isNaN(qPagFin) && qPagFin >= 0){
+      _pagFinAtual = qPagFin + 1;
+    }
+    atualizarTabelaFinanceiroPaginada();
+  }catch(e){}
 })();
 """
 
@@ -2090,6 +2851,45 @@ def _modal_importar_csv() -> str:
     )
 
 
+def _modal_visualizar_mensagem() -> str:
+    return (
+        '<div id="modal-mensagem-backdrop" class="modal-backdrop">'
+        '  <div id="modal-mensagem-card" class="modal-card modal-card-mensagem" role="dialog" aria-modal="true" aria-labelledby="modal-msg-titulo">'
+        '    <button type="button" class="modal-fechar-btn" onclick="fecharModalMensagem()" title="Fechar (Esc)">✕</button>'
+        '    <div class="modal-msg-topo">'
+        '      <div class="modal-msg-cabecalho-info">'
+        '        <div class="modal-msg-tag-origem">📜 Mensagem Recebida pelo Usuário (Tela 7)</div>'
+        '        <h3 id="modal-msg-nome" class="modal-msg-nome">—</h3>'
+        '        <div id="modal-msg-subinfo" class="modal-msg-subinfo"></div>'
+        '      </div>'
+        '      <div class="modal-msg-topo-acoes">'
+        '        <button type="button" id="btn-copiar-mensagem" class="btn-msg-copiar" onclick="copiarTextoMensagem()" title="Copiar texto da mensagem para a área de transferência">'
+        '          📋 Copiar Mensagem'
+        '        </button>'
+        '      </div>'
+        '    </div>'
+        '    <div id="modal-msg-corpo" class="modal-msg-corpo">'
+        '      <div id="modal-msg-carregando" class="modal-msg-loading">'
+        '        <span class="spinner-msg">⏳</span> Carregando mensagem do usuário...'
+        '      </div>'
+        '      <div id="modal-msg-conteudo" style="display:none;">'
+        '        <div id="modal-msg-selo" class="modal-msg-selo" style="display:none;"></div>'
+        '        <div id="modal-msg-titulo-carta" class="modal-msg-titulo-carta" style="display:none;"></div>'
+        '        <div id="modal-msg-destaque" class="modal-msg-destaque" style="display:none;"></div>'
+        '        <div id="modal-msg-paragrafos" class="modal-msg-paragrafos"></div>'
+        '        <div id="modal-msg-janela" class="modal-msg-janela" style="display:none;"></div>'
+        '        <div id="modal-msg-assinatura" class="modal-msg-assinatura" style="display:none;"></div>'
+        '      </div>'
+        '    </div>'
+        '    <div class="modal-msg-rodape">'
+        '      <a id="modal-msg-link-detalhes" href="#" target="_blank" class="modal-msg-link-detalhe" title="Abrir página completa com cálculos, veredito técnico e metadados">'
+        '        🔗 Ver dados técnicos e cálculo completo ↗'
+        '      </a>'
+        '      <button type="button" class="btn-modal-cancelar" onclick="fecharModalMensagem()">Fechar</button>'
+        '    </div>'
+        '  </div>'
+        '</div>'
+    )
 
 
 def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
@@ -2107,11 +2907,13 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
         checkout_salvo = bool(d.get("checkout") or False)
         sid = str(d.get("cliente_id") or "").strip()
 
+        tempo_ativo_salvo = d.get("tempo_ativo_ms")
         progresso[leitura_id] = {
             "max_tela": etapa_salva,
             "rotulo": d.get("etapa_nome") or registro.ETAPAS_ROTULOS.get(etapa_salva, f"Tela {etapa_salva}"),
             "checkout": checkout_salvo,
             "sid": sid,
+            "tempo_ativo_ms": tempo_ativo_salvo,
         }
         if sid:
             sids_map.setdefault(sid, []).append(leitura_id)
@@ -2139,6 +2941,7 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
     if not lids_set and not sids_map:
         return progresso
 
+    soma_ms_sid: dict[str, int] = {}
     for d_pesq in sorted(datas_pesquisa):
         arq_ev = config.DIR_EVENTOS / f"{d_pesq:%Y-%m-%d}.jsonl"
         if not arq_ev.exists():
@@ -2172,17 +2975,32 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
                             if ev_sid:
                                 sids_map.setdefault(ev_sid, []).append(lid_entregue)
 
+                    if evt == "tela" and ev_sid:
+                        de_val = props.get("de")
+                        para_val = props.get("para")
+                        ms_ant = props.get("ms_na_anterior") or 0
+                        if isinstance(de_val, int) and isinstance(ms_ant, (int, float)):
+                            if de_val == 0 and para_val == 1:
+                                soma_ms_sid[ev_sid] = int(ms_ant)
+                            elif 1 <= de_val <= 5:
+                                soma_ms_sid[ev_sid] = soma_ms_sid.get(ev_sid, 0) + int(ms_ant)
+
                     if not alvos:
                         continue
 
                     for alvo_lid in alvos:
                         info = progresso[alvo_lid]
                         if evt == "tela":
+                            de_val = props.get("de")
+                            para_val = props.get("para")
                             for k in ("para", "de"):
                                 val = props.get(k)
                                 if isinstance(val, int) and 0 <= val <= 10:
                                     if val > info["max_tela"]:
                                         info["max_tela"] = val
+                            if de_val == 5 and para_val == 6:
+                                if info.get("tempo_ativo_ms") is None and ev_sid in soma_ms_sid:
+                                    info["tempo_ativo_ms"] = soma_ms_sid[ev_sid]
                         elif evt == "oferta_clique":
                             info["checkout"] = True
                             if info["max_tela"] < 10:
@@ -2195,6 +3013,8 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
                         elif evt == "leitura_entregue":
                             if info["max_tela"] < 7:
                                 info["max_tela"] = 7
+                            if info.get("tempo_ativo_ms") is None and ev_sid in soma_ms_sid:
+                                info["tempo_ativo_ms"] = soma_ms_sid[ev_sid]
         except Exception as err:
             logger.warning("Erro ao ler eventos em %s: %s", arq_ev.name, err)
 
@@ -2395,6 +3215,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                      so_whatsapp: bool = False,
                      so_avaliados: bool = False,
                      uf: Optional[str] = None,
+                     busca: Optional[str] = None,
                      de: Optional[date] = None,
                      ate: Optional[date] = None) -> ResultadoTabela:
     arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
@@ -2474,6 +3295,24 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             if str((g.get("cidade") or {}).get("uf") or (g.get("cidade") or {}).get("nome") or "").strip().lower() == uf_norm
         ]
 
+    if busca and busca.strip():
+        termo_busca = busca.strip().lower()
+        termo_digitos = re.sub(r"\D", "", termo_busca)
+        def _match_busca(g: dict) -> bool:
+            nome = str(g.get("nome_completo") or "").lower()
+            wa = str(g.get("whatsapp") or "").lower()
+            wa_dig = re.sub(r"\D", "", wa)
+            if termo_busca in nome or termo_busca in wa or (termo_digitos and termo_digitos in wa_dig):
+                return True
+            for _, s_d in g.get("outras_leituras", []):
+                s_nome = str(s_d.get("nome_completo") or "").lower()
+                s_wa = str(s_d.get("whatsapp") or "").lower()
+                s_wa_dig = re.sub(r"\D", "", s_wa)
+                if termo_busca in s_nome or termo_busca in s_wa or (termo_digitos and termo_digitos in s_wa_dig):
+                    return True
+            return False
+        grupos_filtrados = [g for g in grupos_filtrados if _match_busca(g)]
+
     total_pessoas_exibidas = len(grupos_filtrados)
     total_leituras_exibidas = sum(g["total_envios"] for g in grupos_filtrados)
 
@@ -2489,6 +3328,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
     for g in recorte_grupos:
         stem = g["stem_principal"]
         d = g["d_principal"]
+        prog = progresso_map.get(stem, {})
         v, pr = d.get("veredito") or {}, d.get("precisao") or {}
         nasc = g["nascimento"]
         cid = g["cidade"]
@@ -2528,7 +3368,12 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             f'onclick="abrirModalCompra(\'{html.escape(stem)}\', \'{nome_js}\', {1 if g_comprou else 0}, this);" '
             f'title="{btn_compra_title}">{btn_compra_txt}</button>'
         )
-        acoes_principal = f'<div style="display:flex;gap:5px;align-items:center;">{btn_compra_principal}{btn_del_principal}</div>'
+        btn_msg_principal = (
+            f'<button type="button" class="btn-ver-msg-acao" '
+            f'onclick="abrirModalMensagem(\'{html.escape(stem)}\')" '
+            f'title="Visualizar a mensagem/carta que o usuário recebeu">👁️ Mensagem</button>'
+        )
+        acoes_principal = f'<div style="display:flex;gap:5px;align-items:center;">{btn_msg_principal}{btn_compra_principal}{btn_del_principal}</div>'
 
         fb_estrelas = g.get("feedback_estrelas")
         fb_pulou = g.get("feedback_pulou")
@@ -2537,12 +3382,21 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
 
         cid_str = html.escape(str(g["d_principal"].get("cliente_id") or ""))
         uf_attr = html.escape(str(cid.get("uf") or cid.get("nome") or "").strip().lower())
-        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-uf="{uf_attr}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-whatsapp="{"1" if g.get("tem_whatsapp") else "0"}" data-avaliado="{aval_attr}" data-sid="{cid_str}"')
+        nome_busca_attr = html.escape(str(g.get("nome_completo") or "").strip().lower())
+        wa_digitos_attr = re.sub(r"\D", "", str(g.get("whatsapp") or ""))
+        wa_raw_attr = html.escape(str(g.get("whatsapp") or "").strip().lower())
+        tr_attrs.append(f'id="row-pessoa-{stem}" class="tr-pessoa" data-checkout="{"1" if g["teve_checkout"] else "0"}" data-uf="{uf_attr}" data-nome="{nome_busca_attr}" data-wa="{wa_digitos_attr}" data-wa-raw="{wa_raw_attr}" data-ao-vivo="{"1" if g["ao_vivo"] else "0"}" data-comprou="{"1" if g_comprou else "0"}" data-whatsapp="{"1" if g.get("tem_whatsapp") else "0"}" data-avaliado="{aval_attr}" data-sid="{cid_str}"')
         
         chk_principal = f'<input type="checkbox" class="chk-selecao chk-contato" data-id="{html.escape(stem)}" data-nome="{nome_js}" onchange="toggleContatoIndividual(this)" title="Selecionar {nome_js}">'
+        cell_id_principal = (
+            f'<div style="display:flex;align-items:center;gap:6px;">'
+            f'<button type="button" class="btn-ver-msg-id" onclick="abrirModalMensagem(\'{html.escape(stem)}\')" title="Visualizar a mensagem/carta que o usuário recebeu">👁️</button>'
+            f'<a href="/painel/leitura/{html.escape(stem)}" onclick="if(!event.ctrlKey&&!event.metaKey){{event.preventDefault();abrirModalMensagem(\'{html.escape(stem)}\');}}" title="Clique para ver a mensagem (ou Ctrl+Clique para página técnica)">{html.escape(stem[:15])}</a>'
+            f'</div>'
+        )
         linhas.append([
             chk_principal,
-            f'<a href="/painel/leitura/{html.escape(stem)}">{html.escape(stem[:15])}</a>',
+            cell_id_principal,
             f'<span style="white-space:nowrap;">{html.escape(chegada_bsb)}</span>',
             f'<span style="white-space:nowrap;">{html.escape(gerada_bsb)}</span>',
             tag_etapa,
@@ -2551,15 +3405,17 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             nome_cell,
             f_wa(g["whatsapp"]),
             f_data(nasc),
+            f_idade(nasc),
             html.escape(cid.get("uf") or cid.get("nome") or "—"),
             html.escape(str((d.get("quiz") or {}).get("area") or "—")),
             html.escape(str(v.get("tipo") or "—")),
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
             f_hora(nasc, pr),
-            f_tempo(d.get("tempo_quiz_ms")),
+            f_tempo_quiz_duplo(prog.get("tempo_ativo_ms", d.get("tempo_ativo_ms")), d.get("tempo_quiz_ms")),
             acoes_principal,
         ])
 
+        t_ativo_exp = prog.get("tempo_ativo_ms", d.get("tempo_ativo_ms"))
         dados_exportacao_map[stem] = {
             "id": stem,
             "chegou_em_bsb": chegada_bsb,
@@ -2571,6 +3427,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "nome": g["nome_completo"],
             "whatsapp": g["whatsapp"] or "—",
             "nascimento": f_data(nasc),
+            "idade": f_idade(nasc),
             "hora_nasc": f_hora(nasc, pr),
             "cidade": cid.get("nome") or "—",
             "uf": cid.get("uf") or "—",
@@ -2578,7 +3435,8 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             "area": str((d.get("quiz") or {}).get("area") or "—"),
             "cenario": str(v.get("tipo") or "—"),
             "casa": "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
-            "tempo_quiz": f_tempo(d.get("tempo_quiz_ms")),
+            "tempo_quiz": f_tempo(t_ativo_exp) if t_ativo_exp is not None else f_tempo(d.get("tempo_quiz_ms")),
+            "tempo_sessao": f_tempo(d.get("tempo_quiz_ms")),
             "total_envios": g["total_envios"]
         }
 
@@ -2611,7 +3469,12 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 f'onclick="abrirModalExcluir(\'{html.escape(sub_stem)}\', \'{nome_js}\', 1, \'[]\', true);" '
                 f'title="Excluir apenas esta tentativa anterior">🗑️</button>'
             )
-            acoes_sub = f'<div style="display:flex;gap:4px;align-items:center;">{btn_compra_sub}{btn_del_sub}</div>'
+            btn_msg_sub = (
+                f'<button type="button" class="btn-ver-msg-acao sub" '
+                f'onclick="abrirModalMensagem(\'{html.escape(sub_stem)}\')" '
+                f'title="Visualizar a mensagem/carta desta tentativa">👁️</button>'
+            )
+            acoes_sub = f'<div style="display:flex;gap:4px;align-items:center;">{btn_msg_sub}{btn_compra_sub}{btn_del_sub}</div>'
 
             sub_wa_digitos = re.sub(r"\D", "", str(sub_d.get("whatsapp") or ""))
             sub_tem_wa = bool(sub_d.get("whatsapp") and len(sub_wa_digitos) >= 8)
@@ -2622,10 +3485,18 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             sub_aval_attr = "1" if (sub_fb_estrelas is not None or sub_fb_pulou) else "0"
 
             sub_uf_attr = html.escape(str(sub_cid.get("uf") or sub_cid.get("nome") or "").strip().lower())
-            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" data-uf="{sub_uf_attr}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-whatsapp="{"1" if sub_tem_wa else "0"}" data-avaliado="{sub_aval_attr}" data-sid="{sub_cid_str}"')
+            sub_nome_attr = html.escape(str(sub_d.get("nome_completo") or g.get("nome_completo") or "").strip().lower())
+            sub_wa_raw_attr = html.escape(str(sub_d.get("whatsapp") or "").strip().lower())
+            tr_attrs.append(f'id="row-leitura-{sub_stem}" class="tr-subleitura grupo-{g["id_grupo"]}" data-uf="{sub_uf_attr}" style="display:none;" data-checkout="{"1" if sub_prog["checkout"] else "0"}" data-ao-vivo="{"1" if sub_ao_vivo else "0"}" data-comprou="{"1" if sub_comprou else "0"}" data-whatsapp="{"1" if sub_tem_wa else "0"}" data-avaliado="{sub_aval_attr}" data-nome="{sub_nome_attr}" data-wa="{sub_wa_digitos}" data-wa-raw="{sub_wa_raw_attr}" data-sid="{sub_cid_str}"')
+            cell_id_sub = (
+                f'<div style="display:flex;align-items:center;gap:6px;padding-left:14px;">'
+                f'<button type="button" class="btn-ver-msg-id" onclick="abrirModalMensagem(\'{html.escape(sub_stem)}\')" title="Visualizar a mensagem desta tentativa">👁️</button>'
+                f'<a href="/painel/leitura/{html.escape(sub_stem)}" onclick="if(!event.ctrlKey&&!event.metaKey){{event.preventDefault();abrirModalMensagem(\'{html.escape(sub_stem)}\');}}" style="color:var(--sand2);" title="Clique para ver a mensagem desta tentativa (ou Ctrl+Clique para página técnica)">↳ {html.escape(sub_stem[:15])}</a>'
+                f'</div>'
+            )
             linhas.append([
                 '<span style="opacity:0.25;font-size:11px;display:inline-block;padding-left:4px;">↳</span>',
-                f'<span style="padding-left:14px;"><a href="/painel/leitura/{html.escape(sub_stem)}" style="color:var(--sand2);">↳ {html.escape(sub_stem[:15])}</a></span>',
+                cell_id_sub,
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_chegada_bsb)}</span>',
                 f'<span style="white-space:nowrap;color:var(--sand2);">{html.escape(sub_gerada_bsb)}</span>',
                 sub_tag_etapa,
@@ -2634,12 +3505,13 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
                 '<span style="color:var(--sand2);font-size:11.5px;padding-left:8px;">↳ tentativa anterior</span>',
                 f_wa(sub_d.get("whatsapp")),
                 f_data(sub_nasc),
+                f_idade(sub_nasc),
                 "—",
                 html.escape(str((sub_d.get("quiz") or {}).get("area") or "—")),
                 html.escape(str(sub_v.get("tipo") or "—")),
                 "—" if not sub_v.get("casa_eleita_real") else f'Casa {sub_v.get("casa_aberta")}',
                 f_hora(sub_nasc, sub_pr),
-                f_tempo(sub_d.get("tempo_quiz_ms")),
+                f_tempo_quiz_duplo(sub_prog.get("tempo_ativo_ms", sub_d.get("tempo_ativo_ms")), sub_d.get("tempo_quiz_ms")),
                 acoes_sub,
             ])
 
@@ -2659,7 +3531,9 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
             '  </div>'
             '</div>'
         )
-        if so_whatsapp:
+        if busca and busca.strip():
+            corpo = barra_vazio + f'<p class="vazio">Nenhum contato encontrado para a busca &ldquo;{html.escape(busca.strip())}&rdquo;.</p>'
+        elif so_whatsapp:
             corpo = barra_vazio + '<p class="vazio">Nenhum contato com WhatsApp registrado neste período.</p>'
         elif so_comprou:
             corpo = barra_vazio + '<p class="vazio">Nenhum comprador registrado neste período.</p>'
@@ -2727,7 +3601,7 @@ def _tabela_leituras(pagina: int = 0, por_pagina: int = 20,
         )
         corpo = barra_acoes + _tabela([
             "[sel]", "id", "chegou ao quiz (bsb)", "preencheu dados (bsb)", "etapa alcançada", "checkout",
-            "avaliação", "nome", "whatsapp", "nascimento", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
+            "avaliação", "nome", "whatsapp", "nascimento", "idade", "uf", "área", "cenário", "casa", "hora nasc.", "tempo no quiz", "ações"
         ], linhas, tr_attrs=tr_attrs, tbody_id="tbody-leituras", wrap_class="tbl-wrap tbl-wrap-leituras") + script_export
 
     return ResultadoTabela(corpo, total_leituras_exibidas, total_paginas, total_pessoas_exibidas, total_pessoas_checkout, total_leituras_geral, total_pessoas_ao_vivo, total_pessoas_comprou, total_pessoas_whatsapp, total_pessoas_avaliados, lista_ufs)
@@ -2753,12 +3627,33 @@ def _dropdown_filtro_uf(lista_ufs: list[tuple[str, int]], uf_selecionado: Option
     )
 
 
+def _campo_busca_contato(busca: Optional[str] = None) -> str:
+    """Renderiza a caixa de busca de contato por Nome ou WhatsApp."""
+    val = html.escape((busca or "").strip())
+    tem_busca = bool(val)
+    btn_limpar_display = "inline-flex" if tem_busca else "none"
+    return (
+        '<div class="busca-contato-wrap" title="Pesquise contatos por Nome ou WhatsApp">'
+        '  <span class="icone-lupa-busca">🔍</span>'
+        f'  <input type="text" id="input-busca-contato" class="input-busca-contato" '
+        f'         placeholder="Buscar por Nome ou WhatsApp..." value="{val}" '
+        f'         autocomplete="off" spellcheck="false" '
+        f'         oninput="buscarContatoClient(this.value)" '
+        f'         onkeydown="if(event.key===\'Enter\'){{event.preventDefault();submeterBuscaContato();}}">'
+        f'  <button type="button" id="btn-limpar-busca" class="btn-limpar-busca" '
+        f'          style="display:{btn_limpar_display};" onclick="limparBuscaContato()" title="Limpar busca">✕</button>'
+        '</div>'
+    )
+
+
 def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: dict,
                      por_pagina: int = 20, param_nome: str = "pag_leituras",
                      hash_tab: str = "", rotulo_item: str = "leituras") -> str:
     if total_arquivos == 0:
         return ""
     total_paginas = max(1, (total_arquivos + por_pagina - 1) // por_pagina)
+    if total_paginas <= 1:
+        return ""
     pagina_int = pagina.default if hasattr(pagina, "default") else int(pagina)
     pagina = min(max(0, pagina_int), total_paginas - 1)
 
@@ -2777,9 +3672,10 @@ def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: di
         return url
 
     botoes = []
+    onclick_attr = ' onclick="return navegarPaginacaoLeituras(this, event);"' if hash_tab == "#aba-leituras" else ""
     # Botão Anterior
     if pagina > 0:
-        botoes.append(f'<a class="pag-btn" href="{make_url(pagina - 1)}">← Anterior</a>')
+        botoes.append(f'<a class="pag-btn" href="{make_url(pagina - 1)}"{onclick_attr}>← Anterior</a>')
     else:
         botoes.append('<span class="pag-btn disabled">← Anterior</span>')
 
@@ -2790,7 +3686,7 @@ def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: di
         p_ini = max(0, p_fim - 5)
 
     if p_ini > 0:
-        botoes.append(f'<a class="pag-btn" href="{make_url(0)}">1</a>')
+        botoes.append(f'<a class="pag-btn" href="{make_url(0)}"{onclick_attr}>1</a>')
         if p_ini > 1:
             botoes.append('<span class="pag-btn disabled">…</span>')
 
@@ -2798,16 +3694,16 @@ def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: di
         if p_idx == pagina:
             botoes.append(f'<span class="pag-btn on">{p_idx + 1}</span>')
         else:
-            botoes.append(f'<a class="pag-btn" href="{make_url(p_idx)}">{p_idx + 1}</a>')
+            botoes.append(f'<a class="pag-btn" href="{make_url(p_idx)}"{onclick_attr}>{p_idx + 1}</a>')
 
     if p_fim < total_paginas:
         if p_fim < total_paginas - 1:
             botoes.append('<span class="pag-btn disabled">…</span>')
-        botoes.append(f'<a class="pag-btn" href="{make_url(total_paginas - 1)}">{total_paginas}</a>')
+        botoes.append(f'<a class="pag-btn" href="{make_url(total_paginas - 1)}"{onclick_attr}>{total_paginas}</a>')
 
     # Botão Próxima
     if pagina < total_paginas - 1:
-        botoes.append(f'<a class="pag-btn" href="{make_url(pagina + 1)}">Próxima →</a>')
+        botoes.append(f'<a class="pag-btn" href="{make_url(pagina + 1)}"{onclick_attr}>Próxima →</a>')
     else:
         botoes.append('<span class="pag-btn disabled">Próxima →</span>')
 
@@ -2817,25 +3713,436 @@ def _barra_paginacao(pagina: int, total_arquivos: int, base_url: str, params: di
             f'</div>')
 
 
+def _barra_paginacao_fin(pagina: int, total_itens: int, base_url: str, params: dict,
+                         por_pagina: int = 20) -> str:
+    if total_itens == 0:
+        return '<div id="paginacao-financeiro"></div>'
+    total_paginas = max(1, (total_itens + por_pagina - 1) // por_pagina)
+    if total_paginas <= 1:
+        return '<div id="paginacao-financeiro"></div>'
+
+    pagina = min(max(0, pagina), total_paginas - 1)
+    inicio = pagina * por_pagina + 1
+    fim = min((pagina + 1) * por_pagina, total_itens)
+    info = f"Mostrando <b>{inicio}–{fim}</b> de <b>{total_itens}</b> gerações · Página {pagina + 1} de {total_paginas}"
+
+    def make_url(p: int) -> str:
+        q = {k: v for k, v in params.items() if v is not None}
+        q["pag_fin"] = p
+        qs = "&".join(f"{k}={v}" for k, v in q.items())
+        return f"{base_url}?{qs}#financeiro"
+
+    botoes = []
+    # Botão Anterior
+    if pagina > 0:
+        botoes.append(f'<a class="pag-btn" href="{make_url(pagina - 1)}" onclick="mudarPaginaFin({pagina}); return false;">← Anterior</a>')
+    else:
+        botoes.append('<span class="pag-btn disabled">← Anterior</span>')
+
+    p_ini = max(0, pagina - 2)
+    p_fim = min(total_paginas, p_ini + 5)
+    if p_fim - p_ini < 5:
+        p_ini = max(0, p_fim - 5)
+
+    if p_ini > 0:
+        botoes.append(f'<a class="pag-btn" href="{make_url(0)}" onclick="mudarPaginaFin(1); return false;">1</a>')
+        if p_ini > 1:
+            botoes.append('<span class="pag-btn disabled">…</span>')
+
+    for p_idx in range(p_ini, p_fim):
+        if p_idx == pagina:
+            botoes.append(f'<span class="pag-btn on">{p_idx + 1}</span>')
+        else:
+            botoes.append(f'<a class="pag-btn" href="{make_url(p_idx)}" onclick="mudarPaginaFin({p_idx + 1}); return false;">{p_idx + 1}</a>')
+
+    if p_fim < total_paginas:
+        if p_fim < total_paginas - 1:
+            botoes.append('<span class="pag-btn disabled">…</span>')
+        botoes.append(f'<a class="pag-btn" href="{make_url(total_paginas - 1)}" onclick="mudarPaginaFin({total_paginas}); return false;">{total_paginas}</a>')
+
+    # Botão Próxima
+    if pagina < total_paginas - 1:
+        botoes.append(f'<a class="pag-btn" href="{make_url(pagina + 1)}" onclick="mudarPaginaFin({pagina + 2}); return false;">Próxima →</a>')
+    else:
+        botoes.append('<span class="pag-btn disabled">Próxima →</span>')
+
+    return (f'<div id="paginacao-financeiro" class="paginacao">'
+            f'<span class="pag-info">{info}</span>'
+            f'<div class="pag-links">{"".join(botoes)}</div>'
+            f'</div>')
+
+
+def _render_bloco_tabela_leituras(pagina: int = 0, por_pagina: int = 20,
+                                 so_checkout: bool = False,
+                                 so_ao_vivo: bool = False,
+                                 so_comprou: bool = False,
+                                 so_whatsapp: bool = False,
+                                 so_avaliados: bool = False,
+                                 uf: Optional[str] = None,
+                                 busca: Optional[str] = None,
+                                 de: Optional[date] = None,
+                                 ate: Optional[date] = None,
+                                 dias_int: int = 7,
+                                 bots: int = 0,
+                                 teste: int = 0,
+                                 base_url: str = "/painel") -> dict:
+    pagina_int = pagina.default if hasattr(pagina, "default") else int(pagina)
+    res_leituras = _tabela_leituras(
+        pagina_int, por_pagina=por_pagina,
+        so_checkout=bool(so_checkout),
+        so_ao_vivo=bool(so_ao_vivo),
+        so_comprou=bool(so_comprou),
+        so_whatsapp=bool(so_whatsapp),
+        so_avaliados=bool(so_avaliados),
+        uf=uf,
+        busca=busca,
+        de=de, ate=ate
+    )
+    corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
+    total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
+    total_comprou = getattr(res_leituras, "total_comprou", 0)
+    total_whatsapp = getattr(res_leituras, "total_whatsapp", 0)
+    total_avaliados = getattr(res_leituras, "total_avaliados", 0)
+
+    p_params = {
+        "dias": dias_int,
+        "de": de.isoformat() if de else None,
+        "ate": ate.isoformat() if ate else None,
+        "bots": bots if bots else None,
+        "teste": teste if teste else None,
+        "so_checkout": 1 if so_checkout else None,
+        "so_ao_vivo": 1 if so_ao_vivo else None,
+        "so_comprou": 1 if so_comprou else None,
+        "so_whatsapp": 1 if so_whatsapp else None,
+        "so_avaliados": 1 if so_avaliados else None,
+        "uf": uf if uf else None,
+        "busca": busca if busca else None,
+    }
+    if so_whatsapp:
+        rotulo_pag = "contatos com WhatsApp"
+        sub_tipo = "que deixaram WhatsApp"
+    elif so_comprou:
+        rotulo_pag = "compradores"
+        sub_tipo = "que compraram o produto"
+    elif so_ao_vivo:
+        rotulo_pag = "pessoas ativas ao vivo"
+        sub_tipo = "ativas navegando agora"
+    elif so_checkout:
+        rotulo_pag = "pessoas com checkout"
+        sub_tipo = "com checkout"
+    elif so_avaliados:
+        rotulo_pag = "pessoas com avaliação"
+        sub_tipo = "que avaliaram a leitura"
+    else:
+        rotulo_pag = "pessoas únicas"
+        sub_tipo = "no total"
+
+    barra_pag = _barra_paginacao(pagina_int, total_pessoas, base_url, p_params,
+                                 por_pagina=por_pagina, param_nome="pag_leituras", hash_tab="#aba-leituras",
+                                 rotulo_item=rotulo_pag)
+
+    extra_sub = []
+    if uf:
+        extra_sub.append(f"UF: {html.escape(uf)}")
+    if busca and busca.strip():
+        extra_sub.append(f'busca: &ldquo;{html.escape(busca.strip())}&rdquo;')
+    extra_str = f" ({', '.join(extra_sub)})" if extra_sub else ""
+
+    txt_pessoas = "pessoa única" if total_pessoas == 1 else "pessoas únicas"
+    txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
+    sub_html = f'<p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo}{extra_str} ({txt_envios} no total) · mostrando {por_pagina} por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>'
+
+    return {
+        "ok": True,
+        "html": f"{sub_html}{corpo_leituras}{barra_pag}",
+        "badges": {
+            "badge-count-todos": total_geral,
+            "badge-count-wa": total_whatsapp,
+            "badge-count-avaliados": total_avaliados,
+            "badge-count-checkout": total_chk,
+            "badge-count-vivo": total_ao_vivo,
+            "badge-count-comprou": total_comprou,
+        },
+        "total_pessoas": total_pessoas,
+        "total_exibidos": total_exibidos,
+        "total_chk": total_chk,
+        "lista_ufs": getattr(res_leituras, "lista_ufs", []),
+    }
+
+
+def _secao_financeiro(dados_fin: dict, d1: date, d2: date, de: Optional[str], ate: Optional[str],
+                      dias_int: int, is_ativa: bool, pag_fin: int = 0) -> str:
+    hoje = hoje_bsb()
+    ontem = hoje - timedelta(days=1)
+    segunda_esta_semana = hoje - timedelta(days=hoje.weekday())
+    segunda_passada = segunda_esta_semana - timedelta(days=7)
+    domingo_passado = segunda_esta_semana - timedelta(days=1)
+
+    is_hoje = (d1 == hoje and d2 == hoje)
+    is_ontem = (d1 == ontem and d2 == ontem)
+    is_esta_semana = (d1 == segunda_esta_semana and d2 == hoje)
+    is_semana_passada = (d1 == segunda_passada and d2 == domingo_passado)
+    is_7dias = (d1 == hoje - timedelta(days=6) and d2 == hoje and not de and not ate)
+    is_30dias = (d1 == hoje - timedelta(days=29) and d2 == hoje and not de and not ate)
+    is_90dias = (d1 == hoje - timedelta(days=89) and d2 == hoje and not de and not ate)
+
+    def link_preset_fin(rot: str, p_de: Optional[str] = None, p_ate: Optional[str] = None, p_dias: Optional[int] = None, ativo: bool = False) -> str:
+        q = {"view": "financeiro"}
+        if p_de and p_ate:
+            q["de"] = p_de
+            q["ate"] = p_ate
+        elif p_dias:
+            q["dias"] = str(p_dias)
+        qs = "&".join(f"{k}={v}" for k, v in q.items())
+        on = " on" if ativo else ""
+        return f'<a class="f{on}" href="/painel?{qs}#financeiro" onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);">{rot}</a>'
+
+    form_datas_fin = (
+        '<form method="GET" action="/painel#financeiro" class="form-filtro-datas form-filtro-fin" onsubmit="return submeterFormDatasAjax(this, event);">'
+        '<input type="hidden" name="view" value="financeiro">'
+        '<span class="lbl-datas">📅 Personalizado:</span>'
+        f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
+        f'<label class="lbl-campo">Até <input type="date" name="ate" value="{d2:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
+        '<button type="submit" class="btn-filtrar-datas">Filtrar</button>'
+        '</form>'
+    )
+
+    filtros_fin = (
+        '<div class="filtros">'
+        + link_preset_fin("hoje", p_de=hoje.isoformat(), p_ate=hoje.isoformat(), ativo=is_hoje)
+        + link_preset_fin("ontem", p_de=ontem.isoformat(), p_ate=ontem.isoformat(), ativo=is_ontem)
+        + link_preset_fin("esta semana", p_de=segunda_esta_semana.isoformat(), p_ate=hoje.isoformat(), ativo=is_esta_semana)
+        + link_preset_fin("semana passada", p_de=segunda_passada.isoformat(), p_ate=domingo_passado.isoformat(), ativo=is_semana_passada)
+        + link_preset_fin("7 dias", p_dias=7, ativo=is_7dias)
+        + link_preset_fin("30 dias", p_dias=30, ativo=is_30dias)
+        + link_preset_fin("90 dias", p_dias=90, ativo=is_90dias)
+        + form_datas_fin
+        + '</div>'
+    )
+
+    p = [
+        f'<div id="visao-financeiro" class="visao-painel{" on" if is_ativa else ""}">'
+        f'<h1>Financeiro · Custos de Geração</h1>'
+        f'<p class="sub">{d1:%d/%m/%Y} a {d2:%d/%m/%Y} · '
+        f'<b>R$ {dados_fin["custo_total_brl"]:.2f}</b> gastos em {dados_fin["total_leituras"]} mensagens '
+        f'({dados_fin["qtd_llm"]} chamadas OpenAI · economia de R$ {dados_fin["economia_total_brl"]:.2f} via cache)</p>'
+        + filtros_fin
+    ]
+
+    p.append(
+        '<div class="cards">'
+        f'<div class="card"><b>R$ {dados_fin["custo_total_brl"]:.2f}</b><span>gasto total no período (${dados_fin["custo_total_usd"]:.4f} USD)</span></div>'
+        f'<div class="card"><b>R$ {dados_fin["custo_medio_geral_brl"]:.3f}</b><span>custo médio / leitura total (${dados_fin["custo_medio_geral_usd"]:.4f})</span></div>'
+        f'<div class="card"><b>R$ {dados_fin["custo_medio_llm_brl"]:.3f}</b><span>custo médio / mensagem IA (${dados_fin["custo_medio_llm_usd"]:.4f})</span></div>'
+        f'<div class="card"><b>R$ {dados_fin["economia_total_brl"]:.2f}</b><span>economia gerada com cache ({dados_fin["pct_cache"]:.1f}% a custo zero)</span></div>'
+        f'<div class="card"><b>{dados_fin["qtd_llm"]} IA · {dados_fin["qtd_cache"]} Cache</b><span>{dados_fin["total_leituras"]} mensagens ({dados_fin["qtd_reserva"]} reserva)</span></div>'
+        f'<div class="card"><b>{dados_fin["total_tokens"]:,}</b><span>tokens totais ({dados_fin["total_prompt_tokens"]:,} in · {dados_fin["total_completion_tokens"]:,} out)</span></div>'
+        '</div>'
+    )
+
+    p.append(
+        '<div class="alerta" style="background:rgba(229,169,60,.08);border-color:rgba(229,169,60,.3);color:var(--sand);margin:16px 0;">'
+        '💡 <b>Monitoramento de Gastos com IA:</b> Cada leitura gerada pela OpenAI consome tokens de entrada '
+        '(instruções do prompt astrológico e mapa do usuário) e tokens de saída (raciocínio interno e redação da carta). '
+        'Leituras reaproveitadas por <b>Cache</b> ou texto de <b>Reserva</b> custam <b>R$ 0,00</b>. '
+        'A economia acumulada reflete o valor poupado ao evitar chamadas repetidas na OpenAI. Cotação base: US$ 1,00 = R$ 5,50.'
+        '</div>'
+    )
+
+    p.append('<h2>Distribuição por Modelo / Origem</h2>')
+    linhas_modelos = []
+    tot_leituras = dados_fin["total_leituras"] or 1
+    for m in dados_fin["por_modelo"]:
+        pct = (m["qtd"] / tot_leituras) * 100
+        media_item = (m["custo_brl"] / m["qtd"]) if m["qtd"] > 0 else 0.0
+        tipo_cls = "llm" if m["modelo"] not in ("cache", "reserva") else m["modelo"]
+        linhas_modelos.append([
+            f'<span class="tag-fin-modelo {tipo_cls}">{html.escape(m["modelo"])}</span>',
+            str(m["qtd"]),
+            f'{pct:.1f}%',
+            f'{m["prompt_tokens"]:,}',
+            f'{m["completion_tokens"]:,}',
+            f'{m["total_tokens"]:,}',
+            f'${m["custo_usd"]:.4f}',
+            f'R$ {m["custo_brl"]:.2f}',
+            f'R$ {media_item:.3f}',
+        ])
+    p.append(_tabela(
+        ["origem / modelo", "#mensagens", "#% total", "#tokens entrada", "#tokens saída", "#tokens totais", "#gasto (usd)", "#gasto (r$)", "#méd / msg"],
+        linhas_modelos
+    ))
+
+    p.append('<h2>Gastos por Área do Quiz</h2>')
+    linhas_areas = []
+    for a in dados_fin["por_area"]:
+        med_a = (a["custo_brl"] / a["qtd"]) if a["qtd"] > 0 else 0.0
+        linhas_areas.append([
+            html.escape(a["area"].capitalize()),
+            str(a["qtd"]),
+            str(a["qtd_llm"]),
+            f'{a["tokens"]:,}',
+            f'${a["custo_usd"]:.4f}',
+            f'R$ {a["custo_brl"]:.2f}',
+            f'R$ {med_a:.3f}',
+        ])
+    p.append(_tabela(
+        ["área do quiz", "#total mensagens", "#geradas via ia", "#tokens consumidos", "#gasto (usd)", "#gasto (r$)", "#custo médio"],
+        linhas_areas
+    ))
+
+    qs_csv_params = {"de": d1.isoformat(), "ate": d2.isoformat()}
+    qs_csv = "&".join(f"{k}={v}" for k, v in qs_csv_params.items())
+
+    p.append(
+        '<div class="fin-topo-tabela">'
+        '  <h2>Extrato Detalhado de Gerações</h2>'
+        '  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        '    <div class="fin-busca-wrap">'
+        '      <span>🔍</span>'
+        '      <input type="text" id="busca-tabela-financeiro" onkeyup="filtrarTabelaFinanceiro(this.value)" placeholder="Buscar por lead, whats, modelo...">'
+        '    </div>'
+        f'    <a href="/painel/financeiro/exportar-csv?{qs_csv}" class="btn-exportar-fin" title="Baixar relatório financeiro em planilha CSV">'
+        '      📥 Exportar Relatório CSV'
+        '    </a>'
+        '  </div>'
+        '</div>'
+    )
+
+    linhas_extrato = []
+    tr_attrs_extrato = []
+    ini_idx = pag_fin * 20
+    fim_idx = ini_idx + 20
+    for idx_it, it in enumerate(dados_fin["itens"]):
+        wa_link = f_wa(it["whatsapp"])
+        tipo_tag = (
+            f'<span class="tag-fin-modelo llm">IA ({html.escape(it["modelo"])})</span>'
+            if it["tipo"] == "llm" else
+            '<span class="tag-fin-modelo cache">Cache (R$ 0)</span>'
+            if it["tipo"] == "cache" else
+            '<span class="tag-fin-modelo reserva">Reserva (R$ 0)</span>'
+        )
+        tempo_str = f'{it["ms_llm"]/1000:.1f}s' if it["ms_llm"] > 0 else "—"
+        tokens_str = f'{it["total_tokens"]:,}' if it["total_tokens"] > 0 else "0"
+        custo_brl_str = f'R$ {it["custo_brl"]:.3f}' if it["custo_brl"] > 0 else '<span style="color:#58B982;">R$ 0,00</span>'
+        custo_usd_str = f'${it["custo_usd"]:.4f}' if it["custo_usd"] > 0 else "$0.00"
+
+        btn_msg = (
+            f'<button type="button" class="btn-ver-msg-acao" '
+            f'onclick="abrirModalMensagem(\'{html.escape(it["leitura_id"])}\')" '
+            f'title="Visualizar a mensagem/carta que o usuário recebeu">👁️ Mensagem</button>'
+        )
+
+        linhas_extrato.append([
+            f'<span style="white-space:nowrap;">{html.escape(it["data_bsb"])}</span>',
+            f'<b>{html.escape(it["nome"])}</b>' + (f'<br><small>{wa_link}</small>' if wa_link != "—" else ""),
+            html.escape(it["area"].capitalize()),
+            tipo_tag,
+            f'{html.escape(it["validacao"])} ({it["tentativas"]}x)',
+            tokens_str,
+            tempo_str,
+            custo_usd_str,
+            custo_brl_str,
+            btn_msg,
+        ])
+        is_visivel = (ini_idx <= idx_it < fim_idx)
+        attr = f'data-fin-idx="{idx_it}"'
+        if not is_visivel:
+            attr += ' style="display:none;"'
+        tr_attrs_extrato.append(attr)
+
+    p.append(_tabela(
+        ["data / hora", "lead", "área", "origem", "validação", "#tokens", "tempo llm", "#gasto (usd)", "#gasto (r$)", "mensagem"],
+        linhas_extrato,
+        tr_attrs=tr_attrs_extrato,
+        classes="tbl-extrato-financeiro",
+        tbody_id="tbody-extrato-financeiro"
+    ))
+
+    qs_fin_params = {"view": "financeiro"}
+    if de and ate:
+        qs_fin_params["de"] = de
+        qs_fin_params["ate"] = ate
+    elif dias_int:
+        qs_fin_params["dias"] = dias_int
+
+    p.append(_barra_paginacao_fin(
+        pagina=pag_fin,
+        total_itens=len(dados_fin["itens"]),
+        base_url="/painel",
+        params=qs_fin_params,
+        por_pagina=20
+    ))
+
+    p.append('</div>')
+    return "".join(p)
+
+
 @router.get("/painel", response_class=HTMLResponse)
 def painel(request: Request, _=Depends(exigir_senha),
            de: Optional[str] = None, ate: Optional[str] = None,
            dias: int = Query(7, ge=1, le=365),
            bots: int = 0, teste: int = 0,
            pag_leituras: int = Query(0, ge=0),
+           pag_fin: int = Query(0, ge=0),
            so_checkout: int = 0,
            so_ao_vivo: int = 0,
            so_comprou: int = 0,
            so_whatsapp: int = 0,
            so_avaliados: int = 0,
-           uf: Optional[str] = None):
+           uf: Optional[str] = None,
+           busca: Optional[str] = None,
+           view: str = Query("dashboard")):
     dias_int = dias.default if hasattr(dias, "default") else int(dias)
     pag_leituras_int = pag_leituras.default if hasattr(pag_leituras, "default") else int(pag_leituras)
+    pag_fin_int = pag_fin.default if hasattr(pag_fin, "default") else int(pag_fin)
     d1, d2 = _periodo(de, ate, dias_int)
     # acolchoa um dia de cada lado: sessao que comeca 23h57 e continua depois da
     # meia-noite tem que ser lida inteira, senao aparece cortada em duas
     brutos = eventos.ler_dias(d1 - timedelta(days=1), d2 + timedelta(days=1))
     d = agregar(brutos, d1, d2, incluir_bots=bool(bots), incluir_teste=bool(teste))
+
+    from servicos.financeiro import calcular_custo_item, agregar_financeiro
+    arquivos_leituras = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
+    itens_financeiro: list[dict] = []
+    for arq in arquivos_leituras:
+        try:
+            d_l = json.loads(arq.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if (d_l.get("nome_completo") or "").strip().lower() == "pessoa de teste":
+            continue
+        if d1 and d2:
+            dt_ch = obter_data_chegada_leitura(d_l, arq.stem)
+            if dt_ch and not (d1 <= dt_ch <= d2):
+                continue
+        if so_checkout and not d_l.get("checkout"):
+            continue
+        if so_whatsapp:
+            wa_raw = re.sub(r"\D", "", str(d_l.get("whatsapp") or ""))
+            if len(wa_raw) < 8:
+                continue
+        if so_comprou and not d_l.get("comprou"):
+            continue
+        if so_avaliados and (d_l.get("feedback_estrelas") is None and not d_l.get("feedback_pulou")):
+            continue
+        if uf:
+            cid_l = d_l.get("cidade") or {}
+            uf_val = str(cid_l.get("uf") or cid_l.get("nome") or "").strip().lower()
+            if uf.strip().lower() != uf_val:
+                continue
+        if busca:
+            termo = busca.strip().lower()
+            termo_num = re.sub(r"\D", "", termo)
+            n_comp = (d_l.get("nome_completo") or "").lower()
+            w_raw = re.sub(r"\D", "", str(d_l.get("whatsapp") or ""))
+            match_nome = termo in n_comp
+            match_wa = bool(termo_num and termo_num in w_raw)
+            if not match_nome and not match_wa:
+                continue
+        itens_financeiro.append(calcular_custo_item(d_l, arq.stem))
+    dados_fin = agregar_financeiro(itens_financeiro)
+
+    is_fin_ativa = (view == "financeiro")
 
     hoje = hoje_bsb()
     ontem = hoje - timedelta(days=1)
@@ -2876,9 +4183,11 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
+        if busca:
+            q["busca"] = busca
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         on = " on" if ativo else ""
-        return f'<a class="f{on}" href="/painel?{qs}">{rot}</a>'
+        return f'<a class="f{on}" href="/painel?{qs}" onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);">{rot}</a>'
 
     def link_toggle(rot: str, novo_bots: int, novo_teste: int) -> str:
         q = {}
@@ -2907,10 +4216,10 @@ def painel(request: Request, _=Depends(exigir_senha),
         if uf:
             q["uf"] = uf
         qs = "&".join(f"{k}={v}" for k, v in q.items())
-        return f'<a href="/painel?{qs}">{rot}</a>'
+        return f'<a href="/painel?{qs}" onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);">{rot}</a>'
 
     form_datas = (
-        '<form method="GET" action="/painel" class="form-filtro-datas">'
+        '<form method="GET" action="/painel" class="form-filtro-datas" onsubmit="return submeterFormDatasAjax(this, event);">'
         + (f'<input type="hidden" name="bots" value="1">' if bots else '')
         + (f'<input type="hidden" name="teste" value="1">' if teste else '')
         + (f'<input type="hidden" name="so_checkout" value="1">' if so_checkout else '')
@@ -2926,7 +4235,35 @@ def painel(request: Request, _=Depends(exigir_senha),
         + '</form>'
     )
 
-    p = [f"<style>{ESTILO}</style><title>Painel · Bússola</title><div class=w>"]
+    p = [
+        f"<style>{ESTILO}</style><title>Painel · Bússola</title>",
+        '<div class="layout-painel">',
+        '  <aside class="sidebar-painel">',
+        '    <div class="sidebar-marca">',
+        '      <div class="sidebar-logo">🧭</div>',
+        '      <div class="sidebar-marca-texto">',
+        '        <div class="sidebar-titulo">Bússola</div>',
+        '        <div class="sidebar-subtitulo">Painel Admin</div>',
+        '      </div>',
+        '    </div>',
+        '    <nav class="sidebar-nav">',
+        f'      <button type="button" class="sidebar-btn{" on" if not is_fin_ativa else ""}" id="btn-visao-dashboard" onclick="trocarVisao(\'dashboard\'); return false;" title="Visualizar métricas do funil, leituras e formulário">',
+        '        <span class="sidebar-icon">📊</span>',
+        '        <span class="sidebar-texto">Dashboard</span>',
+        '      </button>',
+        f'      <button type="button" class="sidebar-btn{" on" if is_fin_ativa else ""}" id="btn-visao-financeiro" onclick="trocarVisao(\'financeiro\'); return false;" title="Visualizar custos e gastos com geração de mensagens pela IA">',
+        '        <span class="sidebar-icon">💰</span>',
+        '        <span class="sidebar-texto">Financeiro</span>',
+        '      </button>',
+        '    </nav>',
+        '    <div class="sidebar-footer">',
+        '      <small>Bússola Astrológica</small>',
+        '    </div>',
+        '  </aside>',
+        '  <main class="conteudo-painel">',
+        '    <div class="w">',
+        f'      <div id="visao-dashboard" class="visao-painel{" on" if not is_fin_ativa else ""}">',
+    ]
     p.append(f"<h1>Bússola Astrológica</h1>")
     p.append(f'<p class="sub">{d1:%d/%m/%Y} a {d2:%d/%m/%Y} · '
              f'<b>{d.get("pessoas_unicas", d["sessoes"])}</b> pessoas únicas, '
@@ -3025,21 +4362,24 @@ def painel(request: Request, _=Depends(exigir_senha),
     # ==================== ABA 2: LEITURAS ====================
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
-    res_leituras = _tabela_leituras(
-        pag_leituras_int, por_pagina=20,
+    bloco_leituras = _render_bloco_tabela_leituras(
+        pagina=pag_leituras_int,
+        por_pagina=20,
         so_checkout=bool(so_checkout),
         so_ao_vivo=bool(so_ao_vivo),
         so_comprou=bool(so_comprou),
         so_whatsapp=bool(so_whatsapp),
         so_avaliados=bool(so_avaliados),
         uf=uf,
-        de=d1, ate=d2
+        busca=busca,
+        de=d1,
+        ate=d2,
+        dias_int=dias_int,
+        bots=bots,
+        teste=teste,
+        base_url="/painel",
     )
-    corpo_leituras, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
-    total_ao_vivo = getattr(res_leituras, "total_ao_vivo", 0)
-    total_comprou = getattr(res_leituras, "total_comprou", 0)
-    total_whatsapp = getattr(res_leituras, "total_whatsapp", 0)
-    total_avaliados = getattr(res_leituras, "total_avaliados", 0)
+    b_badges = bloco_leituras["badges"]
 
     def link_filtro_leituras(modo: str) -> str:
         q = {"dias": dias_int}
@@ -3063,6 +4403,8 @@ def painel(request: Request, _=Depends(exigir_senha),
             q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
+        if busca:
+            q["busca"] = busca
         qs = "&".join(f"{k}={v}" for k, v in q.items())
         url = f"/painel?{qs}#aba-leituras"
         if modo == "checkout":
@@ -3070,43 +4412,43 @@ def painel(request: Request, _=Depends(exigir_senha),
             on = " on" if so_checkout else ""
             rotulo = "✦ Só quem foi pro checkout"
             badge_id = "badge-count-checkout"
-            cnt = total_chk
+            cnt = b_badges.get(badge_id, 0)
         elif modo == "ao_vivo":
             cls = " vivo"
             on = " on" if so_ao_vivo else ""
             rotulo = "🟢 Ao vivo agora"
             badge_id = "badge-count-vivo"
-            cnt = total_ao_vivo
+            cnt = b_badges.get(badge_id, 0)
         elif modo == "comprou":
             cls = " comprou"
             on = " on" if so_comprou else ""
             rotulo = "💰 Só quem comprou"
             badge_id = "badge-count-comprou"
-            cnt = total_comprou
+            cnt = b_badges.get(badge_id, 0)
         elif modo == "whatsapp":
             cls = " wa"
             on = " on" if so_whatsapp else ""
             rotulo = "📱 Só com WhatsApp"
             badge_id = "badge-count-wa"
-            cnt = total_whatsapp
+            cnt = b_badges.get(badge_id, 0)
         elif modo == "avaliados":
             cls = " avaliados"
             on = " on" if so_avaliados else ""
             rotulo = "⭐ Só avaliados"
             badge_id = "badge-count-avaliados"
-            cnt = total_avaliados
+            cnt = b_badges.get(badge_id, 0)
         else:
             cls = ""
             on = " on" if (not so_checkout and not so_ao_vivo and not so_comprou and not so_whatsapp and not so_avaliados) else ""
             rotulo = "Todas as leituras"
             badge_id = "badge-count-todos"
-            cnt = total_geral
+            cnt = b_badges.get(badge_id, 0)
 
         return (f'<a href="{url}" class="btn-filtro-leituras{cls}{on}" '
                 f'data-filtro="{modo}" onclick="return filtrarTabelaClient(\'{modo}\', this, event);">'
                 f'{rotulo} <span id="{badge_id}" class="badge-count">{cnt}</span></a>')
 
-    dropdown_uf = _dropdown_filtro_uf(getattr(res_leituras, "lista_ufs", []), uf_selecionado=uf)
+    dropdown_uf = _dropdown_filtro_uf(bloco_leituras.get("lista_ufs", []), uf_selecionado=uf)
 
     p.append('<div class="filtros-leituras">'
              + link_filtro_leituras("todos")
@@ -3116,56 +4458,11 @@ def painel(request: Request, _=Depends(exigir_senha),
              + link_filtro_leituras("ao_vivo")
              + link_filtro_leituras("comprou")
              + dropdown_uf
+             + _campo_busca_contato(busca)
              + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
              + '</div>')
 
-    p_params = {
-        "dias": dias_int,
-        "de": de if de else None,
-        "ate": ate if ate else None,
-        "bots": bots if bots else None,
-        "teste": teste if teste else None,
-        "so_checkout": 1 if so_checkout else None,
-        "so_ao_vivo": 1 if so_ao_vivo else None,
-        "so_comprou": 1 if so_comprou else None,
-        "so_whatsapp": 1 if so_whatsapp else None,
-        "so_avaliados": 1 if so_avaliados else None,
-        "uf": uf if uf else None,
-    }
-    if so_whatsapp:
-        rotulo_pag = "contatos com WhatsApp"
-    elif so_comprou:
-        rotulo_pag = "compradores"
-    elif so_ao_vivo:
-        rotulo_pag = "pessoas ativas ao vivo"
-    elif so_checkout:
-        rotulo_pag = "pessoas com checkout"
-    elif so_avaliados:
-        rotulo_pag = "pessoas com avaliação"
-    else:
-        rotulo_pag = "pessoas únicas"
-
-    barra_pag = _barra_paginacao(pag_leituras_int, total_pessoas, "/painel", p_params,
-                                 por_pagina=20, param_nome="pag_leituras", hash_tab="#aba-leituras",
-                                 rotulo_item=rotulo_pag)
-    if so_whatsapp:
-        sub_tipo = "que deixaram WhatsApp"
-    elif so_comprou:
-        sub_tipo = "que compraram o produto"
-    elif so_ao_vivo:
-        sub_tipo = "ativas navegando agora"
-    elif so_checkout:
-        sub_tipo = "com checkout"
-    elif so_avaliados:
-        sub_tipo = "que avaliaram a leitura"
-    else:
-        sub_tipo = "no total"
-
-    txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
-    txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
-    p.append(f'<p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo} ({txt_envios} no total) · mostrando 20 por página · clique no ID para ver o mapa astrológico e o detalhe completo.</p>')
-    p.append(corpo_leituras)
-    p.append(barra_pag)
+    p.append(f'<div id="container-tabela-leituras">{bloco_leituras["html"]}</div>')
     p.append('</section>')
 
     # ==================== ABA 2: FORMULÁRIO & HORÁRIO ====================
@@ -3272,15 +4569,85 @@ def painel(request: Request, _=Depends(exigir_senha),
                  'outra, então o vencedor foi quase arbitrário. Se essa fração for alta, a tabela '
                  'acima é mais ruído que sinal.</p>')
     p.append('</section>')
+    p.append('</div>')  # fecha #visao-dashboard
+
+    # Visao Financeiro
+    p.append(_secao_financeiro(dados_fin, d1, d2, de, ate, dias_int, is_fin_ativa, pag_fin=pag_fin_int))
 
     p.append(_modal_confirmar_exclusao())
     p.append(_modal_confirmar_compra())
     p.append(_modal_importar_csv())
+    p.append(_modal_visualizar_mensagem())
     token_ws = gerar_token_ws()
     p.append(f'<script>window._wsToken = "{token_ws}";</script>')
     p.append(f'<script>{JS_PAINEL}</script>')
-    p.append("</div>")
+    p.append("    </div>")  # fecha .w
+    p.append("  </main>")   # fecha .conteudo-painel
+    p.append("</div>")      # fecha .layout-painel
     return HTMLResponse("".join(p), headers=CABECALHOS)
+
+
+@router.get("/painel/financeiro/exportar-csv")
+def exportar_csv_financeiro(_=Depends(exigir_senha),
+                            de: Optional[str] = None, ate: Optional[str] = None,
+                            dias: int = 7):
+    dias_int = dias.default if hasattr(dias, "default") else int(dias)
+    d1, d2 = _periodo(de, ate, dias_int)
+    from servicos.financeiro import calcular_custo_item
+    arquivos = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
+    itens: list[dict] = []
+    for arq in arquivos:
+        try:
+            d = json.loads(arq.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if (d.get("nome_completo") or "").strip().lower() == "pessoa de teste":
+            continue
+        if d1 and d2:
+            dt_ch = obter_data_chegada_leitura(d, arq.stem)
+            if dt_ch and not (d1 <= dt_ch <= d2):
+                continue
+        itens.append(calcular_custo_item(d, arq.stem))
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "Data (BSB)", "Leitura ID", "Nome Completo", "WhatsApp", "Área",
+        "Modelo", "Tipo", "Tentativas", "Validação", "Tempo LLM (ms)",
+        "Tokens Prompt", "Tokens Saída", "Total Tokens",
+        "Custo (USD)", "Custo (BRL)", "Economia (BRL)", "Estimado"
+    ])
+    for it in itens:
+        writer.writerow([
+            it["data_bsb"],
+            it["leitura_id"],
+            it["nome"],
+            it["whatsapp"],
+            it["area"],
+            it["modelo"],
+            it["tipo"],
+            it["tentativas"],
+            it["validacao"],
+            it["ms_llm"],
+            it["prompt_tokens"],
+            it["completion_tokens"],
+            it["total_tokens"],
+            f"{it['custo_usd']:.6f}".replace(".", ","),
+            f"{it['custo_brl']:.4f}".replace(".", ","),
+            f"{it['economia_brl']:.4f}".replace(".", ","),
+            "Sim" if it["estimado"] else "Não"
+        ])
+
+    csv_bytes = output.getvalue().encode("utf-8-sig")
+    nome_arquivo = f"financeiro-bussula-{d1:%Y%m%d}-{d2:%Y%m%d}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8-sig",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nome_arquivo}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        }
+    )
 
 
 @router.get("/painel/leituras", response_class=HTMLResponse)
@@ -3288,7 +4655,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
           de: Optional[str] = None, ate: Optional[str] = None, dias: int = 7,
           so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0, so_whatsapp: int = 0,
           so_avaliados: int = 0,
-          uf: Optional[str] = None):
+          uf: Optional[str] = None,
+          busca: Optional[str] = None):
     d1, d2 = _periodo(de, ate, dias) if (de or ate or dias) else (None, None)
     res_leituras = _tabela_leituras(
         pagina, por_pagina=20,
@@ -3298,6 +4666,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         so_whatsapp=bool(so_whatsapp),
         so_avaliados=bool(so_avaliados),
         uf=uf,
+        busca=busca,
         de=d1, ate=d2
     )
     corpo, total_exibidos, total_pags, total_pessoas, total_chk, total_geral = res_leituras
@@ -3316,6 +4685,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         "so_whatsapp": 1 if so_whatsapp else None,
         "so_avaliados": 1 if so_avaliados else None,
         "uf": uf if uf else None,
+        "busca": busca if busca else None,
     }
     if so_whatsapp:
         rotulo_pag = "contatos com WhatsApp"
@@ -3353,6 +4723,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
             q["so_avaliados"] = 1
         if uf:
             q["uf"] = uf
+        if busca:
+            q["busca"] = busca
         qs = ("?" + "&".join(f"{k}={v}" for k, v in q.items())) if q else ""
         url = f"/painel/leituras{qs}"
         if modo == "checkout":
@@ -3406,6 +4778,7 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
                      + link_filtro_lista("ao_vivo")
                      + link_filtro_lista("comprou")
                      + dropdown_uf
+                     + _campo_busca_contato(busca)
                      + '<span id="ws-status" class="ws-status desconectado" title="Status da conexão em tempo real">○ Conectando...</span>'
                      + '</div>')
 
@@ -3422,12 +4795,19 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
     else:
         sub_tipo = "no total"
 
-    txt_pessoas = f"{total_pessoas} pessoa única" if total_pessoas == 1 else f"{total_pessoas} pessoas únicas"
+    extra_sub = []
+    if uf:
+        extra_sub.append(f"UF: {html.escape(uf)}")
+    if busca and busca.strip():
+        extra_sub.append(f'busca: &ldquo;{html.escape(busca.strip())}&rdquo;')
+    extra_str = f" ({', '.join(extra_sub)})" if extra_sub else ""
+
+    txt_pessoas = "pessoa única" if total_pessoas == 1 else "pessoas únicas"
     txt_envios = f"{total_exibidos} envio" if total_exibidos == 1 else f"{total_exibidos} envios"
     token_ws = gerar_token_ws()
     return HTMLResponse(
         f"<style>{ESTILO}</style><title>Leituras</title><div class=w>"
-        f'<h1>Leituras</h1><p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo} ({txt_envios} no total) · mostrando 20 por página · '
+        f'<h1>Leituras</h1><p class="sub" id="sub-leituras-info"><b>{total_pessoas}</b> {txt_pessoas} {sub_tipo}{extra_str} ({txt_envios} no total) · mostrando 20 por página · '
         f'<a href="/painel#aba-leituras">voltar ao painel</a></p>'
         f'{botoes_filtro}'
         f'{corpo}'
@@ -3435,7 +4815,8 @@ def lista(_=Depends(exigir_senha), pagina: int = Query(0, ge=0),
         f'{_modal_confirmar_exclusao()}'
         f'{_modal_confirmar_compra()}'
         f'{_modal_importar_csv()}'
-        f'<p class="nota">Clique no ID para ver o detalhe e o mapa astrológico completo de cada leitura.</p></div>'
+        f'{_modal_visualizar_mensagem()}'
+        f'<p class="nota">Clique no ID ou em 👁️ Mensagem para ver a mensagem que o usuário recebeu. Use Ctrl+Clique no ID para ver a página técnica com cálculos.</p></div>'
         f'<script>window._wsToken = "{token_ws}";</script>'
         f'<script>{JS_PAINEL}</script>',
         headers=CABECALHOS)
@@ -3785,6 +5166,7 @@ def exportar_csv(_=Depends(exigir_senha),
                  so_checkout: int = 0, so_ao_vivo: int = 0, so_comprou: int = 0, so_whatsapp: int = 0,
                  so_avaliados: int = 0,
                  uf: Optional[str] = None,
+                 busca: Optional[str] = None,
                  ids: Optional[str] = None):
     """Gera planilha CSV estruturada com as leituras filtradas ou selecionadas."""
     d1, d2 = _periodo(de, ate, dias) if not ids else (None, None)
@@ -3843,6 +5225,24 @@ def exportar_csv(_=Depends(exigir_senha),
                 if str((g.get("cidade") or {}).get("uf") or (g.get("cidade") or {}).get("nome") or "").strip().lower() == uf_norm
             ]
 
+        if busca and busca.strip():
+            tb = busca.strip().lower()
+            tdig = re.sub(r"\D", "", tb)
+            def _match_b(g: dict) -> bool:
+                nome = str(g.get("nome_completo") or "").lower()
+                wa = str(g.get("whatsapp") or "").lower()
+                wa_dig = re.sub(r"\D", "", wa)
+                if tb in nome or tb in wa or (tdig and tdig in wa_dig):
+                    return True
+                for _, s_d in g.get("outras_leituras", []):
+                    s_nome = str(s_d.get("nome_completo") or "").lower()
+                    s_wa = str(s_d.get("whatsapp") or "").lower()
+                    s_wa_dig = re.sub(r"\D", "", s_wa)
+                    if tb in s_nome or tb in s_wa or (tdig and tdig in s_wa_dig):
+                        return True
+                return False
+            todos_grupos = [g for g in todos_grupos if _match_b(g)]
+
     out = io.StringIO()
     out.write("\ufeff")
     writer = csv.writer(out, delimiter=";", quoting=csv.QUOTE_ALL)
@@ -3857,6 +5257,7 @@ def exportar_csv(_=Depends(exigir_senha),
         "Nome Completo",
         "WhatsApp",
         "Data de Nascimento",
+        "Idade",
         "Hora de Nascimento",
         "Cidade",
         "UF",
@@ -3889,6 +5290,7 @@ def exportar_csv(_=Depends(exigir_senha),
             g["nome_completo"],
             g["whatsapp"] or "—",
             f_data(nasc),
+            f_idade(nasc),
             f_hora(nasc, pr),
             cid.get("nome") or "—",
             cid.get("uf") or "—",
@@ -3896,7 +5298,7 @@ def exportar_csv(_=Depends(exigir_senha),
             str((d.get("quiz") or {}).get("area") or "—"),
             str(v.get("tipo") or "—"),
             "—" if not v.get("casa_eleita_real") else f'Casa {v.get("casa_aberta")}',
-            f_tempo(d.get("tempo_quiz_ms")),
+            f_tempo(d.get("tempo_ativo_ms") if d.get("tempo_ativo_ms") is not None else d.get("tempo_quiz_ms")),
             g["total_envios"]
         ])
 
@@ -3929,7 +5331,19 @@ def detalhe(leitura_id: str, _=Depends(exigir_senha), revelar: int = 0):
     prog = obter_progresso_leituras([(leitura_id, d)]).get(leitura_id, {"max_tela": 7, "rotulo": "Tela 7 (Leitura)", "checkout": False})
     h_str = f_hora(n, pr)
     uf_str = f' ({html.escape(cid.get("uf"))})' if cid.get("uf") else ''
-    t_quiz_str = f' · tempo no quiz: {f_tempo(d.get("tempo_quiz_ms"))}' if d.get("tempo_quiz_ms") else ''
+    t_ativo = prog.get("tempo_ativo_ms", d.get("tempo_ativo_ms"))
+    t_total = d.get("tempo_quiz_ms")
+    if t_ativo is not None and t_ativo >= 0:
+        t_ativo_str = f_tempo(t_ativo)
+        t_total_str = f_tempo(t_total)
+        if t_total_str != "—" and t_total_str != t_ativo_str:
+            t_quiz_str = f' · tempo ativo: <b style="color:var(--amber);">{html.escape(t_ativo_str)}</b> (total aba: {html.escape(t_total_str)})'
+        else:
+            t_quiz_str = f' · tempo no quiz: {html.escape(t_ativo_str)}'
+    elif t_total is not None and t_total >= 0:
+        t_quiz_str = f' · tempo no quiz: {f_tempo(t_total)}'
+    else:
+        t_quiz_str = ''
     chk_str = '<b style="color:var(--green);">✦ SIM</b>' if prog["checkout"] else '<span style="color:var(--sand2);">Não</span>'
 
     # Verifica se a pessoa enviou mais de uma vez
@@ -4023,9 +5437,19 @@ def deletar_leitura(leitura_id: str, modo: str = Query("individual"), _=Depends(
 
         removidos = []
         erros = []
+        sids_para_remover: set[str] = set()
+        lids_para_remover: set[str] = set(ids_para_excluir)
+
         for lid in ids_para_excluir:
             arq = config.DIR_LEITURAS / f"{lid}.json"
             if arq.exists():
+                try:
+                    conteudo = json.loads(arq.read_text(encoding="utf-8"))
+                    cid = str(conteudo.get("cliente_id") or "").strip()
+                    if cid:
+                        sids_para_remover.add(cid)
+                except Exception:
+                    pass
                 try:
                     arq.unlink()
                     removidos.append(lid)
@@ -4037,6 +5461,12 @@ def deletar_leitura(leitura_id: str, modo: str = Query("individual"), _=Depends(
             raise HTTPException(500, f"falha ao excluir leituras: {erros}")
         if not removidos:
             raise HTTPException(404, "nenhuma leitura encontrada para exclusão")
+
+        # Expurga eventos da telemetria para atualizar métricas do funil/checkout
+        try:
+            eventos.remover_eventos(sids=sids_para_remover, leitura_ids=lids_para_remover)
+        except Exception as e:
+            logger.warning("Falha ao remover eventos da telemetria para leituras %s: %s", ids_para_excluir, e)
 
         logger.info("Grupo de leituras %s excluído com sucesso (%d arquivos removidos).", leitura_id, len(removidos))
         return {
@@ -4051,12 +5481,42 @@ def deletar_leitura(leitura_id: str, modo: str = Query("individual"), _=Depends(
     arq = config.DIR_LEITURAS / f"{leitura_id}.json"
     if not arq.exists():
         raise HTTPException(404, "leitura não encontrada")
+
+    sids_para_remover: set[str] = set()
+    lids_para_remover: set[str] = {leitura_id}
+    try:
+        conteudo = json.loads(arq.read_text(encoding="utf-8"))
+        cid = str(conteudo.get("cliente_id") or "").strip()
+        if cid:
+            outro_usa_cid = False
+            for outro in config.DIR_LEITURAS.glob("*.json"):
+                if outro.stem == leitura_id:
+                    continue
+                try:
+                    d_outro = json.loads(outro.read_text(encoding="utf-8"))
+                    if str(d_outro.get("cliente_id") or "").strip() == cid:
+                        outro_usa_cid = True
+                        break
+                except Exception:
+                    pass
+            if not outro_usa_cid:
+                sids_para_remover.add(cid)
+    except Exception:
+        pass
+
     try:
         arq.unlink()
         logger.info("Leitura %s excluída com sucesso.", leitura_id)
     except Exception as e:
         logger.error("Erro ao excluir arquivo de leitura %s: %s", leitura_id, e)
         raise HTTPException(500, f"falha ao excluir leitura: {e}")
+
+    # Expurga eventos da telemetria para atualizar métricas do funil/checkout
+    try:
+        eventos.remover_eventos(sids=sids_para_remover, leitura_ids=lids_para_remover)
+    except Exception as e:
+        logger.warning("Falha ao remover eventos da telemetria para leitura %s: %s", leitura_id, e)
+
     return {
         "ok": True,
         "leitura_id": leitura_id,
@@ -4102,5 +5562,124 @@ def alterar_status_compra(leitura_id: str, comprou: bool = Query(...), _=Depends
         "comprou": comprou,
         "total_comprou": total_comprou,
     }
+
+
+@router.get("/painel/leitura/{leitura_id}/mensagem")
+def obter_mensagem_leitura(leitura_id: str, _=Depends(exigir_senha)):
+    """Retorna os dados da mensagem/carta entregue ao usuário na Tela 7 para visualização no modal do painel."""
+    if not re.fullmatch(r"[0-9]{8}-[0-9]{6}-[0-9a-f]{8}", leitura_id):
+        raise HTTPException(400, "Identificador de leitura inválido")
+
+    arq = config.DIR_LEITURAS / f"{leitura_id}.json"
+    if not arq.exists():
+        raise HTTPException(404, "Leitura não encontrada")
+
+    try:
+        d = json.loads(arq.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao ler arquivo da leitura: {e}")
+
+    c = d.get("carta") or {}
+    n = d.get("nascimento") or {}
+    cid = d.get("cidade") or {}
+    pr = d.get("precisao") or {}
+
+    chegada_bsb, gerada_bsb = f_chegada_bsb(d, leitura_id)
+    h_str = f_hora(n, pr)
+    data_nasc_str = f_data(n)
+
+    cuidado = c.get("cuidado") or (c.get("porta") or {}).get("cuidado") or ""
+    espera = c.get("espera") or ""
+    janela = c.get("janela") or ""
+
+    # Monta texto completo copiado
+    texto_copia_linhas = []
+    if d.get("nome_completo"):
+        texto_copia_linhas.append(f"Para: {d.get('nome_completo')}")
+    if c.get("selo"):
+        texto_copia_linhas.append(f"[{c.get('selo')}]")
+    if c.get("titulo"):
+        texto_copia_linhas.append(f"\n{c.get('titulo').upper()}\n")
+    if c.get("destaque"):
+        texto_copia_linhas.append(f'✨ "{c.get("destaque")}"\n')
+    if c.get("saudacao"):
+        texto_copia_linhas.append(c.get("saudacao"))
+    for p in (c.get("paragrafos") or []):
+        texto_copia_linhas.append(p)
+    if janela:
+        texto_copia_linhas.append(f"\nJanela: {janela}")
+    if cuidado:
+        texto_copia_linhas.append(f"Atenção: {cuidado}")
+    if c.get("assinatura"):
+        texto_copia_linhas.append(f"\n{c.get('assinatura')}")
+
+    texto_copia = "\n\n".join(texto_copia_linhas)
+
+    return JSONResponse({
+        "id": leitura_id,
+        "nome_completo": d.get("nome_completo") or "—",
+        "whatsapp": d.get("whatsapp") or "",
+        "area": str((d.get("quiz") or {}).get("area") or "—"),
+        "cidade": cid.get("nome") or "—",
+        "uf": cid.get("uf") or "—",
+        "pais": cid.get("pais") or "Brasil",
+        "nascimento_data": data_nasc_str,
+        "nascimento_hora": h_str,
+        "chegada_bsb": chegada_bsb,
+        "gerada_bsb": gerada_bsb,
+        "carta": {
+            "selo": c.get("selo") or "",
+            "titulo": c.get("titulo") or "",
+            "destaque": c.get("destaque") or "",
+            "saudacao": c.get("saudacao") or "",
+            "paragrafos": c.get("paragrafos") or [],
+            "janela": janela,
+            "espera": espera,
+            "cuidado": cuidado,
+            "assinatura": c.get("assinatura") or "",
+        },
+        "texto_copia": texto_copia,
+    }, headers=CABECALHOS)
+
+
+@router.get("/painel/tabela-leituras-ajax")
+def tabela_leituras_ajax(
+    pagina: int = Query(0, ge=0),
+    por_pagina: int = Query(20, ge=1, le=100),
+    de: Optional[str] = None,
+    ate: Optional[str] = None,
+    dias: int = Query(7),
+    bots: int = Query(0),
+    teste: int = Query(0),
+    so_checkout: int = Query(0),
+    so_ao_vivo: int = Query(0),
+    so_comprou: int = Query(0),
+    so_whatsapp: int = Query(0),
+    so_avaliados: int = Query(0),
+    uf: Optional[str] = None,
+    busca: Optional[str] = None,
+    _=Depends(exigir_senha),
+):
+    """Endpoint AJAX para alternar abas de filtro e páginas das Leituras Geradas sem recarregar a tela."""
+    d1, d2 = _periodo(de, ate, dias) if (de or ate or dias) else (None, None)
+    bloco = _render_bloco_tabela_leituras(
+        pagina=pagina,
+        por_pagina=por_pagina,
+        so_checkout=bool(so_checkout),
+        so_ao_vivo=bool(so_ao_vivo),
+        so_comprou=bool(so_comprou),
+        so_whatsapp=bool(so_whatsapp),
+        so_avaliados=bool(so_avaliados),
+        uf=uf,
+        busca=busca,
+        de=d1,
+        ate=d2,
+        dias_int=dias,
+        bots=bots,
+        teste=teste,
+        base_url="/painel",
+    )
+    return JSONResponse(bloco, headers=CABECALHOS)
+
 
 

@@ -19,7 +19,7 @@ FUSO_BSB = timezone(timedelta(hours=-3))
 TELAS = [
     (0, "O chamado"), (1, "O mecanismo"), (2, "A área"), (3, "O espelho"),
     (4, "A quebra"), (5, "Os dados"), (6, "O cálculo"), (7, "A leitura"),
-    (8, "As 12 portas"), (9, "A ponte"), (10, "A oferta"),
+    (10, "A oferta"),
 ]
 
 # Abaixo disto, porcentagem engana mais do que informa: "33%" a partir de três
@@ -248,6 +248,8 @@ def _funil(sessoes: list[dict]) -> list[dict]:
         # quem parou aqui: nunca passou desta tela e nao esta com a sessao aberta
         if n == 10:
             parou = sum(1 for s in sessoes if s["max_tela"] == 10 and not s["oferta"] and not s["aberta"])
+        elif n == 7:
+            parou = sum(1 for s in sessoes if s["max_tela"] in (7, 8, 9) and not s["aberta"])
         else:
             parou = sum(1 for s in sessoes if s["max_tela"] == n and not s["aberta"])
         duracoes = [d for s in sessoes for d in s.get("duracoes_tela", {}).get(n, [])]

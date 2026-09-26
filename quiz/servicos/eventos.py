@@ -24,6 +24,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
+import config
 from config import DIR_EVENTOS, EVENTOS_RETENCAO_DIAS
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ def limite_ok(sid: str, ip: str) -> bool:
 
 
 def _arquivo(d: date) -> Path:
-    return DIR_EVENTOS / f"{d:%Y-%m-%d}.jsonl"
+    return getattr(config, "DIR_EVENTOS", DIR_EVENTOS) / f"{d:%Y-%m-%d}.jsonl"
 
 
 def gravar(linhas: list[dict]) -> int:
@@ -226,7 +227,8 @@ def limpar_antigos() -> int:
         return 0
     limite = hoje_bsb() - timedelta(days=EVENTOS_RETENCAO_DIAS)
     apagados = 0
-    for arq in DIR_EVENTOS.glob("*.jsonl"):
+    dir_eventos = getattr(config, "DIR_EVENTOS", DIR_EVENTOS)
+    for arq in dir_eventos.glob("*.jsonl"):
         try:
             d = datetime.strptime(arq.stem, "%Y-%m-%d").date()
         except ValueError:
@@ -240,3 +242,70 @@ def limpar_antigos() -> int:
     if apagados:
         logger.info("retencao: %d arquivos de evento apagados", apagados)
     return apagados
+
+
+def remover_eventos(sids: set[str] | list[str] | None = None, leitura_ids: set[str] | list[str] | None = None) -> int:
+    """Remove permanentemente eventos associados aos sids e/ou leitura_ids informados.
+
+    Usado quando uma leitura ou contato é excluído pelo painel, para que as
+    métricas agregadas do funil e do checkout reflitam a exclusão imediatamente.
+    """
+    sids_set = {str(s).strip() for s in (sids or []) if s and str(s).strip() and str(s).strip() != "servidor-sem-sessao"}
+    lids_set = {str(l).strip() for l in (leitura_ids or []) if l and str(l).strip()}
+    if not sids_set and not lids_set:
+        return 0
+
+    def _deve_descartar(ev: dict) -> bool:
+        sid = str(ev.get("sid") or "").strip()
+        if sid and sid in sids_set:
+            return True
+        props = ev.get("props")
+        if isinstance(props, dict):
+            lid = str(props.get("leitura_id") or "").strip()
+            if lid and lid in lids_set:
+                return True
+            cid = str(props.get("cliente_id") or "").strip()
+            if cid and cid in sids_set:
+                return True
+        return False
+
+    dir_eventos = getattr(config, "DIR_EVENTOS", DIR_EVENTOS)
+    if not dir_eventos.exists():
+        return 0
+
+    total_removidos = 0
+    with _LOCK:
+        for s in sids_set:
+            _por_sessao.pop(s, None)
+
+        for arq in sorted(dir_eventos.glob("*.jsonl")):
+            for tentativa in range(3):
+                try:
+                    linhas = arq.read_text(encoding="utf-8").splitlines(keepends=True)
+                    novas_linhas = []
+                    alterou = False
+                    for raw in linhas:
+                        texto = raw.strip()
+                        if not texto:
+                            continue
+                        try:
+                            ev = json.loads(texto)
+                        except Exception:
+                            novas_linhas.append(raw)
+                            continue
+                        if _deve_descartar(ev):
+                            alterou = True
+                            total_removidos += 1
+                        else:
+                            novas_linhas.append(raw if raw.endswith("\n") else raw + "\n")
+                    if alterou:
+                        arq.write_text("".join(novas_linhas), encoding="utf-8", newline="\n")
+                    break
+                except PermissionError:
+                    time.sleep(0.05 * (tentativa + 1))
+                except Exception as e:
+                    logger.warning("erro ao remover eventos em %s: %s", arq.name, e)
+                    break
+
+    return total_removidos
+

@@ -102,11 +102,14 @@ class Agregador(unittest.TestCase):
         ]
         r = agregar(d, HOJE, HOJE)
         self.assertEqual(r["checkout"]["cliques"], 1)
-        self.assertEqual(r["funil"][10]["nome"], "A oferta")
-        self.assertEqual(r["funil"][10]["sessoes"], 1)
-        self.assertEqual(r["funil"][11]["nome"], "Clique no Checkout")
-        self.assertEqual(r["funil"][11]["sessoes"], 1)
-        self.assertEqual(r["funil"][11]["tela"], "✦")
+        funil_map = {f["tela"]: f for f in r["funil"]}
+        self.assertEqual(funil_map[10]["nome"], "A oferta")
+        self.assertEqual(funil_map[10]["sessoes"], 1)
+        self.assertEqual(funil_map["✦"]["nome"], "Clique no Checkout")
+        self.assertEqual(funil_map["✦"]["sessoes"], 1)
+        # Telas 8 e 9 inativas (substituídas pela VSL) não devem poluir o funil
+        self.assertNotIn(8, funil_map)
+        self.assertNotIn(9, funil_map)
 
     def test_cronometro_e_tempos_por_tela(self):
         """Verifica se o tempo em cada tela e o cronômetro acumulado são calculados."""
@@ -245,11 +248,20 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.c = TestClient(app)
 
     def test_formatadores_completos(self):
-        from api.painel import f_data, f_hora, f_tempo
+        from api.painel import f_data, f_idade, f_hora, f_tempo
         # Data com ano de 2 dígitos (ex: 09/03/98, 05/11/03)
         self.assertEqual(f_data({"dia": 9, "mes": 3, "ano": 1998}), "09/03/98")
         self.assertEqual(f_data({"dia": 5, "mes": 11, "ano": 2003}), "05/11/03")
         self.assertEqual(f_data({}), "—")
+
+        # Idade calculada a partir da data de nascimento
+        ref_teste = date(2026, 9, 26)
+        self.assertEqual(f_idade({"dia": 10, "mes": 12, "ano": 1980}, ref=ref_teste), "45 anos")
+        self.assertEqual(f_idade({"dia": 3, "mes": 4, "ano": 1984}, ref=ref_teste), "42 anos")
+        self.assertEqual(f_idade({"dia": 14, "mes": 4, "ano": 1952}, ref=ref_teste), "74 anos")
+        self.assertEqual(f_idade({"dia": 26, "mes": 9, "ano": 2025}, ref=ref_teste), "1 ano")
+        self.assertEqual(f_idade({}), "—")
+        self.assertEqual(f_idade(None), "—")
 
         # Hora e minuto de nascimento
         self.assertEqual(f_hora({"hora": 18, "minuto": 35}), "18h35")
@@ -316,9 +328,11 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertIn("Aryaraj Alves Fernandes", txt_lista)
                 self.assertNotIn("Ary***", txt_lista)
 
-                # Data com ano de 2 dígitos
+                # Data com ano de 2 dígitos e Idade calculada
                 self.assertIn("09/03/98", txt_lista)
                 self.assertNotIn("19XX", txt_lista)
+                self.assertIn("idade", txt_lista)
+                self.assertIn("anos", txt_lista)
 
                 # Horário e minuto
                 self.assertIn("18h35", txt_lista)
@@ -442,6 +456,10 @@ class LeiturasPainelSemMascara(unittest.TestCase):
         self.assertIn("← Anterior", html_p1)
         self.assertIn("pag_leituras=0#aba-leituras", html_p1)
         self.assertIn("class=\"pag-btn disabled\">Próxima →", html_p1)
+
+        # Teste com 4 itens (uma única página): não deve renderizar barra de paginação
+        html_p_poucos = _barra_paginacao(0, 4, "/painel", {"dias": 7}, por_pagina=20)
+        self.assertEqual(html_p_poucos, "")
 
     def test_atualizar_progresso_registro(self):
         from servicos import registro
@@ -898,6 +916,92 @@ class LeiturasPainelSemMascara(unittest.TestCase):
                 self.assertFalse(arq2.exists())
                 # E o outro visitante continua intacto
                 self.assertTrue(arq3.exists())
+
+    def test_remover_eventos_servico(self):
+        """Verifica a remoção atômica de eventos em arquivos .jsonl por sid e/ou leitura_id."""
+        from servicos import eventos
+
+        with TemporaryDirectory() as tmpdir:
+            dir_ev = Path(tmpdir)
+            arq = dir_ev / "2026-09-25.jsonl"
+            ev1 = {"v": 1, "ts": "2026-09-25T10:00:00-03:00", "seq": 1, "sid": "sid-alvo", "evt": "sessao_inicio", "props": {}}
+            ev2 = {"v": 1, "ts": "2026-09-25T10:05:00-03:00", "seq": 2, "sid": "sid-alvo", "evt": "oferta_clique", "props": {"leitura_id": "lid-alvo"}}
+            ev3 = {"v": 1, "ts": "2026-09-25T10:02:00-03:00", "seq": 1, "sid": "sid-outro", "evt": "sessao_inicio", "props": {}}
+            ev4 = {"v": 1, "ts": "2026-09-25T10:06:00-03:00", "seq": 2, "sid": "sid-outro", "evt": "oferta_clique", "props": {"leitura_id": "lid-outro"}}
+
+            arq.write_text("\n".join(json.dumps(x) for x in [ev1, ev2, ev3, ev4]) + "\n", encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_EVENTOS", dir_ev):
+                # 1. Sem sids e sem lids -> nada removido
+                rem = eventos.remover_eventos([], [])
+                self.assertEqual(rem, 0)
+                linhas = [json.loads(l) for l in arq.read_text(encoding="utf-8").splitlines() if l.strip()]
+                self.assertEqual(len(linhas), 4)
+
+                # 2. Remove sid-alvo
+                rem = eventos.remover_eventos(sids={"sid-alvo"}, leitura_ids={"lid-alvo"})
+                self.assertEqual(rem, 2)
+                linhas_restantes = [json.loads(l) for l in arq.read_text(encoding="utf-8").splitlines() if l.strip()]
+                self.assertEqual(len(linhas_restantes), 2)
+                self.assertEqual({l["sid"] for l in linhas_restantes}, {"sid-outro"})
+
+    def test_deletar_leitura_expurga_eventos_telemetria_e_atualiza_checkout(self):
+        """Verifica se excluir uma leitura pelo endpoint /painel/leitura/{id}/deletar também expurga os eventos da telemetria, zerando o checkout do funil."""
+        from starlette.testclient import TestClient
+        from main import app
+        from servicos import eventos
+        from servicos.agregador import agregar
+        from datetime import date
+        client = TestClient(app)
+
+        with TemporaryDirectory() as tmp_leituras, TemporaryDirectory() as tmp_eventos:
+            dir_leituras = Path(tmp_leituras)
+            dir_eventos = Path(tmp_eventos)
+
+            lid = "20260925-180000-aaaaaaaa"
+            sid = "sessao-checkout-123"
+
+            # 1. Cria a leitura com cliente_id
+            arq_leitura = dir_leituras / f"{lid}.json"
+            arq_leitura.write_text(json.dumps({
+                "nome_completo": "Cliente Checkout",
+                "cliente_id": sid,
+                "checkout": True,
+            }), encoding="utf-8")
+
+            # 2. Cria eventos de telemetria correspondentes no dia 2026-09-25
+            arq_evento = dir_eventos / "2026-09-25.jsonl"
+            evs = [
+                {"v": 1, "ts": "2026-09-25T18:00:00-03:00", "seq": 1, "sid": sid, "evt": "sessao_inicio", "props": {}},
+                {"v": 1, "ts": "2026-09-25T18:05:00-03:00", "seq": 2, "sid": sid, "evt": "tela", "props": {"de": 0, "para": 10}},
+                {"v": 1, "ts": "2026-09-25T18:06:00-03:00", "seq": 3, "sid": sid, "evt": "oferta_clique", "props": {"leitura_id": lid}},
+            ]
+            arq_evento.write_text("\n".join(json.dumps(x) for x in evs) + "\n", encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras), \
+                 mock.patch.object(config, "DIR_EVENTOS", dir_eventos):
+                # Antes da exclusão: agregação calcula 1 checkout
+                d1 = d2 = date(2026, 9, 25)
+                res_antes = agregar(eventos.ler_dias(d1, d2), d1, d2)
+                self.assertEqual(res_antes["checkout"]["cliques"], 1)
+                self.assertEqual(res_antes["sessoes"], 1)
+
+                # Executa exclusão da leitura via API do painel
+                res_del = client.post(
+                    f"/painel/leitura/{lid}/deletar?modo=individual",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(res_del.status_code, 200)
+                self.assertFalse(arq_leitura.exists())
+
+                # Após a exclusão: eventos foram expurgados de 2026-09-25.jsonl
+                linhas_ev = [l for l in arq_evento.read_text(encoding="utf-8").splitlines() if l.strip()]
+                self.assertEqual(len(linhas_ev), 0)
+
+                # Agregação agora calcula 0 checkouts e 0 sessões
+                res_depois = agregar(eventos.ler_dias(d1, d2), d1, d2)
+                self.assertEqual(res_depois["checkout"]["cliques"], 0)
+                self.assertEqual(res_depois["sessoes"], 0)
 
     def test_arrasto_scroll_horizontal_tabela(self):
         """Verifica se os estilos e scripts de arrasto horizontal (drag-to-scroll) com botão esquerdo estão presentes e restritos à aba Leituras."""
@@ -1429,13 +1533,36 @@ class TestFiltrosDataEFusoHorario(unittest.TestCase):
             resp_semana = painel(req, _="crassus", de="2026-09-07", ate="2026-09-08")
             html_semana = resp_semana.body.decode("utf-8")
             self.assertIn("07/09/2026 a 08/09/2026", html_semana)
-            self.assertIn('class="f on" href="/painel?de=2026-09-07&ate=2026-09-08">esta semana</a>', html_semana)
+            self.assertIn('class="f on" href="/painel?de=2026-09-07&ate=2026-09-08"', html_semana)
+            self.assertIn('onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);"', html_semana)
+            self.assertIn('>esta semana</a>', html_semana)
 
             # 3. Requisição do preset 'semana passada'
             resp_passada = painel(req, _="crassus", de="2026-08-31", ate="2026-09-06")
             html_passada = resp_passada.body.decode("utf-8")
             self.assertIn("31/08/2026 a 06/09/2026", html_passada)
-            self.assertIn('class="f on" href="/painel?de=2026-08-31&ate=2026-09-06">semana passada</a>', html_passada)
+            self.assertIn('class="f on" href="/painel?de=2026-08-31&ate=2026-09-06"', html_passada)
+            self.assertIn('onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);"', html_passada)
+            self.assertIn('>semana passada</a>', html_passada)
+
+    def test_ajax_navegacao_periodo_e_form_datas(self):
+        """Verifica se os handlers e scripts de navegação de período e filtros de data via AJAX estão presentes no HTML."""
+        from api.painel import painel
+        from starlette.requests import Request
+        req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+        resp = painel(req, _="crassus")
+        html = resp.body.decode("utf-8")
+
+        # Verifica presença das funções JS para troca suave sem reload de página
+        self.assertIn("function navegarPeriodoAjax(urlDestino, evt)", html)
+        self.assertIn("function submeterFormDatasAjax(form, evt)", html)
+        self.assertIn("popstate", html)
+
+        # Verifica formulário de datas com handler ajax
+        self.assertIn('onsubmit="return submeterFormDatasAjax(this, event);"', html)
+
+        # Verifica presença nos links de presets
+        self.assertIn('onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);"', html)
 
     def test_filtro_personalizado_de_e_ate(self):
         """Verifica o formulário De/Até e a filtragem correspondente no painel, leituras e CSV."""
@@ -2339,3 +2466,436 @@ class TestFeedbackNoPainel(unittest.TestCase):
                 salvo = json.loads((dir_leituras / f"{lid}.json").read_text(encoding="utf-8"))
                 self.assertEqual(salvo.get("feedback_estrelas"), 5)
                 self.assertIn("feedback_em", salvo)
+
+    def test_visualizar_mensagem_leitura_api_e_modal(self):
+        """Valida endpoint /painel/leitura/{id}/mensagem e renderização dos botões/modal no painel."""
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        lid = f"{hoje_pfx}-112233-12345678"
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            (dir_leituras / f"{lid}.json").write_text(json.dumps({
+                "cliente_id": "cid-teste-msg-001",
+                "nome_completo": "Aryaraj Fernandes",
+                "whatsapp": "+55 (85) 99825-9497",
+                "nascimento": {"dia": 9, "mes": 3, "ano": 1998, "hora": 18, "minuto": 35},
+                "cidade": {"nome": "Fortaleza", "uf": "Ceará", "pais": "Brasil"},
+                "quiz": {"area": "amor"},
+                "carta": {
+                    "selo": "Sol atravessando a Casa 1",
+                    "titulo": "mostrar quem escolhe você",
+                    "destaque": "Você pode parar de adivinhar o amor.",
+                    "saudacao": "ARYARAJ,",
+                    "paragrafos": [
+                        "Você está só, e faz sentido conferir por quê.",
+                        "No amor, você quer segurança antes de se expor."
+                    ],
+                    "janela": "nas próximas duas ou três semanas",
+                    "assinatura": "Escrita no céu de Fortaleza"
+                },
+                "gravado_em_bsb": "25/09/26 21:46",
+                "chegou_em_bsb": "25/09/26 21:25",
+            }, ensure_ascii=False), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras), \
+                 mock.patch.object(config, "PAINEL_SENHA", "senha_teste"), \
+                 mock.patch.object(config, "PAINEL_USUARIO", "crassus"):
+
+                # 1. Sem autenticação -> 401
+                r_sem_auth = self.c.get(f"/painel/leitura/{lid}/mensagem")
+                self.assertEqual(r_sem_auth.status_code, 401)
+
+                # 2. ID inválido -> 400
+                r_inv = self.c.get("/painel/leitura/id-invalido/mensagem", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_inv.status_code, 400)
+
+                # 3. ID inexistente -> 404
+                r_404 = self.c.get(f"/painel/leitura/{hoje_pfx}-000000-00000000/mensagem", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_404.status_code, 404)
+
+                # 4. Sucesso -> 200 OK com dados da carta
+                r_ok = self.c.get(f"/painel/leitura/{lid}/mensagem", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_ok.status_code, 200)
+                dados = r_ok.json()
+                self.assertEqual(dados["id"], lid)
+                self.assertEqual(dados["nome_completo"], "Aryaraj Fernandes")
+                self.assertEqual(dados["whatsapp"], "+55 (85) 99825-9497")
+                self.assertEqual(dados["area"], "amor")
+                self.assertEqual(dados["cidade"], "Fortaleza")
+                self.assertEqual(dados["uf"], "Ceará")
+                self.assertEqual(dados["carta"]["destaque"], "Você pode parar de adivinhar o amor.")
+                self.assertEqual(dados["carta"]["saudacao"], "ARYARAJ,")
+                self.assertEqual(len(dados["carta"]["paragrafos"]), 2)
+                self.assertIn("Para: Aryaraj Fernandes", dados["texto_copia"])
+                self.assertIn("Você pode parar de adivinhar o amor.", dados["texto_copia"])
+
+                # 5. Renderização na rota /painel/leituras
+                r_leituras = self.c.get("/painel/leituras", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_leituras.status_code, 200)
+                txt_leituras = r_leituras.text
+                self.assertIn("modal-mensagem-backdrop", txt_leituras)
+                self.assertIn("abrirModalMensagem", txt_leituras)
+                self.assertIn("btn-ver-msg-acao", txt_leituras)
+                self.assertIn("btn-ver-msg-id", txt_leituras)
+                self.assertIn("👁️ Mensagem", txt_leituras)
+
+                # 6. Renderização na rota principal /painel
+                r_painel = self.c.get("/painel", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_painel.status_code, 200)
+                txt_painel = r_painel.text
+                self.assertIn("modal-mensagem-backdrop", txt_painel)
+                self.assertIn("abrirModalMensagem", txt_painel)
+
+    def test_busca_contatos_por_nome_e_whatsapp(self):
+        """Valida busca de contatos por nome e WhatsApp no painel, leituras e exportação CSV."""
+        hoje_pfx = date.today().strftime("%Y%m%d")
+        lid1 = f"{hoje_pfx}-100000-11111111"
+        lid2 = f"{hoje_pfx}-100001-22222222"
+        lid3 = f"{hoje_pfx}-100002-33333333"
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # Contato 1: Aryaraj Fernandes com WhatsApp Fortaleza
+            (dir_leituras / f"{lid1}.json").write_text(json.dumps({
+                "cliente_id": "cid-busca-001",
+                "nome_completo": "Aryaraj Fernandes",
+                "whatsapp": "+55 (85) 99825-9497",
+                "cidade": {"nome": "Fortaleza", "uf": "CE", "pais": "Brasil"},
+                "gravado_em_bsb": "26/09/2026 10:00:00",
+                "chegou_em_bsb": "26/09/2026 09:55:00",
+            }), encoding="utf-8")
+
+            # Contato 2: Mariana Souza com WhatsApp SP
+            (dir_leituras / f"{lid2}.json").write_text(json.dumps({
+                "cliente_id": "cid-busca-002",
+                "nome_completo": "Mariana Souza",
+                "whatsapp": "+55 (11) 98765-4321",
+                "cidade": {"nome": "São Paulo", "uf": "SP", "pais": "Brasil"},
+                "gravado_em_bsb": "26/09/2026 10:05:00",
+                "chegou_em_bsb": "26/09/2026 10:01:00",
+            }), encoding="utf-8")
+
+            # Contato 3: Carlos Santos sem WhatsApp
+            (dir_leituras / f"{lid3}.json").write_text(json.dumps({
+                "cliente_id": "cid-busca-003",
+                "nome_completo": "Carlos Santos",
+                "whatsapp": "",
+                "cidade": {"nome": "Belo Horizonte", "uf": "MG", "pais": "Brasil"},
+                "gravado_em_bsb": "26/09/2026 10:10:00",
+                "chegou_em_bsb": "26/09/2026 10:08:00",
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Presença do campo de busca na interface do /painel e /painel/leituras
+                r_painel = self.c.get("/painel", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_painel.status_code, 200)
+                self.assertIn("input-busca-contato", r_painel.text)
+                self.assertIn("btn-limpar-busca", r_painel.text)
+                self.assertIn("buscarContatoClient", r_painel.text)
+                self.assertIn("submeterBuscaContato", r_painel.text)
+                self.assertIn('data-nome="aryaraj fernandes"', r_painel.text)
+                self.assertIn('data-wa="5585998259497"', r_painel.text)
+
+                r_leituras = self.c.get("/painel/leituras", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_leituras.status_code, 200)
+                self.assertIn("input-busca-contato", r_leituras.text)
+
+                # 2. Busca por Nome (case-insensitive e parcial) em /painel
+                r_nome = self.c.get("/painel?busca=aryar", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_nome.status_code, 200)
+                self.assertIn("Aryaraj Fernandes", r_nome.text)
+                self.assertNotIn("Mariana Souza", r_nome.text)
+                self.assertNotIn("Carlos Santos", r_nome.text)
+                self.assertIn('value="aryar"', r_nome.text)
+
+                # 3. Busca por WhatsApp em /painel (dígitos limpos)
+                r_wa = self.c.get("/painel?busca=99825", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_wa.status_code, 200)
+                self.assertIn("Aryaraj Fernandes", r_wa.text)
+                self.assertNotIn("Mariana Souza", r_wa.text)
+                self.assertNotIn("Carlos Santos", r_wa.text)
+
+                # 4. Busca por WhatsApp em /painel/leituras (formatado com parênteses)
+                r_wa_fmt = self.c.get("/painel/leituras?busca=(11)+98765", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_wa_fmt.status_code, 200)
+                self.assertIn("Mariana Souza", r_wa_fmt.text)
+                self.assertNotIn("Aryaraj Fernandes", r_wa_fmt.text)
+
+                # 5. Busca sem correspondência -> estado vazio informativo
+                r_nenhum = self.c.get("/painel?busca=ZiraldoInexistente", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_nenhum.status_code, 200)
+                self.assertIn("Nenhum contato encontrado para a busca &ldquo;ZiraldoInexistente&rdquo;.", r_nenhum.text)
+
+                # 6. Exportação CSV com parâmetro de busca
+                r_csv = self.c.get("/painel/exportar-csv?busca=99825", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_csv.status_code, 200)
+                csv_txt = r_csv.text
+                self.assertIn("Aryaraj Fernandes", csv_txt)
+                self.assertNotIn("Mariana Souza", csv_txt)
+                self.assertNotIn("Carlos Santos", csv_txt)
+
+    def test_filtro_checkout_sem_paginacao_desnecessaria(self):
+        """Garante que ao filtrar por checkout, todos os contatos do checkout apareçam sem paginação fantasma."""
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            # Cria 26 contatos no total; apenas 4 fizeram checkout
+            hoje_pfx = date.today().strftime("%Y%m%d")
+            for i in range(26):
+                lid = f"{hoje_pfx}-12{i:02d}00-chk{i:04d}"
+                fez_chk = (i in [2, 5, 21, 24])  # 2 na primeira página e 2 na segunda página
+                (dir_leituras / f"{lid}.json").write_text(json.dumps({
+                    "cliente_id": f"cid-{i}",
+                    "nome_completo": f"Cliente {'Checkout' if fez_chk else 'Comum'} {i}",
+                    "whatsapp": f"+55 (11) 90000-{i:04d}",
+                    "checkout": fez_chk,
+                    "etapa_max": 10 if fez_chk else 6,
+                    "gravado_em_bsb": "26/09/2026 10:00:00",
+                    "chegou_em_bsb": "26/09/2026 09:50:00",
+                }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Sem filtro: 26 pessoas únicas, tem paginação de 2 páginas
+                r_todos = self.c.get("/painel", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_todos.status_code, 200)
+                self.assertIn("26</b> pessoas únicas", r_todos.text)
+                self.assertIn("Página 1 de 2", r_todos.text)
+                self.assertIn("Exportar CSV <span id=\"btn-exportar-contagem\">(todos: 26)</span>", r_todos.text)
+
+                # 2. Com filtro de checkout: exatamente as 4 pessoas devem aparecer na tabela
+                r_chk = self.c.get("/painel?so_checkout=1", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(r_chk.status_code, 200)
+                txt_chk = r_chk.text
+                self.assertIn("Cliente Checkout 2", txt_chk)
+                self.assertIn("Cliente Checkout 5", txt_chk)
+                self.assertIn("Cliente Checkout 21", txt_chk)
+                self.assertIn("Cliente Checkout 24", txt_chk)
+                self.assertNotIn("Cliente Comum 0", txt_chk)
+                self.assertNotIn("Cliente Comum 20", txt_chk)
+
+                # 3. Subtítulo deve registrar 4 pessoas únicas com checkout
+                self.assertIn("<b>4</b> pessoas únicas com checkout", txt_chk)
+
+                # 4. Não deve haver paginação (nem Página 1 de 2 nem botões de paginação)
+                self.assertNotIn("Página 1 de 2", txt_chk)
+                self.assertNotIn("class=\"paginacao\"", txt_chk)
+
+                # 5. Exportar CSV deve indicar (todos: 4)
+                self.assertIn("Exportar CSV <span id=\"btn-exportar-contagem\">(todos: 4)</span>", txt_chk)
+
+
+class TestTempoQuizAtivoEDuplo(unittest.TestCase):
+    """Testes unitários para o cálculo e exibição do tempo ativo vs tempo total de sessão."""
+
+    def setUp(self):
+        from main import app
+        self.c = TestClient(app)
+
+    def test_f_tempo_quiz_duplo_unitario(self):
+        from api.painel import f_tempo, f_tempo_quiz_duplo
+
+        # 1. Casos vazios ou negativos
+        self.assertEqual(f_tempo_quiz_duplo(None, None), "—")
+        self.assertEqual(f_tempo_quiz_duplo(-10, None), "—")
+
+        # 2. Formatação com horas em f_tempo
+        self.assertEqual(f_tempo(1268334), "21m 08s")
+        self.assertEqual(f_tempo(3600000 * 2 + 15 * 60000), "2h 15m")
+
+        # 3. Caso legado: apenas tempo_quiz_ms (tempo total da aba)
+        legado = f_tempo_quiz_duplo(None, 95000)
+        self.assertEqual(legado, "1m 35s")
+
+        # 4. Caso duplo: tempo ativo (28s) e tempo total (21m 08s)
+        duplo = f_tempo_quiz_duplo(28000, 1268334)
+        self.assertIn('class="tempo-ativo"', duplo)
+        self.assertIn(">28s</span>", duplo)
+        self.assertIn('class="tempo-total-sub"', duplo)
+        self.assertIn("total: 21m 08s", duplo)
+
+        # 5. Caso duplo com tempos iguais (ex: respondeu sem pausas)
+        iguais = f_tempo_quiz_duplo(30000, 30000)
+        self.assertIn('class="tempo-ativo"', iguais)
+        self.assertIn(">30s</span>", iguais)
+        self.assertNotIn("total:", iguais)
+
+    def test_renderizacao_tempo_duplo_na_tabela_e_detalhe(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir)
+            hoje_pfx = date.today().strftime("%Y%m%d")
+            lid = f"{hoje_pfx}-183500-abcdef01"
+            (dir_leituras / f"{lid}.json").write_text(json.dumps({
+                "cliente_id": "cid-tempo-1",
+                "nome_completo": "Aline Astróloga",
+                "whatsapp": "85999991234",
+                "etapa_max": 7,
+                "tempo_ativo_ms": 28000,
+                "tempo_quiz_ms": 1268334,
+                "gravado_em_bsb": "26/09/2026 18:35:00",
+                "chegou_em_bsb": "26/09/2026 18:14:00",
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Tabela do painel: deve conter 28s e total: 21m 08s
+                resp = self.c.get("/painel", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(resp.status_code, 200)
+                html = resp.text
+                self.assertIn("Aline Astróloga", html)
+                self.assertIn("28s", html)
+                self.assertIn("total: 21m 08s", html)
+
+                # 2. Detalhe da leitura: deve conter tempo ativo e total aba
+                resp_det = self.c.get(f"/painel/leitura/{lid}", auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA))
+                self.assertEqual(resp_det.status_code, 200)
+                html_det = resp_det.text
+                self.assertIn("tempo ativo:", html_det)
+                self.assertIn("28s", html_det)
+                self.assertIn("total aba: 21m 08s", html_det)
+
+    def test_recuperacao_retroativa_tempo_ativo_de_eventos(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from api.painel import obter_progresso_leituras
+
+        with TemporaryDirectory() as tmpdir_leituras, TemporaryDirectory() as tmpdir_eventos:
+            dir_l = Path(tmpdir_leituras)
+            dir_e = Path(tmpdir_eventos)
+
+            hoje_iso = date.today().strftime("%Y-%m-%d")
+            hoje_pfx = date.today().strftime("%Y%m%d")
+            lid = f"{hoje_pfx}-200000-retro001"
+            cid = "cid-retroativo-123"
+
+            # Leitura antiga sem tempo_ativo_ms
+            d_leitura = {
+                "cliente_id": cid,
+                "nome_completo": "Beatriz Retro",
+                "tempo_quiz_ms": 1268334,
+                "etapa_max": 7,
+            }
+            (dir_l / f"{lid}.json").write_text(json.dumps(d_leitura), encoding="utf-8")
+
+            # Arquivo de eventos com navegação de telas
+            linhas_ev = [
+                json.dumps({"sid": cid, "evt": "sessao_inicio", "props": {}}),
+                json.dumps({"sid": cid, "evt": "tela", "props": {"de": 0, "para": 1, "ms_na_anterior": 1800}}),
+                json.dumps({"sid": cid, "evt": "tela", "props": {"de": 1, "para": 2, "ms_na_anterior": 3200}}),
+                json.dumps({"sid": cid, "evt": "tela", "props": {"de": 2, "para": 3, "ms_na_anterior": 2600}}),
+                json.dumps({"sid": cid, "evt": "tela", "props": {"de": 3, "para": 4, "ms_na_anterior": 2400}}),
+                json.dumps({"sid": cid, "evt": "tela", "props": {"de": 4, "para": 5, "ms_na_anterior": 1100}}),
+                json.dumps({"sid": cid, "evt": "tela", "props": {"de": 5, "para": 6, "ms_na_anterior": 17000}}),
+                json.dumps({"sid": cid, "evt": "leitura_entregue", "props": {"leitura_id": lid}}),
+            ]
+            (dir_e / f"{hoje_iso}.jsonl").write_text("\n".join(linhas_ev), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_l), \
+                 mock.patch.object(config, "DIR_EVENTOS", dir_e):
+                prog = obter_progresso_leituras([(lid, d_leitura)])
+                self.assertIn(lid, prog)
+                # Soma: 1800 + 3200 + 2600 + 2400 + 1100 + 17000 = 28100 ms (~28s)
+                self.assertEqual(prog[lid].get("tempo_ativo_ms"), 28100)
+
+    def test_frontend_index_html_contem_rastreamento_ativo(self):
+        caminho_html = Path("publico/index.html")
+        if not caminho_html.exists():
+            caminho_html = Path("quiz/publico/index.html")
+        conteudo = caminho_html.read_text(encoding="utf-8")
+
+        self.assertIn("msAtivoQuiz", conteudo)
+        self.assertIn("tempo_ativo_ms", conteudo)
+        self.assertIn("telaOcultou", conteudo)
+        self.assertIn("msOcultoTela", conteudo)
+
+    def test_tabela_leituras_ajax_endpoint_auth_e_filtros(self):
+        """Verifica o endpoint /painel/tabela-leituras-ajax: autenticação, resposta JSON, filtros e badges."""
+        from starlette.testclient import TestClient
+        from main import app
+        client = TestClient(app)
+
+        with TemporaryDirectory() as tmp_leituras:
+            dir_leituras = Path(tmp_leituras)
+            hoje_pfx = date.today().strftime("%Y%m%d")
+
+            # Cria 2 leituras: 1 com checkout e 1 com whatsapp
+            lid1 = f"{hoje_pfx}-110000-aaaaaaaa"
+            lid2 = f"{hoje_pfx}-120000-bbbbbbbb"
+
+            (dir_leituras / f"{lid1}.json").write_text(json.dumps({
+                "nome_completo": "Cliente Checkout",
+                "whatsapp": "11999990001",
+                "checkout": True,
+                "etapa_max": 10,
+            }), encoding="utf-8")
+
+            (dir_leituras / f"{lid2}.json").write_text(json.dumps({
+                "nome_completo": "Cliente WhatsApp",
+                "whatsapp": "11999990002",
+                "checkout": False,
+                "etapa_max": 7,
+            }), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                # 1. Sem autenticação -> 401
+                r_sem_auth = client.get("/painel/tabela-leituras-ajax")
+                self.assertEqual(r_sem_auth.status_code, 401)
+
+                # 2. Com autenticação (todas) -> 200 JSON com badges e html
+                r_todas = client.get(
+                    "/painel/tabela-leituras-ajax",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(r_todas.status_code, 200)
+                d_todas = r_todas.json()
+                self.assertTrue(d_todas.get("ok"))
+                self.assertIn("html", d_todas)
+                self.assertIn("badges", d_todas)
+                self.assertEqual(d_todas["badges"]["badge-count-todos"], 2)
+                self.assertEqual(d_todas["badges"]["badge-count-checkout"], 1)
+                self.assertEqual(d_todas["badges"]["badge-count-wa"], 2)
+                self.assertIn("Cliente Checkout", d_todas["html"])
+                self.assertIn("Cliente WhatsApp", d_todas["html"])
+
+                # 3. Filtro só quem foi pro checkout -> retorna apenas Cliente Checkout
+                r_chk = client.get(
+                    "/painel/tabela-leituras-ajax?so_checkout=1",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(r_chk.status_code, 200)
+                d_chk = r_chk.json()
+                self.assertIn("Cliente Checkout", d_chk["html"])
+                self.assertNotIn("Cliente WhatsApp", d_chk["html"])
+                self.assertEqual(d_chk["total_pessoas"], 1)
+
+                # 4. Filtro por busca
+                r_busca = client.get(
+                    "/painel/tabela-leituras-ajax?busca=WhatsApp",
+                    auth=(config.PAINEL_USUARIO, config.PAINEL_SENHA)
+                )
+                self.assertEqual(r_busca.status_code, 200)
+                d_busca = r_busca.json()
+                self.assertIn("Cliente WhatsApp", d_busca["html"])
+                self.assertNotIn("Cliente Checkout", d_busca["html"])
+
+    def test_painel_renderiza_container_ajax_e_funcoes_js(self):
+        """Verifica se o HTML do painel contém o container-tabela-leituras e as funções JS de navegação assíncrona sem reload."""
+        from api.painel import JS_PAINEL, painel
+        from starlette.requests import Request
+
+        # Verifica funções em JS_PAINEL
+        self.assertIn("function carregarTabelaLeiturasAjax", JS_PAINEL)
+        self.assertIn("function navegarPaginacaoLeituras", JS_PAINEL)
+        self.assertIn("filtrarTabelaClient", JS_PAINEL)
+        self.assertIn("filtrarPorUFClient", JS_PAINEL)
+        self.assertIn("/painel/tabela-leituras-ajax", JS_PAINEL)
+
+        # Verifica se o container está no HTML renderizado do painel
+        req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+        resp = painel(req, _="crassus")
+        html_resp = resp.body.decode("utf-8")
+        self.assertIn('id="container-tabela-leituras"', html_resp)
+        self.assertIn('class="btn-filtro-leituras', html_resp)
+        self.assertIn('filtrarTabelaClient', html_resp)
+
+
+

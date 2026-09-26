@@ -86,6 +86,7 @@ class Pedido(BaseModel):
     nascimento: Nascimento
     cidade: Cidade
     ms_ate_gerar: Optional[int] = None
+    tempo_ativo_ms: Optional[int] = None
 
 
 class Contato(BaseModel):
@@ -378,6 +379,8 @@ async def gerar(p: Pedido):
         "ms_llm": meta.get("ms_llm", 0),
         "ms_astro": t_astro,
         "ms_total": resposta["meta"]["ms"]["total"],
+        "ms_ate_gerar": p.ms_ate_gerar,
+        "tempo_ativo_ms": p.tempo_ativo_ms,
     })
 
     # o lead é gravado agora, antes de qualquer tela de oferta
@@ -389,6 +392,7 @@ async def gerar(p: Pedido):
         "cidade": p.cidade.model_dump(),
         "quiz": p.quiz.model_dump(),
         "tempo_quiz_ms": p.ms_ate_gerar,
+        "tempo_ativo_ms": p.tempo_ativo_ms,
         "veredito": resposta["veredito"],
         "precisao": precisao,
         "placar": {str(k): round(v, 1) for k, v in placar.casas.items()},
@@ -421,6 +425,7 @@ async def gerar(p: Pedido):
             "veredito": resposta["veredito"],
             "precisao": precisao,
             "tempo_quiz_ms": p.ms_ate_gerar,
+            "tempo_ativo_ms": p.tempo_ativo_ms,
             "ao_vivo": True,
         },
         "total_ao_vivo": len(rastreador_presenca.obter_ativos(90.0))
