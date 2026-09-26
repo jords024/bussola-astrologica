@@ -1048,9 +1048,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 <!-- 10 · A OFERTA -->
 <section class="scr flow" data-s="10">
   <header class="oferta-vsl-intro">
-    <div class="eye">✦ sua leitura foi só o começo</div>
-    <h2 class="big" id="ofertaVslTitulo" tabindex="-1">Uma direção para agora.<br><em>Uma bússola para o que vem.</em></h2>
-    <p class="sub">Se a sua mensagem fez sentido, veja como levar essa clareza para outras áreas da sua vida.</p>
+    <div class="eye" id="ofertaOlho">✦ uma porta, de doze</div>
+    <h2 class="big" id="ofertaVslTitulo" tabindex="-1">Você acabou de ler uma porta.<br><em>Faltam onze.</em></h2>
+    <p class="sub" id="ofertaSub">A que você viu agora fecha em algumas semanas. Depois dela vem outra, e outra, e nenhuma delas avisa. A Bússola te ensina a achar a próxima sem depender de ninguém.</p>
   </header>
   <div id="vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1" style="max-width:640px;width:100%;margin:0 auto 20px;background:#0d0c0a;border-radius:12px;overflow:hidden;">
     <div style="position:relative;width:100%;padding-top:177.77%;background:#0d0c0a;">
@@ -1607,6 +1607,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if(de === 10 && i !== 10) vslOfertaDesmontar();
     if(i === 10){
       vslOfertaMontar();
+      ofertaPersonalizar();
       $('#ofertaVslTitulo').focus({preventScroll:true});
     }
     atualizarBtnWhatsApp(i);
@@ -1886,6 +1887,26 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   }
   ['click','touchstart','scroll','keydown'].forEach(evt =>
     window.addEventListener(evt, vslOfertaDestravarAudio, {once:true, passive:true}));
+
+  /* O NOME NA TELA DA OFERTA.
+     Ela acabou de ler uma carta que fala com ela pelo nome; chegar aqui num
+     texto anonimo quebra a conversa justamente no ponto em que ela decide.
+     Sem nome, o texto continua de pe: nenhuma frase depende dele. */
+  function ofertaPersonalizar(){
+    const nome = (S.nome || '').trim();
+    if(!nome) return;
+    const olho = document.getElementById('ofertaOlho');
+    if(olho) olho.textContent = `✦ ${nome}, uma porta de doze`;
+    const t = document.getElementById('ofertaVslTitulo');
+    if(t){
+      t.replaceChildren();
+      t.append(document.createTextNode(`${nome}, você acabou de ler uma porta.`),
+               document.createElement('br'));
+      const em = document.createElement('em');
+      em.textContent = 'Faltam onze.';
+      t.append(em);
+    }
+  }
 
   const ofertaRetry = document.getElementById('ofertaVideoRetry');
   if(ofertaRetry) ofertaRetry.addEventListener('click', () => {
@@ -2504,14 +2525,23 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
      O cálculo do mapa leva ~100ms; o resto é o agente escrevendo, e isso leva
      de 12 a 17 segundos. Porcentagem inventada mente sobre isso, então aqui só
      há tempo decorrido e a etapa correspondente. */
+  /* As etapas precisam cobrir o tempo REAL da geracao, senao a ultima frase
+     fica congelada na tela e a pessoa entende que travou. Quando a carta
+     passou a ser escrita com raciocinio alto, o tempo foi de ~20s para ~75s e
+     esta lista parou em 20s: sobravam quase um minuto de "Quase la" parado,
+     que e exatamente a cara de uma tela quebrada. */
   const STG = [
     [0.0, 'Abrindo o céu do seu nascimento'],
     [1.2, 'Cruzando com o céu de hoje'],
     [2.6, 'Percorrendo as doze portas'],
     [4.4, 'Vendo qual delas está aberta agora'],
-    [6.5, 'O astrólogo está escrevendo sua carta'],
-    [12.0, 'Escrevendo com cuidado. Vale a espera.'],
-    [20.0, 'Quase lá. Sua carta está sendo fechada.'],
+    [6.5, 'Lendo os trânsitos que tocam o seu mapa'],
+    [12.0, 'Separando o que está apertando agora'],
+    [20.0, 'O astrólogo está escrevendo a sua carta'],
+    [32.0, 'Escrevendo com cuidado. Vale a espera.'],
+    [46.0, 'Conferindo cada frase contra o seu mapa'],
+    [60.0, 'Quase lá. Sua carta está sendo fechada.'],
+    [80.0, 'Últimos ajustes. Já vai aparecer.'],
   ];
 
 
@@ -2535,7 +2565,14 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     esperaMontar: 2500,  /* sem NADA desenhado ate aqui, a bussola volta */
     esperaPlayer: 9000,  /* sem video ate aqui, seguimos sem ele */
     travaMs: 6000,       /* relogio do video parado por tanto tempo = travou */
-    tetoEspera: 60000,   /* rede de seguranca final */
+    tetoEspera: 120000,  /* rede de seguranca final, acima do tempo da carta */
+    /* A GARANTIA. Passado este tempo COM A CARTA PRONTA, o botao aparece,
+       nao importa em que estado o video ficou. Existe porque a regra das duas
+       condicoes dependia de dois disparos avulsos se encontrarem: se a carta
+       ficasse pronta enquanto o video ainda tocava, ninguem chamava de novo e
+       a tela ficava sem botao e sem erro - a pior falha possivel, porque nao
+       da nem para a pessoa tentar outra vez. */
+    garantiaBotao: 1500,
   };
 
   let vslEstado = 'indisponivel';   /* indisponivel | carregando | tocando | fim */
@@ -2623,8 +2660,38 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   /* As duas condicoes. Chamada pelo relogio do video e pelo fim da geracao. */
   function vslTalvezLiberar(motivo){
     if(!leituraPronta) return;
-    if(vslEstado === 'indisponivel'){ fill(); go(7); return; }
-    if(vslEstado === 'fim') vslLiberar(motivo);
+    if(vslEstado === 'indisponivel'){ vslGuardaParar(); fill(); go(7); return; }
+    if(vslEstado === 'fim'){ vslGuardaParar(); vslLiberar(motivo); return; }
+    /* A carta ficou pronta com o video ainda rodando. Antes isto simplesmente
+       nao fazia nada, e como as duas chamadas sao avulsas, ninguem tentava de
+       novo: a tela ficava parada para sempre. Agora fica um vigia de pe. */
+    vslGuardaIniciar();
+  }
+
+  /* O VIGIA.
+     Com a carta pronta, o botao TEM que aparecer. Ele espera o video terminar
+     por mais um tempo curto - o fim do video ainda e o melhor momento - e
+     depois solta assim mesmo. Um video sem fim nao pode custar a venda. */
+  let vslGuarda = null;
+  let vslGuardaDesde = 0;
+
+  function vslGuardaIniciar(){
+    if(vslGuarda) return;
+    vslGuardaDesde = Date.now();
+    vslGuarda = setInterval(() => {
+      if(!leituraPronta){ vslGuardaParar(); return; }
+      if(vslEstado === 'indisponivel'){ vslGuardaParar(); fill(); go(7); return; }
+      if(vslEstado === 'fim'){ vslGuardaParar(); vslLiberar('carta_pronta'); return; }
+      if(Date.now() - vslGuardaDesde > VSL.garantiaBotao){
+        vslGuardaParar();
+        A.ev('vsl', {estado:'botao_garantido', video:vslEstado}, true);
+        vslLiberar('garantia');
+      }
+    }, 250);
+  }
+
+  function vslGuardaParar(){
+    if(vslGuarda){ clearInterval(vslGuarda); vslGuarda = null; }
   }
 
   function vslIniciar(){
@@ -2752,6 +2819,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     voltandoDeProposito = true;
     if(controleLeitura){ try{ controleLeitura.abort(); }catch(e){} }
     clearInterval(vslRelogio);
+    vslGuardaParar();
     const v = vslPlayer();
     if(v && typeof v.pause === 'function'){ try{ v.pause(); }catch(e){} }
     const btn = document.getElementById('vslGo');

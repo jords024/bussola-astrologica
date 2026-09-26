@@ -33,10 +33,38 @@ from .pesos import (MULT_ESTACAO, MULT_REGENTE, ORBES_CANONICOS,
 
 LENTOS = ("Pluto", "Neptune", "Uranus", "Saturn")
 
-# So Sol e Lua. Sao os dois pontos que a pessoa sente como "eu", e nao como um
-# setor da vida. Ascendente e Meio do Ceu dependem de hora exata e sairiam do
-# ar para boa parte dos leads.
+# Sol e Lua: os dois pontos que a pessoa sente como "eu", e nao como um setor
+# da vida.
 ALVOS = ("Sun", "Moon")
+
+# Ascendente e Meio do Ceu. Ficaram de fora por muito tempo com a justificativa
+# de que "dependem de hora exata e sairiam do ar para boa parte dos leads".
+# Medido nas 88 leituras reais no disco, isso era falso: 97% tem hora exata e
+# casas confiaveis, porque o quiz pede a hora para montar o mapa.
+#
+# O custo era alto. Nos 85 mapas com casas confiaveis:
+#   82% tinham aspecto lento fechado em MC ou Ascendente
+#   40% tinham nesses pontos o aspecto MAIS APERTADO do mapa inteiro
+#   39% recebiam a carta escrita sobre um aspecto mais largo, com o mais
+#       apertado calculado e descartado ali do lado
+#   15% nao tinham NADA fechado em Sol ou Lua e caiam para criterios mais
+#       fracos, mesmo tendo um angulo exato
+#
+# Os dois sao eixos do mapa, nao comodos: o Ascendente e como ela chega, o Meio
+# do Ceu e o lugar que ela ocupa aos olhos dos outros. Falam da vida inteira, e
+# e por isso que entram aqui e nao na Parte 2.
+#
+# So entram quando a hora e confiavel. Sem hora, angulo e chute, e a carta
+# voltaria a afirmar uma precisao que o calculo nao tem.
+ANGULOS = ("Medium_Coeli", "Ascendant")
+
+# qual campo do Perfil pesa cada ponto. Antes isto era uma linha binaria -
+# "peso_sol se for Sol, senao peso_lua" - que daria ao Meio do Ceu o peso da
+# Lua no instante em que os angulos entrassem.
+CAMPO_DO_PONTO = {
+    "Sun": "peso_sol", "Moon": "peso_lua",
+    "Medium_Coeli": "peso_mc", "Ascendant": "peso_asc",
+}
 
 # A conjuncao entra: e o aspecto de maior impacto identificatorio, e sem ela
 # "Plutao conjunto ao Sol" cairia para um criterio mais fraco.
@@ -62,9 +90,32 @@ class Perfil:
     # sentido. Sem hora confiavel os dois ficam em 1.0 e nao desempatam nada.
     peso_sol: float = 1.0
     peso_lua: float = 1.0
+    # os proprios eixos. Ficam em 1.0 de proposito: entram na disputa pelo
+    # merito do orbe, do tempo e do tipo de aspecto, sem um bonus inventado.
+    # Um Sol colado no Meio do Ceu continua valendo mais (chega a 1.6) do que
+    # um aspecto morno no eixo.
+    peso_mc: float = 1.0
+    peso_asc: float = 1.0
+    # so o calculo sabe se a hora daquela pessoa aguenta angulo
+    angulos_ok: bool = False
 
 
 PERFIL_NEUTRO = Perfil()
+
+# Acima disto o transito ainda nao e "agora": conta como pano de fundo.
+HORIZONTE_DIAS = 60.0
+
+
+def dias_para_exato(a: AspectoNorm) -> Optional[float]:
+    """Quantos dias faltam (ou fazem) para o aspecto ficar exato.
+
+    Orbe sozinho mente sobre o tempo. Saturno anda 0,077 grau por dia e Urano
+    0,012: o MESMO grau de orbe significa treze dias para um e oitenta e um
+    para o outro. Quem fala de momento precisa do tempo, nao da distancia.
+    """
+    if not a.velocidade:
+        return None
+    return abs(a.orbe) / abs(a.velocidade)
 
 
 @dataclass(frozen=True)
@@ -75,6 +126,11 @@ class Identificacao:
     casa: Optional[int] = None              # criterio 2
     graus_na_casa: Optional[float] = None   # criterio 2
     forca: float = 0.0
+    # O SEGUNDO transito lento, quando existe outro pegando Sol ou Lua ao
+    # mesmo tempo. Nao e enfeite: quando dois lentos apertam juntos, e isso
+    # que explica a sensacao de estar sendo puxada por dois lados. A carta
+    # mencionava um e jogava o outro fora.
+    segundo: Optional[AspectoNorm] = None
 
 
 def forca_identificacao(a: AspectoNorm, perfil: Perfil = PERFIL_NEUTRO) -> float:
@@ -97,17 +153,40 @@ def forca_identificacao(a: AspectoNorm, perfil: Perfil = PERFIL_NEUTRO) -> float
         return 0.0
     fechamento = max(0.10, 1.0 - abs(a.orbe) / omax)
     tipo = PESO_ASPECTO.get(a.aspecto, 0) / 10.0
-    ponto = perfil.peso_sol if a.natal == "Sun" else perfil.peso_lua
+    ponto = getattr(perfil, CAMPO_DO_PONTO.get(a.natal, ""), 1.0)
     vinculo = MULT_REGENTE if a.transito in perfil.regentes else 1.0
     direcao = PESO_MOVIMENTO.get(a.movimento, 1.0)
     estacao = MULT_ESTACAO if abs(a.velocidade) < VEL_ESTACIONARIO else 1.0
-    return fechamento * tipo * ponto * vinculo * direcao * estacao
+
+    # IMINENCIA: o quanto isto e AGORA, em dias, e nao em graus.
+    #
+    # Sem este fator a eleicao errava feio. Num mapa medido aqui havia Saturno
+    # em quadratura ao Sol com orbe 0,04 grau - exato no mesmo dia - e Urano em
+    # quadratura a Lua com 0,28 grau, exato so dali a vinte e tres dias. O
+    # bonus de 1,2 da Lua regente atropelava a diferenca e a carta falava do
+    # transito distante, ignorando o que estava fechando naquele dia.
+    dias = dias_para_exato(a)
+    if dias is None:
+        iminencia = 1.0
+    else:
+        iminencia = 1.0 + max(0.0, (HORIZONTE_DIAS - dias) / HORIZONTE_DIAS)
+
+    return fechamento * tipo * ponto * vinculo * direcao * estacao * iminencia
 
 
-def _candidatos(aspectos, piso, teto, movimento=None):
+def alvos_de(perfil: Perfil) -> tuple:
+    """Quais pontos natais contam para esta pessoa.
+
+    Os eixos entram so quando a hora de nascimento aguenta: sem ela, o
+    Ascendente pode estar a um signo inteiro de distancia do real.
+    """
+    return ALVOS + ANGULOS if perfil.angulos_ok else ALVOS
+
+
+def _candidatos(aspectos, piso, teto, movimento=None, alvos=ALVOS):
     fora = []
     for a in aspectos:
-        if a.transito not in LENTOS or a.natal not in ALVOS:
+        if a.transito not in LENTOS or a.natal not in alvos:
             continue
         if a.aspecto not in ASPECTOS:
             continue
@@ -129,6 +208,25 @@ def _melhor(aspectos, perfil: Perfil) -> Optional[tuple]:
     return pontuados[0]
 
 
+def _segundo(aspectos, principal: AspectoNorm,
+             perfil: Perfil) -> Optional[AspectoNorm]:
+    """O outro lento que esta apertando junto, se houver.
+
+    Precisa ser outro PLANETA - dois aspectos do mesmo transitante sao a mesma
+    noticia contada duas vezes. Quando pega OUTRO PONTO, melhor ainda: quem ela
+    e e como ela aparece sao historias diferentes, e o atrito entre as duas e
+    o que a carta tem de mais util para contar.
+    """
+    outros = [a for a in aspectos if a.transito != principal.transito]
+    if not outros:
+        return None
+    # o de outro ponto natal tem preferencia; depois, forca
+    def chave(a):
+        mesmo_ponto = (a.natal == principal.natal)
+        return (mesmo_ponto, -forca_identificacao(a, perfil), a.transito)
+    return sorted(outros, key=chave)[0]
+
+
 def eleger_identificacao(
     aspectos: Iterable[AspectoNorm],
     presencas: Iterable[PresencaNorm] = (),
@@ -136,12 +234,15 @@ def eleger_identificacao(
 ) -> Optional[Identificacao]:
     """Devolve UM transito, ou None quando nada qualifica."""
     aspectos = list(aspectos)
+    alvos = alvos_de(perfil)
 
     # 1 - o que esta apertando agora
-    escolha = _melhor(_candidatos(aspectos, 0.0, ORBE_FECHADO), perfil)
+    fechados = _candidatos(aspectos, 0.0, ORBE_FECHADO, alvos=alvos)
+    escolha = _melhor(fechados, perfil)
     if escolha:
         f, a = escolha
-        return Identificacao(1, a.transito, aspecto=a, forca=f)
+        return Identificacao(1, a.transito, aspecto=a, forca=f,
+                             segundo=_segundo(fechados, a, perfil))
 
     # 2 - o que acabou de entrar numa area da vida
     entradas = [p for p in presencas
@@ -157,7 +258,7 @@ def eleger_identificacao(
 
     # 3 - o que ja passou o pico e agora e assimilacao
     escolha = _melhor(_candidatos(aspectos, ORBE_FECHADO, ORBE_LARGO,
-                                  "Separating"), perfil)
+                                  "Separating", alvos), perfil)
     if escolha:
         f, a = escolha
         return Identificacao(3, a.transito, aspecto=a, forca=f)
@@ -165,7 +266,7 @@ def eleger_identificacao(
     # 4 - o que ainda esta a caminho. Fecha o caso em que a Parte 1 sairia
     # vazia, e e honesto: fala do que esta se formando, nao do que passou.
     escolha = _melhor(_candidatos(aspectos, ORBE_FECHADO, ORBE_LARGO,
-                                  "Applying"), perfil)
+                                  "Applying", alvos), perfil)
     if escolha:
         f, a = escolha
         return Identificacao(4, a.transito, aspecto=a, forca=f)

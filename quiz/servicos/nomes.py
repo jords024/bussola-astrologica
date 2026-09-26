@@ -24,9 +24,12 @@ ASPECTO_PT = {
 # deste arquivo, entao "em atrito, pedindo trabalho" volta como "esta pedindo
 # contorno" e a carta sai poetica. Escreva como o Crassus fala.
 ASPECTO_HUMANO = {
-    "conjunction": "em cima, misturado, sem separacao",
-    "opposition": "puxando para os dois lados, e voce no meio",
-    "square": "batendo de frente, da trabalho",
+    # Aspecto duro nao e castigo: e o que tira do lugar. Quadratura e motor -
+    # sem ela ninguem muda nada, so reclama. Dizer so "da trabalho" entregava
+    # ao modelo a metade chata da verdade.
+    "conjunction": "em cima, misturado: vira o assunto central da vida agora",
+    "opposition": "puxando dos dois lados, ate voce achar o jeito de ter os dois",
+    "square": "batendo de frente: da trabalho, e e o que faz sair do lugar",
     "trine": "a favor, sai facil",
     "sextile": "tem chance, mas so se voce for atras",
 }
@@ -47,6 +50,17 @@ MES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
 # usados no selo e na nota tecnica ao pe da carta.
 # ---------------------------------------------------------------------------
 
+# OS LENTOS TEM DOIS LADOS, E OS DOIS VAO PARA O MODELO.
+#
+# Por muito tempo cada um destes era so um problema: Saturno era "a cobranca e
+# a demora que vem junto", Plutao era "o que acaba de vez e nao tem volta".
+# Como a Parte 1 e escrita a partir daqui, a carta saia pesada por construcao -
+# e nenhuma regra de tom no prompt vencia isso, porque o modelo nao tinha do
+# que fazer incentivo. Ele recebia so peso e era mandado animar.
+#
+# Agora cada um traz o que aperta E o que isso constroi. A leitura continua
+# honesta - o aperto esta la, com o nome dele - mas a pessoa sai sabendo para
+# onde aquilo leva, que e a leitura que o Crassus faz.
 PLANETA_VIDA = {
     "Sun": "quem voce e, e a vontade de ser levado a serio",
     "Moon": "o que voce sente antes de pensar, e a necessidade de se sentir seguro",
@@ -54,10 +68,14 @@ PLANETA_VIDA = {
     "Venus": "gosto, afeto, dinheiro e o quanto voce se da valor",
     "Mars": "a vontade de agir, de brigar, de comecar e de ir atras",
     "Jupiter": "o que aumenta, da espaco e abre porta",
-    "Saturn": "a cobranca: prova, prazo e responsabilidade, e a demora que vem junto",
-    "Uranus": "a virada de repente: cansou, nao aguenta mais o mesmo e quer liberdade",
-    "Neptune": "a falta de clareza: cansaco sem motivo, e imaginar no lugar de saber",
-    "Pluto": "a reviravolta funda: o que acaba de vez e nao tem volta",
+    "Saturn": "a cobranca que constroi: prova, prazo e responsabilidade. Pesa, e e o unico jeito de ganhar a autoridade que ninguem tira "
+              "depois, porque foi feita no osso",
+    "Uranus": "a virada: cansou do mesmo e quer ar. Sacode, e e ela que devolve "
+              "o direito de fazer do seu jeito depois de anos no jeito dos outros",
+    "Neptune": "a nevoa que afina a percepcao: imaginar no lugar de saber, e junto "
+               "com isso perceber o que ninguem falou em voz alta",
+    "Pluto": "a virada funda: o que acabou nao volta. E o que devolve forca, porque "
+             "quem larga o que ja morreu para de gastar energia segurando",
     "Ascendant": "o jeito como voce chega e como te veem antes de voce falar",
     "Medium_Coeli": "o lugar que voce ocupa aos olhos dos outros",
 }
@@ -82,6 +100,24 @@ CASA_VIDA = {
 # leitura vira horoscopo. Com ele, ele tem materia concreta para traduzir: o
 # que da para FAZER na segunda-feira, e onde a mesma energia atrapalha.
 # O primeiro item e a oportunidade, o segundo e o cuidado.
+# O que a pessoa PRECISA quando cada lento esta apertando.
+#
+# Esta e a peca que ligava a Parte 1 a Parte 2 e nao existia. A carta
+# diagnosticava o aperto num bloco e anunciava a porta no outro, sem nunca
+# dizer que um responde ao outro - entao a porta parecia assunto novo, e a
+# leitura terminava sem caminho. Com isto, a casa aberta deixa de ser
+# territorio e vira a saida daquele aperto especifico.
+PLANETA_ALIVIO = {
+    "Saturn": "chao firme: uma coisa de cada vez, prazo que cabe, e prova de "
+              "que ja deu conta antes",
+    "Uranus": "espaco para mudar sem quebrar tudo, e permissao para querer "
+              "outra coisa sem se explicar",
+    "Neptune": "informacao confirmada e coisa escrita: parar de adivinhar e "
+               "passar a conferir",
+    "Pluto": "encerrar de vez o que ja acabou, em vez de administrar o resto",
+}
+
+
 CASA_PORTA = {
     1: ("aparecer, tomar a frente, mudar algo no visual ou no jeito de se "
         "apresentar, comecar o que depende so de voce",
@@ -107,8 +143,10 @@ CASA_PORTA = {
     8: ("acertar o que e dividido, renegociar divida, encerrar o que ja "
         "acabou, falar do que costuma ficar sem nome",
         "remoer em vez de resolver; transformar intimidade em cobranca"),
-    9: ("estudar, viajar, publicar, procurar sentido, olhar mais longe do "
-        "que o mes que vem",
+    # "publicar" virava "publique uma hipotese" na carta, que nao e portugues
+    # de gente. O sentido e mostrar o proprio trabalho para fora do circulo.
+    9: ("estudar de verdade, viajar, mostrar o seu trabalho para gente de fora, "
+        "procurar sentido, olhar mais longe do que o mes que vem",
         "trocar a decisao concreta por um plano grande que nunca comeca"),
     10: ("aparecer no trabalho, pedir o que merece, assumir o passo publico, "
          "deixar claro onde quer chegar",

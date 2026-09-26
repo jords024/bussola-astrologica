@@ -6,7 +6,8 @@ Cada teste aqui corresponde a um jeito concreto de a cascata eleger errado.
 import unittest
 
 from servicos.aspectos import AspectoNorm, PresencaNorm
-from servicos.lentos import (GRAUS_DE_ENTRADA, Perfil, eleger_identificacao,
+from servicos.lentos import (ANGULOS, GRAUS_DE_ENTRADA, Perfil, alvos_de,
+                             dias_para_exato, eleger_identificacao,
                              forca_identificacao)
 
 
@@ -169,3 +170,162 @@ class SemNada(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Iminencia(unittest.TestCase):
+    """O placar mede TEMPO, nao grau. Orbe sozinho mente sobre o momento."""
+
+    def test_dias_para_exato_usa_a_velocidade(self):
+        # 0,4 grau a 0,05 grau/dia sao oito dias
+        self.assertAlmostEqual(
+            dias_para_exato(asp("Saturn", "Sun", "square", 0.4, velocidade=0.05)),
+            8.0, places=6)
+
+    def test_sem_velocidade_nao_inventa_prazo(self):
+        self.assertIsNone(
+            dias_para_exato(asp("Saturn", "Sun", "square", 0.4, velocidade=0.0)))
+
+    def test_exato_hoje_vence_orbe_menor_que_demora_meses(self):
+        """O caso real que quebrava a leitura.
+
+        Saturno a 0,03 grau andando 0,077 grau/dia fica exato HOJE. Urano a
+        0,28 grau andando 0,012 fica exato so dali a 23 dias. Com a Lua valendo
+        1,2 por ser regente, o placar antigo - que so olhava orbe - elegia
+        Urano, e a carta falava de um movimento que ainda nao tinha chegado.
+        """
+        perfil = Perfil(regentes=frozenset({"Moon"}), peso_sol=1.0, peso_lua=1.2)
+        r = eleger_identificacao([
+            asp("Uranus", "Moon", "square", 0.28, velocidade=0.0123),
+            asp("Saturn", "Sun", "square", 0.03, velocidade=0.0769),
+        ], perfil=perfil)
+        self.assertEqual(r.planeta, "Saturn")
+        self.assertEqual(r.aspecto.natal, "Sun")
+
+    def test_o_mais_iminente_vence_no_mesmo_orbe(self):
+        a_rapido = asp("Saturn", "Sun", "square", 1.0, velocidade=0.08)
+        a_lento = asp("Pluto", "Sun", "square", 1.0, velocidade=0.01)
+        self.assertGreater(forca_identificacao(a_rapido),
+                           forca_identificacao(a_lento))
+
+    def test_transito_distante_nao_ganha_bonus(self):
+        """Alem do horizonte, a iminencia e neutra e nao distorce o placar."""
+        longe_1 = asp("Pluto", "Sun", "square", 4.0, velocidade=0.001)
+        longe_2 = asp("Neptune", "Sun", "square", 4.0, velocidade=0.002)
+        # ambos a mais de 60 dias: quem decide volta a ser o resto do placar
+        self.assertAlmostEqual(forca_identificacao(longe_1),
+                               forca_identificacao(longe_2), places=6)
+
+
+class SegundoTransito(unittest.TestCase):
+    """Dois lentos apertando juntos explicam a sensacao de ser puxada para
+    dois lados. A carta usava um e jogava o outro fora."""
+
+    def test_devolve_o_segundo_quando_existe(self):
+        r = eleger_identificacao([
+            asp("Saturn", "Sun", "square", 0.5, velocidade=0.07),
+            asp("Uranus", "Moon", "square", 1.0, velocidade=0.01),
+        ])
+        self.assertEqual(r.planeta, "Saturn")
+        self.assertIsNotNone(r.segundo)
+        self.assertEqual(r.segundo.transito, "Uranus")
+
+    def test_segundo_e_sempre_outro_planeta(self):
+        """Dois aspectos do mesmo transitante sao a mesma noticia duas vezes."""
+        r = eleger_identificacao([
+            asp("Saturn", "Sun", "square", 0.5, velocidade=0.07),
+            asp("Saturn", "Moon", "trine", 1.0, velocidade=0.07),
+        ])
+        self.assertEqual(r.planeta, "Saturn")
+        self.assertIsNone(r.segundo)
+
+    def test_o_outro_luminar_tem_preferencia(self):
+        """Sol e Lua contam historias diferentes: o que ela quer ser e o que
+        ela precisa sentir. Dois transitos no mesmo ponto dizem menos."""
+        r = eleger_identificacao([
+            asp("Saturn", "Sun", "square", 0.5, velocidade=0.07),
+            asp("Pluto", "Sun", "trine", 0.6, velocidade=0.01),
+            asp("Uranus", "Moon", "square", 3.0, velocidade=0.01),
+        ])
+        self.assertEqual(r.planeta, "Saturn")
+        self.assertEqual(r.segundo.natal, "Moon")
+
+    def test_transito_sozinho_nao_inventa_segundo(self):
+        r = eleger_identificacao([asp("Saturn", "Sun", "square", 0.5)])
+        self.assertIsNone(r.segundo)
+
+
+class EixosDoMapa(unittest.TestCase):
+    """Ascendente e Meio do Ceu como pontos que geram identificacao.
+
+    Ficaram de fora por muito tempo sob a justificativa de que dependiam de
+    hora exata e "sairiam do ar para boa parte dos leads". Medido nas leituras
+    reais: 97% tem hora exata, porque o quiz pede a hora para montar o mapa. E
+    o custo era alto - em 40% dos mapas o aspecto MAIS APERTADO era num eixo, e
+    era descartado em favor de um mais largo.
+    """
+
+    def _perfil(self, angulos_ok=True):
+        return Perfil(peso_sol=1.0, peso_lua=1.0, angulos_ok=angulos_ok)
+
+    def test_sem_hora_confiavel_os_eixos_nao_entram(self):
+        """Sem hora, o Ascendente pode errar um signo inteiro. Nao da para
+        afirmar uma precisao que o calculo nao tem."""
+        self.assertEqual(alvos_de(self._perfil(False)), ("Sun", "Moon"))
+
+    def test_com_hora_confiavel_os_eixos_entram(self):
+        alvos = alvos_de(self._perfil(True))
+        for ponto in ANGULOS:
+            self.assertIn(ponto, alvos)
+
+    def test_eixo_apertado_vence_luminar_mais_largo(self):
+        """O caso medido no mapa de um leitor: Plutao a 0,13 grau do Meio do
+        Ceu perdia para Netuno a 0,51 da Lua, e a carta falava do mais largo."""
+        r = eleger_identificacao([
+            asp("Neptune", "Moon", "opposition", 0.51, velocidade=0.012),
+            asp("Pluto", "Medium_Coeli", "square", 0.13, velocidade=0.009),
+        ], perfil=self._perfil(True))
+        self.assertEqual(r.aspecto.natal, "Medium_Coeli")
+
+    def test_o_mesmo_mapa_sem_hora_ignora_o_eixo(self):
+        r = eleger_identificacao([
+            asp("Neptune", "Moon", "opposition", 0.51, velocidade=0.012),
+            asp("Pluto", "Medium_Coeli", "square", 0.13, velocidade=0.009),
+        ], perfil=self._perfil(False))
+        self.assertEqual(r.aspecto.natal, "Moon")
+
+    def test_cada_ponto_usa_o_proprio_peso(self):
+        """Antes isto era binario - "peso_sol se for Sol, senao peso_lua" - e
+        teria dado ao Meio do Ceu o peso da LUA assim que os eixos entrassem:
+        um mapa com a Lua angular empurraria junto todo aspecto no MC, sem que
+        o MC daquela pessoa tivesse nada de especial."""
+        mc = asp("Pluto", "Medium_Coeli", "square", 0.5, velocidade=0.01)
+
+        # a Lua vale 9, o MC vale 1: a forca do MC nao pode sentir a Lua
+        so_lua = Perfil(peso_sol=1.0, peso_lua=9.0, angulos_ok=True)
+        neutro = Perfil(peso_sol=1.0, peso_lua=1.0, angulos_ok=True)
+        self.assertAlmostEqual(forca_identificacao(mc, so_lua),
+                               forca_identificacao(mc, neutro), places=9)
+
+        # e mexer no peso do proprio MC tem que mexer na forca dele
+        so_mc = Perfil(peso_sol=1.0, peso_lua=1.0, peso_mc=2.0, angulos_ok=True)
+        self.assertAlmostEqual(forca_identificacao(mc, so_mc),
+                               forca_identificacao(mc, neutro) * 2.0, places=9)
+
+    def test_eixo_pode_ser_o_segundo_transito(self):
+        r = eleger_identificacao([
+            asp("Saturn", "Sun", "square", 0.2, velocidade=0.07),
+            asp("Pluto", "Ascendant", "square", 0.9, velocidade=0.01),
+        ], perfil=self._perfil(True))
+        self.assertEqual(r.planeta, "Saturn")
+        self.assertIsNotNone(r.segundo)
+        self.assertEqual(r.segundo.natal, "Ascendant")
+
+    def test_eixo_salva_quem_nao_tem_nada_em_sol_ou_lua(self):
+        """15% dos mapas reais nao tinham aspecto fechado em Sol nem Lua e
+        caiam para um criterio mais fraco, mesmo com um eixo exato."""
+        aspectos = [asp("Pluto", "Medium_Coeli", "square", 0.3, velocidade=0.01)]
+        presencas = [pres("Neptune", 8, 2.0)]
+        r = eleger_identificacao(aspectos, presencas, self._perfil(True))
+        self.assertEqual(r.criterio, 1)   # o mais forte da cascata
+        sem = eleger_identificacao(aspectos, presencas, self._perfil(False))
+        self.assertEqual(sem.criterio, 2) # antes caia para "entrou numa casa"

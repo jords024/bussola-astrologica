@@ -192,8 +192,12 @@ def _perfil(natal, casas_ok: bool) -> Perfil:
                 return 1.0 + PESO_ANGULAR * max(0.0, 1.0 - d / 30.0)
             peso_sol, peso_lua = peso("sun"), peso("moon")
 
+    # Os eixos so entram na eleicao quando a hora de nascimento aguenta. Sem
+    # ela o Ascendente pode errar um signo inteiro, e a carta afirmaria uma
+    # precisao que o calculo nao tem.
     return Perfil(regentes=frozenset(regentes),
-                  peso_sol=peso_sol, peso_lua=peso_lua)
+                  peso_sol=peso_sol, peso_lua=peso_lua,
+                  angulos_ok=bool(casas_ok))
 
 
 def _presencas_solares(natal, transito) -> list[PresencaNorm]:

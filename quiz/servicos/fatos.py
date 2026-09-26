@@ -16,9 +16,12 @@ from typing import Optional
 
 from .aspectos import AspectoNorm, PresencaNorm
 from .heuristica import Placar
+from .lentos import dias_para_exato
 from .nomes import (ASPECTO_HUMANO, ASPECTO_PT, CASA_PORTA, CASA_VIDA,
+                    PLANETA_ALIVIO,
                     MES_PT, PLANETA_MODO, PLANETA_PORTA, PLANETA_PT,
                     PLANETA_VIDA, SIGNO_PT)
+from .tratamento import bloco_tratamento
 from .veredito import CASA_NOME, Veredito
 
 MAX_ASPECTOS = 5
@@ -43,13 +46,22 @@ def janela_em_palavras(a: Optional[AspectoNorm], hoje: date) -> str:
     """Quando essa configuração perde força, em linguagem comum.
 
     Estimativa honesta: quanto tempo o planeta leva para percorrer o orbe que
-    falta, na velocidade em que está andando. Dá urgência real, sem contador
-    falso.
+    falta ATÉ SAIR, na velocidade em que está andando. Dá urgência real, sem
+    contador falso.
+
+    Um aspecto que ainda está aplicando não acaba quando fica exato: ele passa
+    pelo exato e continua pesando até sair do orbe do outro lado. A conta
+    antiga usava só a distância até o exato, e com isso Saturno exato hoje
+    saía como "nos próximos dias" quando na verdade ainda apertaria por dois
+    meses. Dizia à pessoa que já tinha acabado justamente no dia do pico.
     """
     if not a or not a.velocidade:
         return "nas próximas semanas"
 
-    restante = a.orbe_max - abs(a.orbe) if a.movimento == "Separating" else abs(a.orbe)
+    if a.movimento == "Separating":
+        restante = a.orbe_max - abs(a.orbe)      # o que falta para sair
+    else:
+        restante = abs(a.orbe) + a.orbe_max      # até o exato, e depois até sair
     dias = abs(restante / a.velocidade) if a.velocidade else 0
 
     if dias <= 10:
@@ -68,6 +80,35 @@ def janela_em_palavras(a: Optional[AspectoNorm], hoje: date) -> str:
 def _somar_dias(d: date, n: int) -> date:
     from datetime import timedelta
     return d + timedelta(days=n)
+
+
+def quando_exato(a: Optional[AspectoNorm], hoje: date) -> str:
+    """A data aproximada em que o aspecto fica (ou ficou) exato.
+
+    A carta falava de "momento" sem nunca dizer QUANDO. Uma data aproximada e
+    a diferenca entre horoscopo e leitura: ela confere no calendario, lembra da
+    semana, e o texto para de ser palavra bonita.
+
+    Aproximada de proposito: a velocidade de hoje projetada para a frente
+    ignora a curva do planeta. Erra por dias, nunca por semanas - e por isso o
+    texto sempre diz "por volta de".
+    """
+    dias = dias_para_exato(a) if a is not None else None
+    if dias is None:
+        return ""
+    n = int(round(dias))
+    passou = (a.movimento == "Separating")
+
+    if n <= 1:
+        return "fica exato HOJE ou amanha" if not passou else "ficou exato ontem ou hoje"
+    if n <= 6:
+        return (f"fica exato daqui a uns {n} dias" if not passou
+                else f"ficou exato ha uns {n} dias")
+    alvo = _somar_dias(hoje, -n if passou else n)
+    data = f"{alvo.day} de {MES_PT[alvo.month - 1]}"
+    if passou:
+        return f"ficou exato por volta de {data}, ha {n} dias"
+    return f"fica exato por volta de {data}, daqui a {n} dias"
 
 
 def descrever_aspecto(a: AspectoNorm, casas_ok: bool) -> str:
@@ -211,7 +252,7 @@ def montar(
 
     # ---- quiz ----
     bloco_quiz = "\n".join([
-        f"nome: {quiz.get('primeiro_nome','')}",
+        bloco_tratamento(quiz.get("primeiro_nome", "")),
         f"area escolhida: {quiz.get('area','')}",
         f"frase do espelho: {quiz.get('espelho','')}",
         f"resposta sobre insistencia: {quiz.get('quebra_texto','')}",
@@ -223,9 +264,10 @@ def montar(
         "bloco_veredito": bloco_veredito,
         "bloco_quiz": bloco_quiz,
         # as duas partes da leitura nova
-        "bloco_identificacao": bloco_identificacao(ident, hoje),
+        "bloco_identificacao": bloco_identificacao(ident, hoje, casas_ok),
         "bloco_porta": bloco_porta(porta, solares, veredito.casa_demanda,
-                                   AREA_TEMA.get(quiz.get("area", ""), "")),
+                                   AREA_TEMA.get(quiz.get("area", ""), ""),
+                                   ident),
         "selo_identificacao": selo_identificacao(ident),
         "selo_porta": selo_porta(porta, solares),
         # a janela e a do movimento que a Parte 1 elegeu, nao a do placar
@@ -367,12 +409,56 @@ def selo_porta(porta, solares: bool = False) -> str:
             f"{CASA_NOME.get(porta.casa, '')}{fim}")
 
 
-def bloco_identificacao(ident, hoje: Optional[date] = None) -> str:
+def _fatos_do_aspecto(a: AspectoNorm, casas_ok: bool, hoje: Optional[date],
+                      rotulo: str) -> list:
+    """Um transito descrito com tudo que o calculo sabe sobre ele.
+
+    Antes daqui saiam quatro linhas abstratas - o que chega, o que e tocado,
+    como se encontram, o quanto pesa - e o modelo recebia material para falar
+    de sentimento e de mais nada. Casa, data e direcao ficavam calculadas e
+    jogadas fora, e a carta virava conversa de horoscopo.
+    """
+    linhas = [f"{rotulo}o que chega de fora: "
+              f"{PLANETA_VIDA.get(a.transito, _pt_planeta(a.transito))}"]
+    linhas.append(f"{rotulo}toca em voce: "
+                  f"{PLANETA_VIDA.get(a.natal, _pt_planeta(a.natal))}")
+    linhas.append(f"{rotulo}como se encontram: {ASPECTO_HUMANO.get(a.aspecto, '')}")
+
+    # ONDE. Esta e a linha que transforma "voce esta sentindo" em "olha o que
+    # esta acontecendo na sua vida": a casa e o assunto concreto.
+    if casas_ok:
+        if a.casa_transito:
+            linhas.append(f"{rotulo}ONDE isso esta acontecendo na vida dela: "
+                          f"{CASA_VIDA.get(a.casa_transito, '')}")
+        if a.casa_natal and a.casa_natal != a.casa_transito:
+            linhas.append(f"{rotulo}DE ONDE vem o que foi mexido: "
+                          f"{CASA_VIDA.get(a.casa_natal, '')}")
+
+    # QUANDO
+    if hoje is not None:
+        q = quando_exato(a, hoje)
+        if q:
+            linhas.append(f"{rotulo}QUANDO: {q}")
+        linhas.append(f"{rotulo}ate quando isso pesa: {janela_em_palavras(a, hoje)}")
+
+    linhas.append(f"{rotulo}forca: " + ("muito fechado, pesa bastante"
+                  if abs(a.orbe) <= 2 else "fechado" if abs(a.orbe) <= 4
+                  else "ainda largo"))
+    if a.retrogrado:
+        linhas.append(f"{rotulo}VOLTANDO sobre o proprio caminho: e hora de rever, "
+                      "retomar e renegociar, nunca de comecar do zero"
+                      if not rotulo else
+                      f"{rotulo}tambem esta VOLTANDO: assunto que ja passou por aqui antes")
+    return linhas
+
+
+def bloco_identificacao(ident, hoje: Optional[date] = None,
+                        casas_ok: bool = False) -> str:
     """Os FATOS da Parte 1, ja traduzidos para linguagem de vida.
 
-    O modelo recebe o SIGNIFICADO, nunca o rotulo. Sem isto ele simplifica
-    cortando conteudo; com isto ele troca o termo pela descricao que carrega o
-    mesmo peso.
+    O modelo recebe o SIGNIFICADO, nunca o rotulo: ele nao pode citar planeta,
+    casa nem orbe no corpo da carta. Mas precisa SABER onde e quando, senao
+    escreve sobre sentimento no vazio - que foi exatamente o que aconteceu.
     """
     if ident is None:
         return ("NAO ha transito lento tocando Sol ou Lua agora. NAO invente um.\n"
@@ -380,28 +466,38 @@ def bloco_identificacao(ident, hoje: Optional[date] = None) -> str:
                 "do que costuma ser, sem prometer nada e sem dramatizar.")
 
     linhas = [f"momento: {CRITERIO_HUMANO.get(ident.criterio, '')}"]
-    t = PLANETA_VIDA.get(ident.planeta, _pt_planeta(ident.planeta))
-    linhas.append(f"o que chega de fora: {t}")
 
     a = ident.aspecto
     if a is not None:
-        linhas.append(f"toca em voce: {PLANETA_VIDA.get(a.natal, _pt_planeta(a.natal))}")
-        linhas.append(f"como se encontram: {ASPECTO_HUMANO.get(a.aspecto, '')}")
+        linhas += _fatos_do_aspecto(a, casas_ok, hoje, "")
+    else:
+        linhas.append("o que chega de fora: "
+                      f"{PLANETA_VIDA.get(ident.planeta, _pt_planeta(ident.planeta))}")
+        if ident.casa:
+            linhas.append("area da vida em que acabou de entrar: "
+                          f"{CASA_VIDA.get(ident.casa, '')}")
+
+    # O SEGUNDO movimento. Dois lentos apertando ao mesmo tempo e o que explica
+    # a sensacao de estar sendo puxada por dois lados - e era justamente essa
+    # parte que a carta descartava, sobrando a metade que nao fecha a conta.
+    s = ident.segundo
+    if s is not None:
+        linhas.append("")
+        linhas.append("AO MESMO TEMPO, um SEGUNDO movimento esta pegando ela:")
+        linhas += _fatos_do_aspecto(s, casas_ok, hoje, "2) ")
+        linhas.append("")
         linhas.append(
-            "forca: " + ("muito fechado, pesa bastante" if abs(a.orbe) <= 2
-                         else "fechado" if abs(a.orbe) <= 4 else "ainda largo"))
-        if a.retrogrado:
-            linhas.append("VOLTANDO sobre o proprio caminho: e hora de rever, "
-                          "retomar e renegociar, nunca de comecar do zero")
-    elif ident.casa:
-        linhas.append(f"area da vida em que acabou de entrar: "
-                      f"{CASA_VIDA.get(ident.casa, '')}")
-    if hoje is not None and a is not None:
-        linhas.append(f"janela deste movimento: {janela_em_palavras(a, hoje)}")
-    return "\n".join(f"  - {x}" for x in linhas)
+            "COMO USAR OS DOIS: nao liste um e depois o outro. Mostre o ATRITO "
+            "CONCRETO entre eles, com as areas da vida de cada um pelo nome. "
+            "Nao escreva 'um cobra e o outro quer romper' - isso nao diz nada. "
+            "Escreva o que ela esta de fato vivendo: em que hora do dia isso "
+            "aparece, o que ela adia, o que ela ensaia falar e nao fala.")
+
+    return "\n".join((f"  - {x}" if x else "") for x in linhas)
 
 
-def bloco_porta(porta, solares: bool = False, casa_do_tema=None, tema: str = "") -> str:
+def bloco_porta(porta, solares: bool = False, casa_do_tema=None,
+                tema: str = "", ident=None) -> str:
     """Os FATOS da Parte 2: a oportunidade concreta e o cuidado.
 
     A porta NAO e uma area que cede. E onde os rapidos estao se acumulando
@@ -471,6 +567,18 @@ def bloco_porta(porta, solares: bool = False, casa_do_tema=None, tema: str = "")
         f"o que da para FAZER nas proximas semanas: {aproveitar}",
         f"onde a mesma energia atrapalha: {cuidado}",
     ]
+
+    # O ELO. Sem ele a Parte 2 anunciava um territorio e a pessoa nao entendia
+    # por que aquilo era resposta para o que acabara de ler sobre si.
+    alivio = PLANETA_ALIVIO.get(getattr(ident, "planeta", None) or "")
+    if alivio:
+        linhas.append(
+            "O ELO COM O APERTO DA PARTE 1 - escreva esta ligacao, e o "
+            f"caminho que ela esta esperando: o aperto de agora pede {alivio}. "
+            f"E o que esta area oferece e exatamente isto: {aproveitar}. "
+            "NAO escreva as duas coisas em frases separadas: escreva o "
+            "ENCONTRO delas, em cena concreta, dizendo o que ela ganha ao "
+            "entrar por aqui. Sem citar planeta, casa nem grau.")
     if cuidados_planeta:
         linhas.append(f"cuidado que vem de quem esta ali: {'; '.join(cuidados_planeta)}")
     if modo:

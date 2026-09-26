@@ -13,6 +13,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import deque
+from typing import Optional
+
+from config import DIR_PROMPTS
 
 from .nomes import PLANETA_PT, SIGNO_PT
 
@@ -194,6 +197,13 @@ RE_POESIA = [
     (re.compile(r"(esta|estao) pedindo |[^a-z]pede (abrigo|contorno|revisao|espaco|nome)"),
      "verbo 'pedir' com sujeito abstrato"),
     (re.compile(r"dar nome a|nomear o |colocar em palavras"), "dar nome a"),
+    # A formula que mais saiu nas aberturas reprovadas: "Uma conversa simples
+    # anda virando um problema grande", "Uma conversa simples esta virando
+    # duvida demais". Sempre a mesma engenharia - substantivo abstrato, verbo
+    # de transformacao, substantivo abstrato - e sempre sem nenhuma cena.
+    (re.compile(r"(anda|esta|vem|comecou a|passou a) virand[oa]|"
+                r"virou (um|uma|assunto|problema|duvida|questao)"),
+     "formula 'X esta virando Y': troque por uma coisa que aconteceu"),
 ]
 
 
@@ -296,3 +306,295 @@ def auditar_destaque(carta: dict, lembrar: bool = True) -> list[str]:
     if lembrar:
         _DESTAQUES_RECENTES.append((nucleo, abertura))
     return []
+
+
+# ---------------------------------------------------------------------------
+# O PLAGIO DOS PROPRIOS EXEMPLOS
+#
+# O prompt ensina pelo exemplo: mostra uma frase fraca e uma forte, e pede a
+# forte. O modelo entendeu como molde. Numa carta medida aqui, o exemplo
+#
+#     "Voce rele a mensagem procurando o tom, e responde para a versao que
+#      imaginou."
+#
+# saiu quase inteiro no paragrafo 1 de uma pessoa cujo mapa nao tinha nada a
+# ver com mensagem nenhuma - e o mesmo aconteceu com "nao conta isso para
+# ninguem". A carta parecia precisa e era decorada: a pessoa recebia a cena de
+# outra pessoa, escrita por mim, com o nome dela em cima.
+#
+# Nenhuma regra em texto resolve isto, porque a regra mora no mesmo arquivo dos
+# exemplos e perde para eles. Entao a checagem e mecanica: as frases de exemplo
+# sao extraidas do proprio prompt e comparadas com o que voltou.
+
+_RE_EXEMPLO = re.compile(
+    r'^\s*(?:certo|forte|boa|com dente|→)\s*:?\s*"([^"]{20,})"', re.MULTILINE)
+
+# acima disso, a frase da carta e uma parafrase do exemplo, nao uma cena dela
+_LIMITE_PLAGIO = 0.55
+# exemplos curtos demais nao dao para julgar sem acusar falso
+_MINIMO_EXEMPLO = 5
+
+_EXEMPLOS_DO_PROMPT: Optional[list] = None
+
+
+_TAMANHO_RADICAL = 5
+
+
+def _radical(p: str) -> str:
+    """O comeco da palavra, que e onde o portugues guarda o sentido.
+
+    A primeira versao tirava o "s" final e nao servia para nada: "mensagens"
+    virava "mensagen" e nunca encontrava "mensagem", "responder" nunca
+    encontrava "responde". O auditor aprovava paragrafos copiados porque
+    comparava terminacao em vez de raiz. Cortar no prefixo resolve os dois
+    casos e ainda pega "interpretacoes"/"interpretacao".
+
+    Grosseiro de proposito: junta demais em alguns casos ("conta", "contar",
+    "contato" viram "conta"). Como a decisao final depende de varias palavras
+    coincidirem, juntar demais custa menos do que deixar passar.
+    """
+    return p[:_TAMANHO_RADICAL]
+
+
+def _carregar_exemplos() -> list:
+    """As frases de exemplo do proprio prompt, em conjuntos de radicais."""
+    global _EXEMPLOS_DO_PROMPT
+    if _EXEMPLOS_DO_PROMPT is None:
+        try:
+            texto = (DIR_PROMPTS / "carta.txt").read_text(encoding="utf-8")
+        except Exception:
+            _EXEMPLOS_DO_PROMPT = []
+            return _EXEMPLOS_DO_PROMPT
+        fora = []
+        for frase in _RE_EXEMPLO.findall(texto):
+            radicais = {_radical(x) for x in _palavras_de_conteudo(frase)}
+            if len(radicais) >= _MINIMO_EXEMPLO:
+                fora.append((frase, radicais))
+        _EXEMPLOS_DO_PROMPT = fora
+    return _EXEMPLOS_DO_PROMPT
+
+
+def auditar_exemplos(carta: dict) -> list[str]:
+    """A carta reaproveitou a cena de um exemplo do prompt. Vazia = pode."""
+    if not isinstance(carta, dict):
+        return []
+    exemplos = _carregar_exemplos()
+    if not exemplos:
+        return []
+
+    for trecho in _frases_da_carta(carta):
+        radicais = {_radical(x) for x in _palavras_de_conteudo(trecho)}
+        if len(radicais) < _MINIMO_EXEMPLO:
+            continue
+        for frase, alvo in exemplos:
+            comum = len(radicais & alvo)
+            if comum / len(alvo) >= _LIMITE_PLAGIO:
+                return ["uma frase da carta reaproveita a CENA de um exemplo "
+                        "das instrucoes (\"" + frase[:60] + "...\"). Os exemplos "
+                        "mostram a FORMA, nunca o assunto. Escreva a cena que "
+                        "sai dos FATOS desta pessoa."]
+    return []
+
+
+def _frases_da_carta(carta: dict) -> list:
+    ident = carta.get("identificacao") or {}
+    porta = carta.get("porta") or {}
+    return [x for x in [
+        carta.get("destaque"),
+        ident.get("abertura"), porta.get("abertura"), porta.get("cuidado"),
+        *(ident.get("paragrafos") or []),
+        *(porta.get("paragrafos") or []),
+        *(porta.get("aproveitar") or []),
+        *(carta.get("paragrafos") or []),
+    ] if isinstance(x, str) and x.strip()]
+
+
+# ---------------------------------------------------------------------------
+# A RECITACAO DO DICIONARIO
+#
+# Os FATOS chegam ao modelo em "linguagem de vida": a casa 3 vai como "as
+# conversas do dia a dia, as mensagens, os combinados curtos, o vaivem com quem
+# esta perto". Isso existe para o modelo saber DE QUE ASSUNTO se trata sem
+# poder citar casa nenhuma.
+#
+# So que ele passou a devolver a propria definicao em prosa. Numa carta medida
+# aqui, com Netuno atravessando a casa 3, saiu: "Uma conversa simples esta
+# virando duvida demais. Nas mensagens... Um combinado curto vira tres
+# interpretacoes." Tres substantivos da definicao, em ordem, sem uma cena.
+#
+# Nao e plagio de exemplo e nao e invencao: e aritmetica de dicionario. E o
+# jeito mais discreto de a carta parecer precisa sem dizer nada, porque a
+# definicao serve para todo mundo que tem aquela casa ativada.
+#
+# A definicao entrega o TERRITORIO. Quem escreve escolhe UMA coisa dali e faz
+# a cena. Recitar a lista e o contrario disso.
+
+# quantos substantivos da MESMA definicao um paragrafo pode usar antes de
+# estar recitando em vez de escrevendo
+_LIMITE_RECITACAO = 4
+
+_DEFINICOES: Optional[list] = None
+
+
+def _definicoes() -> list:
+    """Cada entrada dos dicionarios de vida, como conjunto de radicais."""
+    global _DEFINICOES
+    if _DEFINICOES is None:
+        from .nomes import CASA_VIDA, PLANETA_VIDA
+        fora = []
+        for origem in (CASA_VIDA, PLANETA_VIDA):
+            for texto in origem.values():
+                radicais = {_radical(x) for x in _palavras_de_conteudo(texto)}
+                if len(radicais) >= _LIMITE_RECITACAO:
+                    fora.append((texto, radicais))
+        _DEFINICOES = fora
+    return _DEFINICOES
+
+
+# Uma ancora e o que prova que existe uma CENA: um numero, uma fala entre
+# aspas, uma hora do dia. Definicao nunca tem nenhuma das tres.
+RE_ANCORA = re.compile(
+    r"\d|[\"\u201c\u201d\u2018\u2019\']|"
+    r"\b(manha|tarde|noite|madrugada|almoco|jantar|domingo|segunda|sabado|"
+    r"ontem|amanha|semana|mes|ano)\b")
+
+
+def auditar_recitacao(carta: dict) -> list[str]:
+    """Um bloco que repete a definicao da area em vez de escrever a cena.
+
+    So acusa quando NAO ha nenhuma ancora concreta no bloco. Varias definicoes
+    sao listas curtas - PLANETA_VIDA['Mercury'] e "a cabeca: conversa,
+    mensagem, combinado, decisao" - e uma carta legitima sobre comunicacao
+    esbarra em quatro daquelas palavras sem estar recitando nada. O que separa
+    recitacao de escrita nao e a contagem sozinha: e a contagem SEM cena.
+    """
+    if not isinstance(carta, dict):
+        return []
+
+    # O bloco INTEIRO, nao frase a frase: a recitacao se espalha entre a
+    # abertura e o paragrafo, e cada pedaco sozinho parece inocente.
+    for trecho in _blocos_da_carta(carta):
+        if RE_ANCORA.search(_sem_acento(trecho).lower()):
+            continue
+        radicais = {_radical(x) for x in _palavras_de_conteudo(trecho)}
+        for texto, alvo in _definicoes():
+            if len(radicais & alvo) >= _LIMITE_RECITACAO:
+                return ["um trecho recita a definicao da area (\"" + texto[:55]
+                        + "...\") em vez de escrever uma cena. A definicao diz "
+                        "DE QUE ASSUNTO se trata: escolha UMA coisa dela e "
+                        "conte o que acontece com esta pessoa, com objeto, "
+                        "hora ou numero. Listar os termos da area nao e "
+                        "precisao, e enchimento."]
+    return []
+
+
+def _blocos_da_carta(carta: dict) -> list:
+    """Cada parte da carta como um texto so."""
+    fora = []
+    for parte in ("identificacao", "porta"):
+        bloco = carta.get(parte)
+        if not isinstance(bloco, dict):
+            continue
+        pedacos = [bloco.get("abertura") or "",
+                   *(bloco.get("paragrafos") or []),
+                   *(bloco.get("aproveitar") or []),
+                   bloco.get("cuidado") or ""]
+        junto = " ".join(x for x in pedacos if isinstance(x, str))
+        if junto.strip():
+            fora.append(junto)
+    return fora
+
+
+# ---------------------------------------------------------------------------
+# A EXPRESSAO QUE O BRASILEIRO USA
+#
+# "Voce esta empurrando uma coisa que nao anda na carreira" e
+# "Voce esta empurrando COM A BARRIGA uma coisa que nao anda na carreira"
+# carregam a mesma informacao. A segunda e a que a pessoa fala - e por isso e a
+# que ela reconhece. Sem a expressao o texto sai correto e morno, tipo manual,
+# e morno nao gruda.
+#
+# Pedir isso em prosa nao bastou: numa carta medida aqui o modelo leu a regra,
+# reaproveitou a frase do proprio quiz e nao usou expressao nenhuma. Entao a
+# conferencia e mecanica, como a do plagio.
+#
+# O banco de expressoes mora no prompt, nao aqui: um lugar so para manter, e
+# quem edita o texto edita a regra junto.
+
+# _sem_acento() tambem poe em minuscula, entao o padrao ignora caixa.
+_RE_BANCO = re.compile(r"banco de expressoes(.+?)regra de ouro", re.S | re.I)
+
+# Palavras que aparecem no banco mas NAO denunciam expressao nenhuma: sao
+# vocabulario comum. "dinheiro" sai de "o dinheiro nao estica" e faria toda
+# carta sobre dinheiro passar de graca; "frente", "depois" e "cima" idem. O
+# auditor procura SABOR, nao assunto.
+_COMUNS_DEMAIS = frozenset(
+    "dinheiro frente fora depois cima sabe corpo conta tempo coisa parte".split())
+
+_EXPRESSOES: Optional[frozenset] = None
+
+
+def _carregar_expressoes() -> frozenset:
+    """As palavras que denunciam uma expressao popular no texto.
+
+    De cada expressao guarda a palavra DISTINTIVA: "barriga" em empurrar com a
+    barriga, "balde" em chutar o balde, "tranco" em aguentar o tranco. E quase
+    sempre o substantivo, entao os verbos no infinitivo saem da disputa - a
+    primeira versao pegava a palavra mais longa e escolhia "empurrar" em vez de
+    "barriga", justamente a metade que nao tem graca nenhuma sozinha.
+
+    Guardar o substantivo tambem resolve a conjugacao: "empurrando com a
+    barriga" continua tendo barriga.
+    """
+    global _EXPRESSOES
+    if _EXPRESSOES is not None:
+        return _EXPRESSOES
+    try:
+        texto = (DIR_PROMPTS / "carta.txt").read_text(encoding="utf-8")
+    except Exception:
+        _EXPRESSOES = frozenset()
+        return _EXPRESSOES
+    bloco = _RE_BANCO.search(_sem_acento(texto))
+    if not bloco:
+        _EXPRESSOES = frozenset()
+        return _EXPRESSOES
+    fora = set()
+    for linha in bloco.group(1).split("\n"):
+        if "\u00b7" not in linha and "·" not in linha:
+            continue
+        for frase in re.split(r"[\u00b7·]", linha):
+            palavras = [w for w in re.findall(r"[a-z]{4,}", frase.lower())
+                        if w not in _VAZIAS]
+            if not palavras:
+                continue
+            # o substantivo manda; o infinitivo so serve se nao sobrar mais nada
+            nomes = [w for w in palavras if not w.endswith(("ar", "er", "ir"))]
+            escolha = max(nomes or palavras, key=len)
+            if escolha not in _COMUNS_DEMAIS:
+                fora.add(escolha)
+    _EXPRESSOES = frozenset(fora)
+    return _EXPRESSOES
+
+
+def auditar_expressao(carta: dict) -> list[str]:
+    """A carta inteira sem nenhuma expressao popular. Vazia = pode mostrar."""
+    if not isinstance(carta, dict):
+        return []
+    marcas = _carregar_expressoes()
+    if not marcas:
+        return []          # banco sumiu do prompt: nao inventa exigencia
+
+    texto = _sem_acento(" ".join(_frases_da_carta(carta))).lower()
+    palavras = set(re.findall(r"[a-z]{4,}", texto))
+    # carta vazia ou truncada nao e problema de ESTILO: quem cuida disso e a
+    # checagem de estrutura. Cobrar expressao de um texto que nao existe so
+    # acrescentaria um problema falso a lista de correcao.
+    if len(palavras) < 10:
+        return []
+    if palavras & marcas:
+        return []
+    return ["a carta inteira nao tem uma expressao popular brasileira. Use UMA, "
+            "do banco do prompt, de preferencia no primeiro paragrafo ou no "
+            "destaque: empurrar com a barriga, segurar a barra, dar tiro no "
+            "escuro, chutar o balde, virar a pagina, se virar nos trinta. Sem "
+            "ela o texto fica correto e morno, tipo manual."]
