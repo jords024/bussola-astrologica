@@ -170,6 +170,9 @@ class TestConfigOferta(unittest.TestCase):
         self.assertIn("vslConfigOferta", conteudo)
         self.assertIn("vslNotificarPlay", conteudo)
         self.assertIn("/api/vsl-play", conteudo)
+        self.assertIn("window.S = S", conteudo)
+        self.assertIn('data-src="https://turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061', conteudo)
+        self.assertIn("!nome && !whatsapp && !leituraId", conteudo)
 
 
 if __name__ == "__main__":

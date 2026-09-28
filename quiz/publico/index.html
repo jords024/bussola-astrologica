@@ -938,7 +938,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 <section class="scr" data-s="6">
   <div id="vturb-wrapper-65cb9c18-e117-4734-a983-2fc6275c2061" style="max-width:640px;width:100%;margin:0 auto;background:transparent;">
     <div style="position:relative;width:100%;padding-top:177.77%;background:transparent;">
-      <iframe id="vsl01Iframe" src="https://turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:20px;background:transparent;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
+      <iframe id="vsl01Iframe" data-src="https://turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:20px;background:transparent;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
     </div>
   </div>
   <script>
@@ -953,11 +953,12 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       var leituraId = '';
 
       try {
-        if (typeof S !== 'undefined') {
-          nome = (S.nomeCompleto || S.nome || '').trim();
-          whatsapp = (S.whatsapp || '').trim();
-          if (S.leitura && S.leitura.leitura_id) {
-            leituraId = S.leitura.leitura_id;
+        var sObj = (typeof S !== 'undefined' && S) ? S : (window.S || null);
+        if (sObj) {
+          nome = (sObj.nomeCompleto || sObj.nome || '').trim();
+          whatsapp = (sObj.whatsapp || '').trim();
+          if (sObj.leitura && sObj.leitura.leitura_id) {
+            leituraId = sObj.leitura.leitura_id;
           }
         }
       } catch(e) {}
@@ -987,11 +988,18 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         }
       } catch(e) {}
 
-      // Só bloqueia duplicidade se já tiver enviado com os dados preenchidos
-      if (_vslPlaysEnviados[chave]) return;
-      if (nome || whatsapp) {
-        _vslPlaysEnviados[chave] = true;
+      // Não dispara lead anônimo/vazio se o visitante ainda não tiver preenchido nada
+      if (!nome && !whatsapp && !leituraId) {
+        return;
       }
+
+      var temDados = Boolean(nome || whatsapp);
+      // Se já enviou de forma completa para esta chave, evita duplicidade;
+      // se tinha enviado incompleto e agora temos dados, permite atualizar
+      if (_vslPlaysEnviados[chave] && (!temDados || _vslPlaysEnviados[chave] === 'completo')) {
+        return;
+      }
+      _vslPlaysEnviados[chave] = temDados ? 'completo' : 'parcial';
 
       var payload = {
         video_id: vid,
@@ -1748,6 +1756,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   const scr = [...document.querySelectorAll('.scr')];
   let i = 0;
   const S = {area:null,mirror:null,brk:null,nome:'',signo:'',whatsapp:''};
+  window.S = S;
 
   /* Heartbeat de presença ativa: a cada 20s enquanto a aba estiver visível */
   setInterval(() => {
