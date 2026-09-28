@@ -272,7 +272,7 @@ class TestPainelFinanceiro(unittest.TestCase):
             self.assertEqual(resp_dias.status_code, 200)
             html_dias = resp_dias.text
             self.assertIn('id="visao-financeiro" class="visao-painel on"', html_dias)
-            self.assertIn('href="/painel?view=financeiro&dias=30#financeiro"', html_dias)
+            self.assertIn('href="/painel?view=financeiro&preset=30dias&dias=30#financeiro"', html_dias)
             self.assertIn('<input type="hidden" name="view" value="financeiro">', html_dias)
             self.assertIn('action="/painel#financeiro"', html_dias)
 

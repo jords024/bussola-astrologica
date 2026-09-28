@@ -89,7 +89,8 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   .scr{display:none;flex-direction:column;align-items:center;text-align:center;
     min-height:calc(100dvh - 46px);justify-content:center;padding:34px 0 40px;}
   .scr.on{display:flex;animation:rise .55s cubic-bezier(.2,.9,.3,1) both;}
-  .scr.flow{justify-content:flex-start;min-height:auto;}
+  .scr.flow{justify-content:flex-start;min-height:auto;animation:none !important;transform:none !important;filter:none !important;}
+  .scr[data-s="10"]{animation:none !important;transform:none !important;filter:none !important;}
   @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 
@@ -942,6 +943,74 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   </div>
   <script>
   (function() {
+    var _vslPlaysEnviados = {};
+    window.vslNotificarPlay = function(vid, tipo) {
+      if (!vid) return;
+      var chave = vid + '_' + (tipo || 'video');
+
+      var nome = '';
+      var whatsapp = '';
+      var leituraId = '';
+
+      try {
+        if (typeof S !== 'undefined') {
+          nome = (S.nomeCompleto || S.nome || '').trim();
+          whatsapp = (S.whatsapp || '').trim();
+          if (S.leitura && S.leitura.leitura_id) {
+            leituraId = S.leitura.leitura_id;
+          }
+        }
+      } catch(e) {}
+
+      // Fallbacks em elementos de formulário e localStorage
+      try {
+        if (!nome) {
+          var nmEl = document.getElementById('nm');
+          if (nmEl && nmEl.value) nome = nmEl.value.trim();
+        }
+        if (!nome) {
+          nome = (localStorage.getItem('bsl_lead_nome') || '').trim();
+        }
+        if (!whatsapp) {
+          var telEl = document.getElementById('tel');
+          var ddiEl = document.getElementById('ddi');
+          if (telEl && telEl.value) {
+            var ddi = ddiEl ? ddiEl.value : '+55';
+            whatsapp = (ddi + ' ' + telEl.value).trim();
+          }
+        }
+        if (!whatsapp) {
+          whatsapp = (localStorage.getItem('bsl_lead_whatsapp') || '').trim();
+        }
+        if (!leituraId) {
+          leituraId = (localStorage.getItem('bsl_leitura_id') || '').trim();
+        }
+      } catch(e) {}
+
+      // Só bloqueia duplicidade se já tiver enviado com os dados preenchidos
+      if (_vslPlaysEnviados[chave]) return;
+      if (nome || whatsapp) {
+        _vslPlaysEnviados[chave] = true;
+      }
+
+      var payload = {
+        video_id: vid,
+        video_tipo: tipo || 'oferta',
+        nome: nome,
+        whatsapp: whatsapp,
+        leitura_id: leituraId
+      };
+
+      try {
+        fetch('/api/vsl-play', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true
+        }).catch(function() {});
+      } catch(e) {}
+    };
+
     var videoId = '65cb9c18-e117-4734-a983-2fc6275c2061';
     var videoRatio = '9:16';
     var isFloatingConfig = true;
@@ -955,6 +1024,12 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if (!wrapper) return;
     var iframe = wrapper.querySelector('iframe');
     if (!iframe) return;
+
+    wrapper.addEventListener('click', function() {
+      if (typeof window.vslNotificarPlay === 'function') {
+        window.vslNotificarPlay(videoId, 'antecipacao');
+      }
+    }, { passive: true });
 
     function updateFloatingState() {
       var rect = wrapper.getBoundingClientRect();
@@ -971,7 +1046,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         if (floatingPos === 'bottom-right') { wrapper.style.bottom = '16px'; wrapper.style.right = '16px'; wrapper.style.top = 'auto'; wrapper.style.left = 'auto'; }
         else if (floatingPos === 'bottom-left') { wrapper.style.bottom = '16px'; wrapper.style.left = '16px'; wrapper.style.top = 'auto'; wrapper.style.right = 'auto'; }
         else if (floatingPos === 'top-right') { wrapper.style.top = '16px'; wrapper.style.right = '16px'; wrapper.style.bottom = 'auto'; wrapper.style.left = 'auto'; }
-        else if (floatingPos === 'top-left') { wrapper.style.top = '16px'; wrapper.style.left = '16px'; wrapper.style.bottom = 'auto'; wrapper.style.right = 'auto'; }
+        else if (floatingPos === 'top-left') { wrapper.style.top = '16px'; wrapper.style.left = '16px'; wrapper.style.bottom = 'auto'; wrapper.style.left = 'auto'; }
         if (isCloseable && !wrapper.querySelector('.vturb-float-close')) {
           var btn = document.createElement('button');
           btn.className = 'vturb-float-close';
@@ -1021,7 +1096,10 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       if (!e.data || typeof e.data !== 'object') return;
       if (e.data.videoId && e.data.videoId !== videoId) return;
       if (e.data.type === 'VTURB_PLAY_STATE') {
-        if (e.data.action === 'play') {
+        if (e.data.action === 'play' || e.data.isPlaying) {
+          if (typeof window.vslNotificarPlay === 'function') {
+            window.vslNotificarPlay(videoId, 'antecipacao');
+          }
           var audioCtx = window.AudioContext || window.webkitAudioContext;
           if (audioCtx) {
             var ctx = new audioCtx();
@@ -1182,7 +1260,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   </header>
   <div id="vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1" style="max-width:640px;width:100%;margin:0 auto 20px;background:#0d0c0a;border-radius:12px;overflow:hidden;">
     <div style="position:relative;width:100%;padding-top:177.77%;background:#0d0c0a;">
-      <iframe id="ofertaVsl" data-src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:1px;background:#0d0c0a;color-scheme:dark;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
+      <iframe id="ofertaVsl" data-src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:1px;background:#0d0c0a;color-scheme:dark;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
     </div>
   </div>
   <script>
@@ -1198,12 +1276,24 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     var isVideoPlaying = false;
     var isIntersecting = true;
 
+    var wrapper = document.getElementById('vturb-wrapper-' + videoId);
+    if (wrapper) {
+      wrapper.addEventListener('click', function() {
+        if (typeof window.vslNotificarPlay === 'function') {
+          window.vslNotificarPlay(videoId, 'oferta');
+        }
+      }, { passive: true });
+    }
+
     window.addEventListener('message', function(e) {
       if (!e.data) return;
       if (e.data.type === 'VTURB_PLAY_STATE') {
-        isVideoPlaying = Boolean(e.data.isPlaying);
+        isVideoPlaying = Boolean(e.data.isPlaying || e.data.action === 'play');
         if (typeof window.updateFloatingState === 'function') window.updateFloatingState();
         if (typeof window.vslOfertaNotificarPlayState === 'function') window.vslOfertaNotificarPlayState(isVideoPlaying);
+        if (isVideoPlaying && typeof window.vslNotificarPlay === 'function') {
+          window.vslNotificarPlay(videoId, 'oferta');
+        }
       }
       if (e.data.type === 'VTURB_PITCH_REACHED') {
         if (typeof window.vslOfertaAvisarPitch === 'function') {
@@ -1325,16 +1415,27 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         isCurrentlyFloating = shouldFloat;
 
         if (shouldFloat) {
+          var isMobile = window.innerWidth <= 640;
           var isVertical = videoRatio === '9:16';
-          var actualWidth = isVertical ? Math.min(floatingWidth, 250) : floatingWidth;
+          var actualWidth = isMobile ? Math.min(150, Math.round(window.innerWidth * 0.42)) : Math.min(floatingWidth, 220);
           var floatHeight = isVertical ? Math.round((actualWidth * 16) / 9) : Math.round((actualWidth * 9) / 16);
-          var marginEdge = 32;
-          var marginEdgeRight = 56;
+          // O botão do WhatsApp fica no canto inferior direito a bottom: 24px com 58px de altura (vai até 82px).
+          // marginEdgeBottom: 100px posiciona o mini player no canto direito logo ACIMA do botão do WhatsApp, sem cobri-lo.
+          var marginEdgeBottom = isMobile ? 92 : 100;
+          var marginEdgeRight = isMobile ? 16 : 24;
+
+          if (scr10) {
+            scr10.style.animation = 'none';
+            scr10.style.transform = 'none';
+            scr10.style.filter = 'none';
+          }
+          if (wrapper) wrapper.style.overflow = 'visible';
+
           ifr.style.position = 'fixed';
           ifr.style.top = 'auto';
-          ifr.style.bottom = marginEdge + 'px';
+          ifr.style.bottom = marginEdgeBottom + 'px';
           if (floatingPos === 'bottom-left') {
-            ifr.style.left = marginEdge + 'px';
+            ifr.style.left = marginEdgeRight + 'px';
             ifr.style.right = 'auto';
           } else {
             ifr.style.right = marginEdgeRight + 'px';
@@ -1342,7 +1443,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
           }
           ifr.style.width = actualWidth + 'px';
           ifr.style.height = floatHeight + 'px';
-          ifr.style.zIndex = '99999';
+          ifr.style.zIndex = '99998';
           ifr.style.backgroundColor = '#000000';
           ifr.style.borderRadius = '12px';
           ifr.style.boxShadow = '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.15)';
@@ -1351,12 +1452,12 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
           if (closeBtn) {
             closeBtn.style.display = 'flex';
             closeBtn.style.top = 'auto';
-            closeBtn.style.bottom = (marginEdge + floatHeight - 14) + 'px';
+            closeBtn.style.bottom = (marginEdgeBottom + floatHeight - 12) + 'px';
             if (floatingPos === 'bottom-left') {
-              closeBtn.style.left = (marginEdge + actualWidth - 14) + 'px';
+              closeBtn.style.left = (marginEdgeRight + actualWidth - 14) + 'px';
               closeBtn.style.right = 'auto';
             } else {
-              closeBtn.style.right = (marginEdgeRight - 12) + 'px';
+              closeBtn.style.right = (marginEdgeRight - 10) + 'px';
               closeBtn.style.left = 'auto';
             }
           }
@@ -1372,6 +1473,8 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
           ifr.style.zIndex = '1';
           ifr.style.borderRadius = '1px';
           ifr.style.boxShadow = 'none';
+
+          if (wrapper) wrapper.style.overflow = 'hidden';
 
           if (closeBtn) {
             closeBtn.style.display = 'none';
@@ -1746,6 +1849,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if(de === 10 && i !== 10) vslOfertaDesmontar();
     if(i === 10){
       vslOfertaMontar();
+      if(typeof window.vslNotificarPlay === 'function'){
+        window.vslNotificarPlay(VSL_OFERTA.video, 'oferta');
+      }
       ofertaPersonalizar();
       $('#ofertaVslTitulo').focus({preventScroll:true});
     }
@@ -1790,6 +1896,24 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   let vslOfertaRelogios = [];
   let vslTempoReproducao = 0;       /* segundos acumulados de video reproduzido */
   let vslPlayTicker = null;
+  let vslConfigOferta = null;
+
+  function vslCarregarConfig(){
+    if(vslConfigOferta) return Promise.resolve(vslConfigOferta);
+    const sid = (typeof S !== 'undefined' && S.sid) ? S.sid : (typeof A !== 'undefined' && A.sid ? A.sid : '');
+    const aid = (typeof S !== 'undefined' && S.aid) ? S.aid : (typeof A !== 'undefined' && A.aid ? A.aid : '');
+    return fetch('/api/config-oferta?sid=' + encodeURIComponent(sid) + '&aid=' + encodeURIComponent(aid))
+      .then(r => r.json())
+      .then(data => {
+        vslConfigOferta = data;
+        return data;
+      })
+      .catch(() => {
+        vslConfigOferta = {modo: 'delay', variante: 'B', pitch_imediato: false};
+        return vslConfigOferta;
+      });
+  }
+  try{ vslCarregarConfig(); }catch(e){}
 
   function vslOfertaIniciarTicker(){
     if(vslPlayTicker || vslOfertaRevelada) return;
@@ -1841,6 +1965,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   window.vslOfertaNotificarPlayState = function(isPlaying){
     if(isPlaying){
       vslOfertaIniciarTicker();
+      if(typeof window.vslNotificarPlay === 'function'){
+        window.vslNotificarPlay(VSL_OFERTA.video, 'oferta');
+      }
     } else {
       vslOfertaPararTicker();
     }
@@ -1863,12 +1990,35 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     const ifr = document.getElementById('ofertaVsl');
     if(!ifr) { vslOfertaRevelar('sem_player'); return; }
 
+    /* Como a 2ª VSL já inicia funcionando automaticamente,
+       garante o envio imediato dos dados do contato para o Smart VSL ao chegar na tela */
+    if(typeof window.vslNotificarPlay === 'function'){
+      window.vslNotificarPlay(VSL_OFERTA.video, 'oferta');
+    }
+
+    vslCarregarConfig().then(cfg => {
+      if(cfg && cfg.pitch_imediato){
+        vslOfertaRevelar('imediato');
+      }
+      if(cfg && cfg.modo === 'teste_ab'){
+        A.ev('oferta_vsl', {estado: 'teste_ab', variante: cfg.variante, pitch_imediato: !!cfg.pitch_imediato});
+      }
+    });
+
     try{
       localStorage.removeItem('vturb_pitch_' + VSL_OFERTA.video);
     }catch(e){}
 
+    if(ifr){
+      ifr.addEventListener('load', () => {
+        vslOfertaCarregou = true;
+        if(typeof window.vslNotificarPlay === 'function'){
+          window.vslNotificarPlay(VSL_OFERTA.video, 'oferta');
+        }
+      });
+    }
+
     if(!ifr.getAttribute('src') && ifr.dataset.src){
-      ifr.addEventListener('load', () => { vslOfertaCarregou = true; });
       ifr.src = ifr.dataset.src;
       A.ev('oferta_vsl', {estado:'montou'});
 
@@ -1998,7 +2148,11 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if(e.origin !== VSL_OFERTA.origem && (!e.origin || e.origin.indexOf('turb-front') === -1)) return;
 
     if(e.data.type === 'VTURB_PLAY_STATE'){
-      window.vslOfertaNotificarPlayState(Boolean(e.data.isPlaying));
+      var isPlay = Boolean(e.data.isPlaying || e.data.action === 'play');
+      window.vslOfertaNotificarPlayState(isPlay);
+      if(isPlay && typeof window.vslNotificarPlay === 'function'){
+        window.vslNotificarPlay(VSL_OFERTA.video, 'oferta');
+      }
     }
     if(e.data.type === 'VTURB_PITCH_REACHED'){
       window.vslOfertaAvisarPitch('pitch');
@@ -2031,6 +2185,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   function vslOfertaDestravarAudio(){
     if(vslOfertaDestravou) return;
     vslOfertaDestravou = true;
+    if(typeof window.vslNotificarPlay === 'function'){
+      window.vslNotificarPlay(VSL_OFERTA.video, 'oferta');
+    }
     const ifr = document.getElementById('ofertaVsl');
     if(ifr && ifr.contentWindow){
       try{ ifr.contentWindow.postMessage({type:'VTURB_PARENT_INTERACTION'}, VSL_OFERTA.origem); }catch(e){}
@@ -2596,6 +2753,11 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       S.whatsapp = `${ddiVal} ${telVal}`;
     }
 
+    try {
+      if (S.nomeCompleto) localStorage.setItem('bsl_lead_nome', S.nomeCompleto);
+      if (S.whatsapp) localStorage.setItem('bsl_lead_whatsapp', S.whatsapp);
+    } catch(e) {}
+
     if (!dd.value || !mm.value || !$('#yy').value) {
       if (!dd.value) marcarErro(dd, null);
       if (!mm.value) marcarErro(mm, null);
@@ -2926,6 +3088,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       if(!result.ok || !Array.isArray(result.carta?.paragrafos) || !result.carta.paragrafos.length)
         throw new Error('carta incompleta');
       S.leitura=result;
+      try {
+        if (result && result.leitura_id) localStorage.setItem('bsl_leitura_id', result.leitura_id);
+      } catch(e) {}
       /* a espera cosmética existe para a bússola não piscar; com vídeo
          o próprio vídeo é a espera, então ela sai do caminho */
       const minimo = (vslEstado==='indisponivel') ? (reduced?300:4400) : 0;

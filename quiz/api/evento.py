@@ -13,7 +13,7 @@ import logging
 
 from fastapi import APIRouter, Request, Response
 
-from servicos import eventos, registro
+from servicos import eventos, registro, webhook
 from servicos.tempo_real import rastreador_presenca, ws_manager
 
 router = APIRouter()
@@ -73,6 +73,12 @@ async def receber(request: Request) -> Response:
                         await asyncio.to_thread(
                             registro.anexar_feedback, leitura_id_fb,
                             props.get("estrelas"), bool(props.get("pulou")))
+                        # Cancela cronômetro de 5min e envia o webhook imediatamente com as estrelas
+                        webhook.notificar_feedback_leitura(
+                            leitura_id=leitura_id_fb,
+                            estrelas=props.get("estrelas"),
+                            pulou=bool(props.get("pulou")),
+                        )
                     ws_manager.broadcast_sync({
                         "tipo": "feedback",
                         "leitura_id": leitura_id_fb,

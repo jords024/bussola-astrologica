@@ -282,8 +282,8 @@ class Integracao(unittest.TestCase):
         self.assertIn('gravado_em_bsb', lead_conteudo)
         self.assertIn('chegou_em_bsb', lead_conteudo)
 
-    @patch('servicos.webhook.disparar_webhook_leitura')
-    def test_webhook_disparado_na_leitura(self, mock_webhook):
+    @patch('servicos.webhook.agendar_webhook_leitura')
+    def test_webhook_agendado_na_leitura(self, mock_agendar):
         dados = pedido()
         dados['nome_completo'] = 'Aryaraj Alves Fernandes'
         dados['whatsapp'] = '+55 (85) 99999-8888'
@@ -291,11 +291,42 @@ class Integracao(unittest.TestCase):
             response = self.client.post('/api/leitura', json=dados)
         self.assertEqual(response.status_code, 200)
         import time
-        time.sleep(0.1)
-        mock_webhook.assert_called_once()
-        args, kwargs = mock_webhook.call_args
-        self.assertEqual(args[0], 'Aryaraj Alves Fernandes')
-        self.assertEqual(args[1], '+55 (85) 99999-8888')
+        time.sleep(0.05)
+        mock_agendar.assert_called_once()
+        args, kwargs = mock_agendar.call_args
+        nome = kwargs.get('nome_completo') if 'nome_completo' in kwargs else args[1]
+        wa = kwargs.get('whatsapp') if 'whatsapp' in kwargs else args[2]
+        self.assertEqual(nome, 'Aryaraj Alves Fernandes')
+        self.assertEqual(wa, '+55 (85) 99999-8888')
+
+    @patch('servicos.webhook.disparar_webhook_leitura')
+    def test_evento_feedback_dispara_webhook_com_estrelas(self, mock_disparar):
+        # 1. Gera leitura para criar o agendamento
+        dados = pedido()
+        dados['nome_completo'] = 'Cliente Com Estrelas'
+        dados['whatsapp'] = '+55 (11) 97777-6666'
+        with patch.object(llm, 'OPENAI_API_KEY', ''):
+            res_leit = self.client.post('/api/leitura', json=dados)
+        self.assertEqual(res_leit.status_code, 200)
+        lid = res_leit.json()['leitura_id']
+
+        # 2. Envia evento de feedback com nota 5
+        res_ev = self.client.post('/api/evento', json={
+            'sid': 'sid-teste-feedback-wb',
+            'aid': 'aid-teste',
+            'eventos': [{
+                'seq': 10,
+                'evt': 'feedback',
+                'props': {'estrelas': 5, 'leitura_id': lid}
+            }]
+        })
+        self.assertEqual(res_ev.status_code, 204)
+        import time
+        time.sleep(0.05)
+        mock_disparar.assert_called_once()
+        args, kwargs = mock_disparar.call_args
+        estrelas = kwargs.get('estrelas') if 'estrelas' in kwargs else (args[6] if len(args) > 6 else None)
+        self.assertEqual(estrelas, 5)
     def test_botao_whatsapp_suporte_fixo(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
@@ -374,6 +405,28 @@ class Integracao(unittest.TestCase):
         # 4. Deve conter a rotina de calibracao e ticker para 230s
         self.assertIn('vslTempoReproducao >= VSL_OFERTA.pitchSegundos', html)
         self.assertIn("vslOfertaRevelar('pitch_tempo')", html)
+
+    def test_vsl_player_flutuante_posicionamento_direita_e_viewport(self):
+        """Valida que o player flutuante da VSL fica posicionado a direita (e nao preso no centro)
+        e que os containers da tela de oferta nao criam containing blocks que restrinjam o position: fixed."""
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+
+        # 1. Regras de CSS que evitam containing block indevido na tela de oferta (evitam que o video fique preso no centro)
+        self.assertIn('.scr.flow{justify-content:flex-start;min-height:auto;animation:none !important;transform:none !important;filter:none !important;}', html)
+        self.assertIn('.scr[data-s="10"]{animation:none !important;transform:none !important;filter:none !important;}', html)
+
+        # 2. Posicionamento a direita no script do player flutuante
+        self.assertIn("ifr.style.right = marginEdgeRight + 'px';", html)
+        self.assertIn("ifr.style.left = 'auto';", html)
+        self.assertIn("marginEdgeRight", html)
+        self.assertIn("marginEdgeBottom", html)
+
+        # 3. Liberacao de overflow do wrapper durante o estado flutuante
+        self.assertIn("if (wrapper) wrapper.style.overflow = 'visible';", html)
+        self.assertIn("if (wrapper) wrapper.style.overflow = 'hidden';", html)
+
 
 if __name__ == '__main__':
     unittest.main()

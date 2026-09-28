@@ -431,22 +431,23 @@ async def gerar(p: Pedido):
         "total_ao_vivo": len(rastreador_presenca.obter_ativos(90.0))
     })
 
-    # Disparo assíncrono do webhook para ZapVoice / automação (nome completo, número, mensagem e dados completos)
+    # Agendamento do disparo do webhook para ZapVoice / zapjords (timer de 5 min)
+    # Se o usuário preencher a nota ou pular na tela da mensagem antes dos 5 min,
+    # o cronômetro é cancelado e o webhook é enviado imediatamente com a nota/estrelas.
     if p.whatsapp:
-        asyncio.create_task(asyncio.to_thread(
-            webhook.disparar_webhook_leitura,
-            p.nome_completo,
-            p.whatsapp,
-            resposta["carta"],
-            leitura_id,
-            {
+        webhook.agendar_webhook_leitura(
+            leitura_id=leitura_id,
+            nome_completo=p.nome_completo,
+            whatsapp=p.whatsapp,
+            carta=resposta["carta"],
+            meta={
                 "casa_aberta": veredito.casa_aberta,
                 "area": p.quiz.area,
                 "nascimento": p.nascimento.model_dump(),
                 "cidade": p.cidade.model_dump(),
                 "quiz": p.quiz.model_dump(),
             },
-        ))
+        )
 
     return resposta
 
@@ -468,13 +469,53 @@ async def contato(c: Contato):
             arq = registro.DIR_LEITURAS / f"{c.leitura_id}.json"
             if arq.exists():
                 d = json.loads(arq.read_text(encoding="utf-8"))
-                asyncio.create_task(asyncio.to_thread(
-                    webhook.disparar_webhook_leitura,
-                    d.get("nome_completo", ""),
-                    c.whatsapp,
-                    d.get("carta", {}),
-                    c.leitura_id,
-                ))
+                meta_contato = {
+                    "nascimento": d.get("nascimento"),
+                    "cidade": d.get("cidade"),
+                    "quiz": d.get("quiz"),
+                }
+                if d.get("feedback_estrelas") is not None or d.get("feedback_pulou"):
+                    asyncio.create_task(asyncio.to_thread(
+                        webhook.disparar_webhook_leitura,
+                        d.get("nome_completo", ""),
+                        c.whatsapp,
+                        d.get("carta", {}),
+                        c.leitura_id,
+                        meta_contato,
+                        None,
+                        d.get("feedback_estrelas"),
+                        bool(d.get("feedback_pulou")),
+                    ))
+                else:
+                    webhook.agendar_webhook_leitura(
+                        leitura_id=c.leitura_id,
+                        nome_completo=d.get("nome_completo", ""),
+                        whatsapp=c.whatsapp,
+                        carta=d.get("carta", {}),
+                        meta=meta_contato,
+                    )
         except Exception:
             pass
     return {"ok": ok}
+
+
+class VslPlayPayload(BaseModel):
+    video_id: str = ""
+    video_tipo: str = "oferta"
+    leitura_id: str = ""
+    nome: str = ""
+    whatsapp: str = ""
+
+
+@router.post("/api/vsl-play")
+async def registrar_vsl_play(payload: VslPlayPayload):
+    """Recebe notificação quando o contato aperta o play na VSL e dispara o webhook assíncrono."""
+    asyncio.create_task(asyncio.to_thread(
+        webhook.disparar_webhook_vsl_play,
+        nome=payload.nome,
+        whatsapp=payload.whatsapp,
+        video_id=payload.video_id,
+        video_tipo=payload.video_tipo,
+        leitura_id=payload.leitura_id,
+    ))
+    return {"ok": True, "event": "vsl_play"}

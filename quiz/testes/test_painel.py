@@ -1507,7 +1507,7 @@ class TestFiltrosDataEFusoHorario(unittest.TestCase):
         self.assertEqual(res["sessoes"], 1)
 
     def test_presets_data_semana_e_ontem(self):
-        """Verifica a renderização dos presets 'esta semana', 'semana passada', 'hoje' e 'ontem'."""
+        """Verifica a renderização dos presets 'esta semana' (segunda a domingo), 'semana passada', 'hoje' e 'ontem'."""
         from api.painel import painel
         from starlette.requests import Request
 
@@ -1526,24 +1526,87 @@ class TestFiltrosDataEFusoHorario(unittest.TestCase):
             self.assertIn("semana passada", html)
             self.assertIn("ontem", html)
             self.assertIn("hoje", html)
-            self.assertIn("de=2026-09-07&ate=2026-09-08", html)  # Segunda até terça (esta semana)
-            self.assertIn("de=2026-08-31&ate=2026-09-06", html)  # Segunda até domingo da semana anterior
+            # Na Opção B, esta semana vai de segunda (07/09) a domingo (13/09)
+            self.assertIn("preset=esta_semana&de=2026-09-07&ate=2026-09-13", html)
+            self.assertIn("preset=semana_passada&de=2026-08-31&ate=2026-09-06", html)
 
             # 2. Requisição do preset 'esta semana'
-            resp_semana = painel(req, _="crassus", de="2026-09-07", ate="2026-09-08")
+            resp_semana = painel(req, _="crassus", preset="esta_semana", de="2026-09-07", ate="2026-09-13")
             html_semana = resp_semana.body.decode("utf-8")
-            self.assertIn("07/09/2026 a 08/09/2026", html_semana)
-            self.assertIn('class="f on" href="/painel?de=2026-09-07&ate=2026-09-08"', html_semana)
+            self.assertIn("07/09/2026 a 13/09/2026", html_semana)
+            self.assertIn('class="f on" href="/painel?preset=esta_semana&de=2026-09-07&ate=2026-09-13"', html_semana)
             self.assertIn('onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);"', html_semana)
             self.assertIn('>esta semana</a>', html_semana)
 
             # 3. Requisição do preset 'semana passada'
-            resp_passada = painel(req, _="crassus", de="2026-08-31", ate="2026-09-06")
+            resp_passada = painel(req, _="crassus", preset="semana_passada", de="2026-08-31", ate="2026-09-06")
             html_passada = resp_passada.body.decode("utf-8")
             self.assertIn("31/08/2026 a 06/09/2026", html_passada)
-            self.assertIn('class="f on" href="/painel?de=2026-08-31&ate=2026-09-06"', html_passada)
+            self.assertIn('class="f on" href="/painel?preset=semana_passada&de=2026-08-31&ate=2026-09-06"', html_passada)
             self.assertIn('onclick="return navegarPeriodoAjax(this.getAttribute(\'href\'), event);"', html_passada)
             self.assertIn('>semana passada</a>', html_passada)
+
+    def test_apenas_um_preset_ativo_segunda_feira(self):
+        """Garante que na segunda-feira apenas 1 botão fica aceso ('on'), nunca 'hoje' e 'esta semana' simultaneamente."""
+        from api.painel import painel
+        from starlette.requests import Request
+        import re
+
+        # Simula segunda-feira 28/09/2026
+        dt_segunda = datetime(2026, 9, 28, 10, 0, tzinfo=timezone(timedelta(hours=-3)))
+        with mock.patch("api.painel.datetime") as mock_dt:
+            mock_dt.now.side_effect = lambda tz=None: dt_segunda.astimezone(tz) if tz else dt_segunda
+            mock_dt.fromisoformat = datetime.fromisoformat
+
+            req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+
+            # 1. Clicando em 'esta semana'
+            resp_semana = painel(req, _="crassus", preset="esta_semana", de="2026-09-28", ate="2026-10-04")
+            html_semana = resp_semana.body.decode("utf-8")
+
+            # Botão 'esta semana' deve estar ativo
+            self.assertIn('class="f on" href="/painel?preset=esta_semana&de=2026-09-28&ate=2026-10-04"', html_semana)
+            self.assertIn('>esta semana</a>', html_semana)
+            # Botão 'hoje' NÃO pode estar ativo
+            self.assertIn('class="f" href="/painel?preset=hoje&de=2026-09-28&ate=2026-09-28"', html_semana)
+            self.assertNotIn('class="f on" href="/painel?preset=hoje&de=2026-09-28&ate=2026-09-28"', html_semana)
+
+            # Verifica que na barra de filtros do dashboard há exatamente 1 link com a classe "f on"
+            filtros_dash = re.search(r'<div class="filtros">(.*?)</div>', html_semana, re.DOTALL)
+            self.assertIsNotNone(filtros_dash)
+            links_ativos = re.findall(r'class="f on"', filtros_dash.group(1))
+            self.assertEqual(len(links_ativos), 1, "Deve haver exatamente 1 botão de preset ativo na barra de filtros")
+
+            # 2. Clicando em 'hoje'
+            resp_hoje = painel(req, _="crassus", preset="hoje", de="2026-09-28", ate="2026-09-28")
+            html_hoje = resp_hoje.body.decode("utf-8")
+
+            # Botão 'hoje' deve estar ativo
+            self.assertIn('class="f on" href="/painel?preset=hoje&de=2026-09-28&ate=2026-09-28"', html_hoje)
+            self.assertIn('>hoje</a>', html_hoje)
+            # Botão 'esta semana' NÃO pode estar ativo
+            self.assertIn('class="f" href="/painel?preset=esta_semana&de=2026-09-28&ate=2026-10-04"', html_hoje)
+            self.assertNotIn('class="f on" href="/painel?preset=esta_semana&de=2026-09-28&ate=2026-10-04"', html_hoje)
+
+            filtros_dash_hoje = re.search(r'<div class="filtros">(.*?)</div>', html_hoje, re.DOTALL)
+            self.assertIsNotNone(filtros_dash_hoje)
+            links_ativos_hoje = re.findall(r'class="f on"', filtros_dash_hoje.group(1))
+            self.assertEqual(len(links_ativos_hoje), 1, "Deve haver exatamente 1 botão de preset ativo ao filtrar por hoje")
+
+    def test_preset_personalizado_nenhum_botao_aceso(self):
+        """Garante que um filtro de datas personalizado não acenda nenhum botão de preset."""
+        from api.painel import painel
+        from starlette.requests import Request
+        import re
+
+        req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+        resp = painel(req, _="crassus", de="2026-09-10", ate="2026-09-15")
+        html = resp.body.decode("utf-8")
+
+        filtros_dash = re.search(r'<div class="filtros">(.*?)</div>', html, re.DOTALL)
+        self.assertIsNotNone(filtros_dash)
+        links_ativos = re.findall(r'class="f on"', filtros_dash.group(1))
+        self.assertEqual(len(links_ativos), 0, "Nenhum botão de preset deve estar aceso para período personalizado arbitrário")
 
     def test_ajax_navegacao_periodo_e_form_datas(self):
         """Verifica se os handlers e scripts de navegação de período e filtros de data via AJAX estão presentes no HTML."""
@@ -2894,8 +2957,85 @@ class TestTempoQuizAtivoEDuplo(unittest.TestCase):
         resp = painel(req, _="crassus")
         html_resp = resp.body.decode("utf-8")
         self.assertIn('id="container-tabela-leituras"', html_resp)
-        self.assertIn('class="btn-filtro-leituras', html_resp)
-        self.assertIn('filtrarTabelaClient', html_resp)
+    def test_calcular_idade_num_e_agregar_idades_leads(self):
+        """Valida cálculos de idade numérica e agregação por faixas etárias."""
+        from api.painel import calcular_idade_num, agregar_idades_leads
+        ref = date(2026, 9, 28)
+
+        # 1. Testes de cálculo de idade individual
+        self.assertEqual(calcular_idade_num({"ano": 1996, "mes": 9, "dia": 28}, ref), 30)
+        self.assertEqual(calcular_idade_num({"ano": 1996, "mes": 9, "dia": 29}, ref), 29) # ainda não fez aniversário
+        self.assertEqual(calcular_idade_num({"ano": "85", "mes": 1, "dia": 1}, ref), 41)
+        self.assertEqual(calcular_idade_num({"ano": "04", "mes": 5, "dia": 10}, ref), 22)
+        self.assertEqual(calcular_idade_num({"ano": 1980}, ref), 46)
+        self.assertIsNone(calcular_idade_num(None))
+        self.assertIsNone(calcular_idade_num({}))
+        self.assertIsNone(calcular_idade_num({"ano": 2040}, ref))
+        self.assertIsNone(calcular_idade_num({"ano": 1850}, ref))
+
+        # 2. Agregação vazia
+        vazia = agregar_idades_leads([], ref)
+        self.assertEqual(vazia["total"], 0)
+        self.assertIsNone(vazia["media"])
+
+        # 3. Agregação com lista de leads
+        leads = [
+            {"nascimento": {"ano": 2005, "mes": 1, "dia": 1}}, # 21 anos (Até 24)
+            {"nascimento": {"ano": 1995, "mes": 1, "dia": 1}}, # 31 anos (25 a 34)
+            {"nascimento": {"ano": 1985, "mes": 1, "dia": 1}}, # 41 anos (35 a 44)
+            {"nascimento": {"ano": 1975, "mes": 1, "dia": 1}}, # 51 anos (45 a 54)
+            {"nascimento": {"ano": 1965, "mes": 1, "dia": 1}}, # 61 anos (55 a 64)
+            {"nascimento": {"ano": 1955, "mes": 1, "dia": 1}}, # 71 anos (65+)
+        ]
+        res = agregar_idades_leads(leads, ref)
+        self.assertEqual(res["total"], 6)
+        self.assertEqual(res["min"], 21)
+        self.assertEqual(res["max"], 71)
+        self.assertEqual(res["media"], 46.0)
+        self.assertEqual(res["mediana"], 46.0)
+        self.assertEqual(len(res["faixas"]), 6)
+        for fx in res["faixas"]:
+            self.assertEqual(fx["qtd"], 1)
+            self.assertAlmostEqual(fx["pct"], 16.7, places=1)
+
+    def test_painel_renderiza_idade_media_kpi_e_aba_formulario(self):
+        """Verifica se a idade média dos leads é exibida nos KPIs do topo e na aba Formulário & Horário."""
+        from api.painel import painel
+        from starlette.requests import Request
+
+        with TemporaryDirectory() as tmpdir:
+            dir_leituras = Path(tmpdir) / "leituras"
+            dir_leituras.mkdir(parents=True, exist_ok=True)
+
+            # Cria leituras de teste com datas de nascimento reais
+            lead1 = {
+                "nome_completo": "Ana Silva",
+                "whatsapp": "+5511999998888",
+                "nascimento": {"ano": 1996, "mes": 5, "dia": 10},
+                "cidade": {"nome": "São Paulo", "uf": "SP"},
+            }
+            lead2 = {
+                "nome_completo": "Carlos Souza",
+                "whatsapp": "+5511988887777",
+                "nascimento": {"ano": 1986, "mes": 2, "dia": 20},
+                "cidade": {"nome": "Campinas", "uf": "SP"},
+            }
+            (dir_leituras / "20260928-100000-aaaa1111.json").write_text(json.dumps(lead1), encoding="utf-8")
+            (dir_leituras / "20260928-100500-bbbb2222.json").write_text(json.dumps(lead2), encoding="utf-8")
+
+            with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
+                req = Request({"type": "http", "method": "GET", "path": "/painel", "headers": []})
+                resp = painel(req, _="crassus", de="2026-09-28", ate="2026-09-28")
+                html_resp = resp.body.decode("utf-8")
+
+                # 1. Card no topo
+                self.assertIn("idade média dos leads", html_resp)
+                # 2. Seção na aba formulário
+                self.assertIn("Idade dos leads que preencheram o formulário", html_resp)
+                self.assertIn("faixa etária", html_resp)
+                # 3. Nota na aba de leituras
+                self.assertIn("Idade dos leads:", html_resp)
+
 
 
 

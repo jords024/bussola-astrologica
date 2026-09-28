@@ -47,6 +47,8 @@ EVENTOS_VALIDOS = {
     # a nota de 1 a 5 que a pessoa da para a carta. Nome fora desta lista e
     # descartado em silencio, e /api/evento continua respondendo 204 - entao
     # esquecer esta linha significa perder o dado sem nenhum aviso.
+    # telemetria de revelação da oferta e teste A/B
+    "oferta_vsl",
     "feedback",
 }
 

@@ -145,35 +145,105 @@ def f_data(nasc: dict) -> str:
         return f"{dia}/{mes}/{ano_2d}"
 
 
-def f_idade(nasc: dict, ref: Optional[date] = None) -> str:
-    """Calcula a idade em anos a partir do dicionário de nascimento."""
-    if not nasc:
-        return "—"
-    dia = nasc.get("dia")
-    mes = nasc.get("mes")
+def calcular_idade_num(nasc: dict, ref: Optional[date] = None) -> Optional[int]:
+    """Calcula a idade em anos (número inteiro) a partir do dicionário de nascimento."""
+    if not nasc or not isinstance(nasc, dict):
+        return None
     ano = nasc.get("ano")
-    if dia is None or mes is None or not ano:
-        return "—"
+    if not ano:
+        return None
     try:
-        d = int(dia)
-        m = int(mes)
         y = int(ano)
         hoje = ref or hoje_bsb()
         if y < 100:
             limite_sec = hoje.year % 100
             y = (2000 + y) if y <= limite_sec else (1900 + y)
         if not (1900 <= y <= hoje.year):
-            return "—"
-        try:
-            dt_nasc = date(y, m, d)
-            idade = hoje.year - dt_nasc.year - ((hoje.month, hoje.day) < (dt_nasc.month, dt_nasc.day))
-        except ValueError:
-            idade = hoje.year - y - ((hoje.month, hoje.day) < (m, d))
-        if idade < 0 or idade > 130:
-            return "—"
-        return f"{idade} anos" if idade != 1 else "1 ano"
+            return None
+        dia = nasc.get("dia")
+        mes = nasc.get("mes")
+        if dia is not None and mes is not None:
+            try:
+                dt_nasc = date(y, int(mes), int(dia))
+                idade = hoje.year - dt_nasc.year - ((hoje.month, hoje.day) < (dt_nasc.month, dt_nasc.day))
+            except ValueError:
+                idade = hoje.year - y - ((hoje.month, hoje.day) < (int(mes), 1))
+        else:
+            idade = hoje.year - y
+        if 0 <= idade <= 130:
+            return idade
+        return None
     except (ValueError, TypeError):
+        return None
+
+
+def f_idade(nasc: dict, ref: Optional[date] = None) -> str:
+    """Calcula a idade em anos a partir do dicionário de nascimento."""
+    idade = calcular_idade_num(nasc, ref)
+    if idade is None:
         return "—"
+    return f"{idade} anos" if idade != 1 else "1 ano"
+
+
+def agregar_idades_leads(itens_ou_grupos: list, ref: Optional[date] = None) -> dict:
+    """Calcula métricas agregadas de idade para os leads que preencheram o formulário."""
+    idades: list[int] = []
+    hoje = ref or hoje_bsb()
+
+    for item in itens_ou_grupos:
+        nasc = None
+        if isinstance(item, dict):
+            nasc = item.get("nascimento") or (item.get("d_principal") or {}).get("nascimento")
+        elif isinstance(item, tuple) and len(item) == 2 and isinstance(item[1], dict):
+            nasc = item[1].get("nascimento")
+
+        idade = calcular_idade_num(nasc, ref=hoje)
+        if idade is not None:
+            idades.append(idade)
+
+    if not idades:
+        return {
+            "total": 0,
+            "media": None,
+            "mediana": None,
+            "min": None,
+            "max": None,
+            "faixas": [],
+        }
+
+    total = len(idades)
+    media = round(sum(idades) / total, 1)
+    idades_ord = sorted(idades)
+    mediana = idades_ord[total // 2] if total % 2 != 0 else round((idades_ord[total // 2 - 1] + idades_ord[total // 2]) / 2, 1)
+    if isinstance(mediana, float) and mediana.is_integer():
+        mediana = int(mediana)
+
+    defs_faixas = [
+        ("Até 24 anos", lambda x: x < 25),
+        ("25 a 34 anos", lambda x: 25 <= x <= 34),
+        ("35 a 44 anos", lambda x: 35 <= x <= 44),
+        ("45 a 54 anos", lambda x: 45 <= x <= 54),
+        ("55 a 64 anos", lambda x: 55 <= x <= 64),
+        ("65 anos ou mais", lambda x: x >= 65),
+    ]
+    faixas = []
+    for nome, cond in defs_faixas:
+        qtd = sum(1 for x in idades if cond(x))
+        pct_val = round((qtd * 100.0 / total), 1) if total > 0 else 0.0
+        faixas.append({
+            "nome": nome,
+            "qtd": qtd,
+            "pct": pct_val,
+        })
+
+    return {
+        "total": total,
+        "media": media,
+        "mediana": mediana,
+        "min": min(idades),
+        "max": max(idades),
+        "faixas": faixas,
+    }
 
 
 def f_hora(nasc: dict, pr: Optional[dict] = None) -> str:
@@ -240,9 +310,9 @@ def hoje_bsb() -> date:
     return datetime.now(FUSO_BSB).date()
 
 
-def _formatar_data_hora_curta(val: datetime | str) -> str:
+def _formatar_data_hora_curta(val: Any) -> str:
     """Formata datetime ou string existente para dd/mm/aa HH:MM (ano 2 dígitos, sem segundos)."""
-    if isinstance(val, datetime):
+    if hasattr(val, "strftime"):
         return val.strftime("%d/%m/%y %H:%M")
     if not val:
         return "—"
@@ -641,46 +711,117 @@ a{color:var(--amber)}
 .btn-limpar-busca{background:none;border:none;color:var(--sand2);font-size:12px;cursor:pointer;padding:1px 4px;border-radius:4px;line-height:1;transition:all .15s ease}
 .btn-limpar-busca:hover{color:#D96558;background:rgba(196,86,74,.15)}
 @keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+/* Estilos de Configurações da VSL & Teste A/B */
+.card-config-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px;max-width:760px}
+.cfg-opcao-item{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02);margin-bottom:12px;cursor:pointer;transition:all .15s ease}
+.cfg-opcao-item:hover{border-color:rgba(229,169,60,.4);background:rgba(229,169,60,.04)}
+.cfg-opcao-item.selecionado{border-color:var(--amber);background:rgba(229,169,60,.09);box-shadow:0 0 12px rgba(229,169,60,.12)}
+.cfg-opcao-item input[type="radio"]{margin-top:4px;accent-color:var(--amber);width:17px;height:17px;cursor:pointer}
+.cfg-opcao-corpo{flex:1}
+.cfg-opcao-titulo{font-size:14.5px;font-weight:700;color:var(--sand);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.cfg-badge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em}
+.cfg-badge.padrao{background:rgba(255,255,255,.08);color:var(--sand2)}
+.cfg-badge.ab{background:rgba(88,185,130,.15);color:#58B982;border:1px solid rgba(88,185,130,.35)}
+.cfg-badge.imediato{background:rgba(229,169,60,.15);color:var(--amber);border:1px solid rgba(229,169,60,.35)}
+.cfg-opcao-desc{font-size:12.5px;color:var(--sand2);line-height:1.55}
+.btn-salvar-cfg{background:var(--amber);color:#12100C;border:none;font-weight:700;font-size:13.5px;padding:10px 24px;border-radius:9px;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:8px}
+.btn-salvar-cfg:hover{background:#F6C467;transform:translateY(-1px)}
+.btn-salvar-cfg:disabled{opacity:.6;cursor:not-allowed}
+.msg-status-cfg{font-size:13px;font-weight:600;margin-left:14px}
+.msg-status-cfg.sucesso{color:#58B982}
+.msg-status-cfg.erro{color:#E06C75}
 """
 
 JS_PAINEL = r"""
 function trocarVisao(visao){
   var bDash = document.getElementById("btn-visao-dashboard");
   var bFin = document.getElementById("btn-visao-financeiro");
+  var bCfg = document.getElementById("btn-visao-configuracoes");
   var vDash = document.getElementById("visao-dashboard");
   var vFin = document.getElementById("visao-financeiro");
+  var vCfg = document.getElementById("visao-configuracoes");
   if(!vDash || !vFin) return;
 
-  if(visao === "financeiro"){
-    if(bDash) bDash.classList.remove("on");
-    if(bFin) bFin.classList.add("on");
-    vDash.classList.remove("on");
-    vFin.classList.add("on");
-    try{
-      localStorage.setItem("painel_visao_ativa", "financeiro");
-      if(history.replaceState){
-        var u = new URL(window.location.href);
-        u.searchParams.set("view", "financeiro");
-        history.replaceState(null, "", u.pathname + u.search + "#financeiro");
-      }
-    }catch(e){}
-  } else {
-    if(bDash) bDash.classList.add("on");
-    if(bFin) bFin.classList.remove("on");
-    vDash.classList.add("on");
-    vFin.classList.remove("on");
-    try{
-      localStorage.setItem("painel_visao_ativa", "dashboard");
-      var abaAtiva = localStorage.getItem("painel_aba_ativa") || "aba-funil";
-      if(history.replaceState){
-        var u = new URL(window.location.href);
+  if(bDash) bDash.classList.toggle("on", visao === "dashboard");
+  if(bFin) bFin.classList.toggle("on", visao === "financeiro");
+  if(bCfg) bCfg.classList.toggle("on", visao === "configuracoes");
+
+  if(vDash) vDash.classList.toggle("on", visao === "dashboard");
+  if(vFin) vFin.classList.toggle("on", visao === "financeiro");
+  if(vCfg) vCfg.classList.toggle("on", visao === "configuracoes");
+
+  try{
+    localStorage.setItem("painel_visao_ativa", visao);
+    if(history.replaceState){
+      var u = new URL(window.location.href);
+      if(visao === "dashboard"){
         u.searchParams.delete("view");
+        var abaAtiva = localStorage.getItem("painel_aba_ativa") || "aba-funil";
         history.replaceState(null, "", u.pathname + (u.search || "") + "#" + abaAtiva);
+      } else {
+        u.searchParams.set("view", visao);
+        history.replaceState(null, "", u.pathname + u.search + "#" + visao);
       }
-    }catch(e){}
-  }
+    }
+  }catch(e){}
 }
 window.trocarVisao = trocarVisao;
+
+function selecionarModoVsl(labelEl){
+  document.querySelectorAll(".cfg-opcao-item").forEach(function(el){
+    el.classList.remove("selecionado");
+  });
+  if(labelEl){
+    labelEl.classList.add("selecionado");
+    var inp = labelEl.querySelector('input[type="radio"]');
+    if(inp) inp.checked = true;
+  }
+}
+window.selecionarModoVsl = selecionarModoVsl;
+
+function salvarConfigOferta(){
+  var radios = document.getElementsByName("modo_vsl_radio");
+  var modoSel = "delay";
+  for(var i = 0; i < radios.length; i++){
+    if(radios[i].checked){ modoSel = radios[i].value; break; }
+  }
+  var webhookInput = document.getElementById("cfg-webhook-vsl-url");
+  var webhookUrl = webhookInput ? webhookInput.value.trim() : "";
+  var btn = document.querySelector(".btn-salvar-cfg");
+  var msg = document.getElementById("msg-status-cfg");
+  if(btn){ btn.disabled = true; btn.innerText = "Salvando..."; }
+
+  fetch("/painel/api/config-oferta", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({modo_vsl: modoSel, webhook_vsl_play_url: webhookUrl})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(btn){ btn.disabled = false; btn.innerText = "💾 Salvar Alterações"; }
+    if(msg){
+      msg.style.display = "inline-block";
+      if(d.ok){
+        msg.className = "msg-status-cfg sucesso";
+        msg.innerText = "✓ Configuração salva com sucesso!";
+      } else {
+        msg.className = "msg-status-cfg erro";
+        msg.innerText = "Erro: " + (d.detail || "Falha ao salvar");
+      }
+      setTimeout(function(){ msg.style.display = "none"; }, 4000);
+    }
+  })
+  .catch(function(err){
+    if(btn){ btn.disabled = false; btn.innerText = "💾 Salvar Alterações"; }
+    if(msg){
+      msg.style.display = "inline-block";
+      msg.className = "msg-status-cfg erro";
+      msg.innerText = "Erro de conexão: " + err;
+    }
+  });
+}
+window.salvarConfigOferta = salvarConfigOferta;
 
 var _pagFinAtual = 1;
 var _porPaginaFin = 20;
@@ -1342,7 +1483,7 @@ function obterAssinaturaFiltro(){
     var temDatas = (u.searchParams.get("de") || u.searchParams.get("ate"));
     var diasVal = u.searchParams.get("dias") || (temDatas ? "" : "7");
     if(diasVal) partes.push("dias=" + diasVal);
-    ["de", "ate", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "so_avaliados", "uf", "busca"].sort().forEach(function(k){
+    ["de", "ate", "preset", "bots", "teste", "so_checkout", "so_ao_vivo", "so_comprou", "so_whatsapp", "so_avaliados", "uf", "busca"].sort().forEach(function(k){
       var v = u.searchParams.get(k);
       if(v !== null && v !== "") partes.push(k + "=" + v);
     });
@@ -3871,23 +4012,49 @@ def _render_bloco_tabela_leituras(pagina: int = 0, por_pagina: int = 20,
 
 
 def _secao_financeiro(dados_fin: dict, d1: date, d2: date, de: Optional[str], ate: Optional[str],
-                      dias_int: int, is_ativa: bool, pag_fin: int = 0) -> str:
+                      dias_int: int, is_ativa: bool, pag_fin: int = 0,
+                      preset: Optional[str] = None) -> str:
     hoje = hoje_bsb()
     ontem = hoje - timedelta(days=1)
     segunda_esta_semana = hoje - timedelta(days=hoje.weekday())
+    domingo_esta_semana = segunda_esta_semana + timedelta(days=6)
     segunda_passada = segunda_esta_semana - timedelta(days=7)
     domingo_passado = segunda_esta_semana - timedelta(days=1)
+    max_data = max(hoje, domingo_esta_semana)
 
-    is_hoje = (d1 == hoje and d2 == hoje)
-    is_ontem = (d1 == ontem and d2 == ontem)
-    is_esta_semana = (d1 == segunda_esta_semana and d2 == hoje)
-    is_semana_passada = (d1 == segunda_passada and d2 == domingo_passado)
-    is_7dias = (d1 == hoje - timedelta(days=6) and d2 == hoje and not de and not ate)
-    is_30dias = (d1 == hoje - timedelta(days=29) and d2 == hoje and not de and not ate)
-    is_90dias = (d1 == hoje - timedelta(days=89) and d2 == hoje and not de and not ate)
+    # Identifica o preset ativo de forma estrita e mutuamente exclusiva (garante que apenas 1 botão fique aceso)
+    preset_ativo = None
+    if preset in ("hoje", "ontem", "esta_semana", "semana_passada", "7dias", "30dias", "90dias"):
+        preset_ativo = preset
+    elif de and ate:
+        if d1 == hoje and d2 == hoje:
+            preset_ativo = "hoje"
+        elif d1 == ontem and d2 == ontem:
+            preset_ativo = "ontem"
+        elif d1 == segunda_esta_semana and d2 == domingo_esta_semana:
+            preset_ativo = "esta_semana"
+        elif d1 == segunda_passada and d2 == domingo_passado:
+            preset_ativo = "semana_passada"
+    elif not de and not ate:
+        if dias_int == 7:
+            preset_ativo = "7dias"
+        elif dias_int == 30:
+            preset_ativo = "30dias"
+        elif dias_int == 90:
+            preset_ativo = "90dias"
 
-    def link_preset_fin(rot: str, p_de: Optional[str] = None, p_ate: Optional[str] = None, p_dias: Optional[int] = None, ativo: bool = False) -> str:
+    is_hoje = (preset_ativo == "hoje")
+    is_ontem = (preset_ativo == "ontem")
+    is_esta_semana = (preset_ativo == "esta_semana")
+    is_semana_passada = (preset_ativo == "semana_passada")
+    is_7dias = (preset_ativo == "7dias")
+    is_30dias = (preset_ativo == "30dias")
+    is_90dias = (preset_ativo == "90dias")
+
+    def link_preset_fin(rot: str, p_preset: Optional[str] = None, p_de: Optional[str] = None, p_ate: Optional[str] = None, p_dias: Optional[int] = None, ativo: bool = False) -> str:
         q = {"view": "financeiro"}
+        if p_preset:
+            q["preset"] = p_preset
         if p_de and p_ate:
             q["de"] = p_de
             q["ate"] = p_ate
@@ -3901,21 +4068,21 @@ def _secao_financeiro(dados_fin: dict, d1: date, d2: date, de: Optional[str], at
         '<form method="GET" action="/painel#financeiro" class="form-filtro-datas form-filtro-fin" onsubmit="return submeterFormDatasAjax(this, event);">'
         '<input type="hidden" name="view" value="financeiro">'
         '<span class="lbl-datas">📅 Personalizado:</span>'
-        f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
-        f'<label class="lbl-campo">Até <input type="date" name="ate" value="{d2:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
+        f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{max_data:%Y-%m-%d}"></label>'
+        f'<label class="lbl-campo">Até <input type="date" name="ate" value="{d2:%Y-%m-%d}" max="{max_data:%Y-%m-%d}"></label>'
         '<button type="submit" class="btn-filtrar-datas">Filtrar</button>'
         '</form>'
     )
 
     filtros_fin = (
         '<div class="filtros">'
-        + link_preset_fin("hoje", p_de=hoje.isoformat(), p_ate=hoje.isoformat(), ativo=is_hoje)
-        + link_preset_fin("ontem", p_de=ontem.isoformat(), p_ate=ontem.isoformat(), ativo=is_ontem)
-        + link_preset_fin("esta semana", p_de=segunda_esta_semana.isoformat(), p_ate=hoje.isoformat(), ativo=is_esta_semana)
-        + link_preset_fin("semana passada", p_de=segunda_passada.isoformat(), p_ate=domingo_passado.isoformat(), ativo=is_semana_passada)
-        + link_preset_fin("7 dias", p_dias=7, ativo=is_7dias)
-        + link_preset_fin("30 dias", p_dias=30, ativo=is_30dias)
-        + link_preset_fin("90 dias", p_dias=90, ativo=is_90dias)
+        + link_preset_fin("hoje", p_preset="hoje", p_de=hoje.isoformat(), p_ate=hoje.isoformat(), ativo=is_hoje)
+        + link_preset_fin("ontem", p_preset="ontem", p_de=ontem.isoformat(), p_ate=ontem.isoformat(), ativo=is_ontem)
+        + link_preset_fin("esta semana", p_preset="esta_semana", p_de=segunda_esta_semana.isoformat(), p_ate=domingo_esta_semana.isoformat(), ativo=is_esta_semana)
+        + link_preset_fin("semana passada", p_preset="semana_passada", p_de=segunda_passada.isoformat(), p_ate=domingo_passado.isoformat(), ativo=is_semana_passada)
+        + link_preset_fin("7 dias", p_preset="7dias", p_dias=7, ativo=is_7dias)
+        + link_preset_fin("30 dias", p_preset="30dias", p_dias=30, ativo=is_30dias)
+        + link_preset_fin("90 dias", p_preset="90dias", p_dias=90, ativo=is_90dias)
         + form_datas_fin
         + '</div>'
     )
@@ -4077,10 +4244,71 @@ def _secao_financeiro(dados_fin: dict, d1: date, d2: date, de: Optional[str], at
     return "".join(p)
 
 
+def _secao_configuracoes(cfg: dict, is_ativa: bool = False) -> str:
+    modo_atual = cfg.get("modo_vsl", "delay")
+    contador = cfg.get("contador_ab", 0)
+    atualizado_em = cfg.get("atualizado_em")
+    atualizado_str = _formatar_data_hora_curta(atualizado_em) if atualizado_em else "—"
+    url_webhook_vsl = cfg.get("webhook_vsl_play_url") or ""
+
+    return (
+        f'<div id="visao-configuracoes" class="visao-painel{" on" if is_ativa else ""}">'
+        '  <h1>Configurações da VSL & Oferta</h1>'
+        '  <p class="sub">Defina como o conteúdo e o momento do pitch se comportam na página da oferta (Tela 10).</p>'
+        '  <div class="card-config-box">'
+        '    <h3 style="font-size:16px;color:var(--sand);margin:0 0 6px;">Exibição do Conteúdo da Oferta (Pitch da VSL)</h3>'
+        '    <p style="font-size:12.5px;color:var(--sand2);margin:0 0 18px;line-height:1.5;">'
+        '      Escolha se o texto, o preço e os botões de compra abaixo do vídeo aparecem imediatamente ou se ficam retidos até os 3min50 do vídeo, ou ative o Teste A / B para alternar entre os visitantes.'
+        '    </p>'
+        '    <form id="form-config-vsl" onsubmit="salvarConfigOferta(); return false;">'
+        '      <label class="cfg-opcao-item' + (' selecionado' if modo_atual == "delay" else "") + '" onclick="selecionarModoVsl(this)">'
+        '        <input type="radio" name="modo_vsl_radio" value="delay"' + (' checked' if modo_atual == "delay" else "") + '>'
+        '        <div class="cfg-opcao-corpo">'
+        '          <div class="cfg-opcao-titulo">⏱️ Sempre com Delay do Pitch <span class="cfg-badge padrao">Padrão</span></div>'
+        '          <div class="cfg-opcao-desc">O visitante assiste à VSL e fica preso na tela sem o conteúdo abaixo. Os textos, botões e preço só aparecem quando o vídeo atinge o momento do pitch aos 3min50 (230s).</div>'
+        '        </div>'
+        '      </label>'
+        '      <label class="cfg-opcao-item' + (' selecionado' if modo_atual == "imediato" else "") + '" onclick="selecionarModoVsl(this)">'
+        '        <input type="radio" name="modo_vsl_radio" value="imediato"' + (' checked' if modo_atual == "imediato" else "") + '>'
+        '        <div class="cfg-opcao-corpo">'
+        '          <div class="cfg-opcao-titulo">🚀 Sempre com Pitch Imediato <span class="cfg-badge imediato">Liberado de primeira</span></div>'
+        '          <div class="cfg-opcao-desc">Assim que o usuário chega na página da oferta, o vídeo e todos os textos, botões de checkout e informações da parte de baixo já aparecem de primeira.</div>'
+        '        </div>'
+        '      </label>'
+        '      <label class="cfg-opcao-item' + (' selecionado' if modo_atual == "teste_ab" else "") + '" onclick="selecionarModoVsl(this)">'
+        '        <input type="radio" name="modo_vsl_radio" value="teste_ab"' + (' checked' if modo_atual == "teste_ab" else "") + '>'
+        '        <div class="cfg-opcao-corpo">'
+        '          <div class="cfg-opcao-titulo">🧪 Teste A / B (Alternado 50% / 50%) <span class="cfg-badge ab">Ativo</span></div>'
+        '          <div class="cfg-opcao-desc">Distribui alternadamente 1 a 1: envia 1 contato para a <b>Variante A</b> (vídeo com todas as informações liberadas de primeira) e 1 contato para a <b>Variante B</b> (vídeo com delay, preso até o pitch aos 3min50).</div>'
+        '        </div>'
+        '      </label>'
+        '      <div style="margin-top:20px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.08);">'
+        '        <label for="cfg-webhook-vsl-url" style="display:block;font-size:13.5px;font-weight:600;color:var(--sand);margin-bottom:6px;">'
+        '          🔗 Webhook ao Apertar na VSL (URL de Destino)'
+        '        </label>'
+        '        <p style="font-size:12px;color:var(--sand2);margin:0 0 10px;line-height:1.4;">'
+        '          URL para onde o nome, número e dados do lead serão enviados via POST no instante em que o visitante apertar o play no vídeo.'
+        '        </p>'
+        f'        <input type="url" id="cfg-webhook-vsl-url" name="webhook_vsl_play_url" value="{html.escape(url_webhook_vsl)}" placeholder="https://turb-back.aryaraj.shop/api/webhooks/vsl-play" style="width:100%;max-width:560px;background:#141310;border:1px solid var(--line);border-radius:8px;padding:10px 14px;color:var(--sand);font-size:13px;box-sizing:border-box;">'
+        '      </div>'
+        '      <div style="margin-top:22px;display:flex;align-items:center;">'
+        '        <button type="submit" class="btn-salvar-cfg">💾 Salvar Alterações</button>'
+        '        <span id="msg-status-cfg" class="msg-status-cfg" style="display:none;"></span>'
+        '      </div>'
+        '      <p style="font-size:11.5px;color:var(--sand2);margin:16px 0 0;opacity:.7;">'
+        '        Última alteração salva: ' + atualizado_str + ' · Total no contador alternador: ' + str(contador) + ' contatos distribuídos.'
+        '      </p>'
+        '    </form>'
+        '  </div>'
+        '</div>'
+    )
+
+
 @router.get("/painel", response_class=HTMLResponse)
 def painel(request: Request, _=Depends(exigir_senha),
            de: Optional[str] = None, ate: Optional[str] = None,
            dias: int = Query(7, ge=1, le=365),
+           preset: Optional[str] = None,
            bots: int = 0, teste: int = 0,
            pag_leituras: int = Query(0, ge=0),
            pag_fin: int = Query(0, ge=0),
@@ -4104,6 +4332,7 @@ def painel(request: Request, _=Depends(exigir_senha),
     from servicos.financeiro import calcular_custo_item, agregar_financeiro
     arquivos_leituras = sorted(config.DIR_LEITURAS.glob("*.json"), reverse=True)
     itens_financeiro: list[dict] = []
+    leituras_periodo: list[tuple[str, dict]] = []
     for arq in arquivos_leituras:
         try:
             d_l = json.loads(arq.read_text(encoding="utf-8"))
@@ -4115,6 +4344,7 @@ def painel(request: Request, _=Depends(exigir_senha),
             dt_ch = obter_data_chegada_leitura(d_l, arq.stem)
             if dt_ch and not (d1 <= dt_ch <= d2):
                 continue
+        leituras_periodo.append((arq.stem, d_l))
         if so_checkout and not d_l.get("checkout"):
             continue
         if so_whatsapp:
@@ -4141,25 +4371,55 @@ def painel(request: Request, _=Depends(exigir_senha),
                 continue
         itens_financeiro.append(calcular_custo_item(d_l, arq.stem))
     dados_fin = agregar_financeiro(itens_financeiro)
+    from servicos.config_oferta import obter_config_oferta
+    cfg_oferta = obter_config_oferta()
 
     is_fin_ativa = (view == "financeiro")
+    is_config_ativa = (view in ("config", "configuracoes"))
+    is_dash_ativa = (not is_fin_ativa and not is_config_ativa)
 
     hoje = hoje_bsb()
+    stats_idade = agregar_idades_leads(leituras_periodo, ref=hoje)
     ontem = hoje - timedelta(days=1)
     segunda_esta_semana = hoje - timedelta(days=hoje.weekday())
+    domingo_esta_semana = segunda_esta_semana + timedelta(days=6)
     segunda_passada = segunda_esta_semana - timedelta(days=7)
     domingo_passado = segunda_esta_semana - timedelta(days=1)
+    max_data = max(hoje, domingo_esta_semana)
 
-    is_hoje = (d1 == hoje and d2 == hoje)
-    is_ontem = (d1 == ontem and d2 == ontem)
-    is_esta_semana = (d1 == segunda_esta_semana and d2 == hoje)
-    is_semana_passada = (d1 == segunda_passada and d2 == domingo_passado)
-    is_7dias = (d1 == hoje - timedelta(days=6) and d2 == hoje and not de and not ate)
-    is_30dias = (d1 == hoje - timedelta(days=29) and d2 == hoje and not de and not ate)
-    is_90dias = (d1 == hoje - timedelta(days=89) and d2 == hoje and not de and not ate)
+    # Identifica o preset ativo de forma estrita e mutuamente exclusiva (garante que apenas 1 botão fique aceso)
+    preset_ativo = None
+    if preset in ("hoje", "ontem", "esta_semana", "semana_passada", "7dias", "30dias", "90dias"):
+        preset_ativo = preset
+    elif de and ate:
+        if d1 == hoje and d2 == hoje:
+            preset_ativo = "hoje"
+        elif d1 == ontem and d2 == ontem:
+            preset_ativo = "ontem"
+        elif d1 == segunda_esta_semana and d2 == domingo_esta_semana:
+            preset_ativo = "esta_semana"
+        elif d1 == segunda_passada and d2 == domingo_passado:
+            preset_ativo = "semana_passada"
+    elif not de and not ate:
+        if dias_int == 7:
+            preset_ativo = "7dias"
+        elif dias_int == 30:
+            preset_ativo = "30dias"
+        elif dias_int == 90:
+            preset_ativo = "90dias"
 
-    def link_preset(rot: str, p_de: Optional[str] = None, p_ate: Optional[str] = None, p_dias: Optional[int] = None, ativo: bool = False) -> str:
+    is_hoje = (preset_ativo == "hoje")
+    is_ontem = (preset_ativo == "ontem")
+    is_esta_semana = (preset_ativo == "esta_semana")
+    is_semana_passada = (preset_ativo == "semana_passada")
+    is_7dias = (preset_ativo == "7dias")
+    is_30dias = (preset_ativo == "30dias")
+    is_90dias = (preset_ativo == "90dias")
+
+    def link_preset(rot: str, p_preset: Optional[str] = None, p_de: Optional[str] = None, p_ate: Optional[str] = None, p_dias: Optional[int] = None, ativo: bool = False) -> str:
         q = {}
+        if p_preset:
+            q["preset"] = p_preset
         if p_de and p_ate:
             q["de"] = p_de
             q["ate"] = p_ate
@@ -4191,6 +4451,8 @@ def painel(request: Request, _=Depends(exigir_senha),
 
     def link_toggle(rot: str, novo_bots: int, novo_teste: int) -> str:
         q = {}
+        if preset_ativo:
+            q["preset"] = preset_ativo
         if de:
             q["de"] = de
         if ate:
@@ -4229,8 +4491,8 @@ def painel(request: Request, _=Depends(exigir_senha),
         + (f'<input type="hidden" name="so_avaliados" value="1">' if so_avaliados else '')
         + (f'<input type="hidden" name="uf" value="{html.escape(uf)}">' if uf else '')
         + '<span class="lbl-datas">📅 Personalizado:</span>'
-        + f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
-        + f'<label class="lbl-campo">Até <input type="date" name="ate" value="{d2:%Y-%m-%d}" max="{hoje:%Y-%m-%d}"></label>'
+        + f'<label class="lbl-campo">De <input type="date" name="de" value="{d1:%Y-%m-%d}" max="{max_data:%Y-%m-%d}"></label>'
+        + f'<label class="lbl-campo">Até <input type="date" name="ate" value="{d2:%Y-%m-%d}" max="{max_data:%Y-%m-%d}"></label>'
         + '<button type="submit" class="btn-filtrar-datas">Filtrar</button>'
         + '</form>'
     )
@@ -4247,13 +4509,17 @@ def painel(request: Request, _=Depends(exigir_senha),
         '      </div>',
         '    </div>',
         '    <nav class="sidebar-nav">',
-        f'      <button type="button" class="sidebar-btn{" on" if not is_fin_ativa else ""}" id="btn-visao-dashboard" onclick="trocarVisao(\'dashboard\'); return false;" title="Visualizar métricas do funil, leituras e formulário">',
+        f'      <button type="button" class="sidebar-btn{" on" if is_dash_ativa else ""}" id="btn-visao-dashboard" onclick="trocarVisao(\'dashboard\'); return false;" title="Visualizar métricas do funil, leituras e formulário">',
         '        <span class="sidebar-icon">📊</span>',
         '        <span class="sidebar-texto">Dashboard</span>',
         '      </button>',
         f'      <button type="button" class="sidebar-btn{" on" if is_fin_ativa else ""}" id="btn-visao-financeiro" onclick="trocarVisao(\'financeiro\'); return false;" title="Visualizar custos e gastos com geração de mensagens pela IA">',
         '        <span class="sidebar-icon">💰</span>',
         '        <span class="sidebar-texto">Financeiro</span>',
+        '      </button>',
+        f'      <button type="button" class="sidebar-btn{" on" if is_config_ativa else ""}" id="btn-visao-configuracoes" onclick="trocarVisao(\'configuracoes\'); return false;" title="Configurações da VSL da oferta e Teste A/B">',
+        '        <span class="sidebar-icon">⚙️</span>',
+        '        <span class="sidebar-texto">Configurações</span>',
         '      </button>',
         '    </nav>',
         '    <div class="sidebar-footer">',
@@ -4262,20 +4528,20 @@ def painel(request: Request, _=Depends(exigir_senha),
         '  </aside>',
         '  <main class="conteudo-painel">',
         '    <div class="w">',
-        f'      <div id="visao-dashboard" class="visao-painel{" on" if not is_fin_ativa else ""}">',
+        f'      <div id="visao-dashboard" class="visao-painel{" on" if is_dash_ativa else ""}">',
     ]
     p.append(f"<h1>Bússola Astrológica</h1>")
     p.append(f'<p class="sub">{d1:%d/%m/%Y} a {d2:%d/%m/%Y} · '
              f'<b>{d.get("pessoas_unicas", d["sessoes"])}</b> pessoas únicas, '
              f'{d["sessoes"]} sessões no total ({d["abertas"]} ainda em andamento)</p>')
     p.append('<div class="filtros">'
-             + link_preset("hoje", p_de=hoje.isoformat(), p_ate=hoje.isoformat(), ativo=is_hoje)
-             + link_preset("ontem", p_de=ontem.isoformat(), p_ate=ontem.isoformat(), ativo=is_ontem)
-             + link_preset("esta semana", p_de=segunda_esta_semana.isoformat(), p_ate=hoje.isoformat(), ativo=is_esta_semana)
-             + link_preset("semana passada", p_de=segunda_passada.isoformat(), p_ate=domingo_passado.isoformat(), ativo=is_semana_passada)
-             + link_preset("7 dias", p_dias=7, ativo=is_7dias)
-             + link_preset("30 dias", p_dias=30, ativo=is_30dias)
-             + link_preset("90 dias", p_dias=90, ativo=is_90dias)
+             + link_preset("hoje", p_preset="hoje", p_de=hoje.isoformat(), p_ate=hoje.isoformat(), ativo=is_hoje)
+             + link_preset("ontem", p_preset="ontem", p_de=ontem.isoformat(), p_ate=ontem.isoformat(), ativo=is_ontem)
+             + link_preset("esta semana", p_preset="esta_semana", p_de=segunda_esta_semana.isoformat(), p_ate=domingo_esta_semana.isoformat(), ativo=is_esta_semana)
+             + link_preset("semana passada", p_preset="semana_passada", p_de=segunda_passada.isoformat(), p_ate=domingo_passado.isoformat(), ativo=is_semana_passada)
+             + link_preset("7 dias", p_preset="7dias", p_dias=7, ativo=is_7dias)
+             + link_preset("30 dias", p_preset="30dias", p_dias=30, ativo=is_30dias)
+             + link_preset("90 dias", p_preset="90dias", p_dias=90, ativo=is_90dias)
              + link_toggle("ocultar bots" if bots else "mostrar bots", novo_bots=0 if bots else 1, novo_teste=teste)
              + link_toggle("ocultar meus testes" if teste else "mostrar meus testes", novo_bots=bots, novo_teste=0 if teste else 1)
              + form_datas
@@ -4306,24 +4572,33 @@ def painel(request: Request, _=Depends(exigir_senha),
     card_aval_val = (f"★ {fb_media:.2f}".replace(".", ",") if fb_media is not None else "—")
     card_aval_rot = f"avaliação da carta ({fb_respostas} aval.)" if fb_respostas > 0 else "avaliação da carta"
 
+    card_idade_val = f"{stats_idade['media']:.1f} anos".replace(".", ",") if stats_idade.get("media") is not None else "—"
+    card_idade_title = (
+        f'Idade média: {card_idade_val} | Mediana: {stats_idade["mediana"]} anos | Amplitude: {stats_idade["min"]} a {stats_idade["max"]} anos ({stats_idade["total"]} leads)'
+        if stats_idade.get("total") else "Idade média dos leads que preencheram o formulário"
+    )
+
     p.append('<div class="cards">')
-    for valor, rot in [
-        (d.get("pessoas_unicas", d["sessoes"]), "pessoas únicas"),
-        (d["sessoes"], "sessões totais"),
-        (f_tempo(tempos.get("mediana_sessao_ms")), "tempo médio no funil"),
-        (f_tempo(tempos.get("mediana_ate_oferta_ms")), "tempo até a oferta"),
+    for item in [
+        (d.get("pessoas_unicas", d["sessoes"]), "pessoas únicas", None),
+        (d["sessoes"], "sessões totais", None),
+        (f_tempo(tempos.get("mediana_sessao_ms")), "tempo médio no funil", None),
+        (f_tempo(tempos.get("mediana_ate_oferta_ms")), "tempo até a oferta", None),
         (chegaram_dados_pessoas,
-         f"chegaram aos dados ({chegaram_dados_sessoes} sessões)" if chegaram_dados_pessoas != chegaram_dados_sessoes else "chegaram aos dados"),
-        (g["total"], "cartas entregues"),
-        (card_aval_val, card_aval_rot),
+         f"chegaram aos dados ({chegaram_dados_sessoes} sessões)" if chegaram_dados_pessoas != chegaram_dados_sessoes else "chegaram aos dados", None),
+        (g["total"], "cartas entregues", None),
+        (card_idade_val, "idade média dos leads", card_idade_title),
+        (card_aval_val, card_aval_rot, None),
         (chegaram_oferta_pessoas,
-         f"chegaram à oferta ({chegaram_oferta_sessoes} sessões)" if chegaram_oferta_pessoas != chegaram_oferta_sessoes else "chegaram à oferta"),
+         f"chegaram à oferta ({chegaram_oferta_sessoes} sessões)" if chegaram_oferta_pessoas != chegaram_oferta_sessoes else "chegaram à oferta", None),
         (clicaram_checkout_pessoas,
-         f"foram ao checkout ({clicaram_checkout_sessoes} sessões)" if clicaram_checkout_pessoas != clicaram_checkout_sessoes else "foram ao checkout"),
-        (f'{g["mediana_ms"]/1000:.1f}s', "mediana do agente"),
-        (g["reserva"], "cartas de reserva"),
+         f"foram ao checkout ({clicaram_checkout_sessoes} sessões)" if clicaram_checkout_pessoas != clicaram_checkout_sessoes else "foram ao checkout", None),
+        (f'{g["mediana_ms"]/1000:.1f}s', "mediana do agente", None),
+        (g["reserva"], "cartas de reserva", None),
     ]:
-        p.append(f'<div class="card"><b>{valor}</b><span>{rot}</span></div>')
+        valor, rot, title_opt = item
+        attr_t = f' title="{html.escape(title_opt)}"' if title_opt else ''
+        p.append(f'<div class="card"{attr_t}><b>{valor}</b><span>{rot}</span></div>')
     p.append("</div>")
 
     # ---- navegação de abas ----
@@ -4359,9 +4634,13 @@ def painel(request: Request, _=Depends(exigir_senha),
              'A linha <b>✦ Clique no Checkout</b> registra quem apertou o botão de compra na oferta.</p>')
     p.append('</section>')
 
-    # ==================== ABA 2: LEITURAS ====================
     p.append('<section class="aba-painel" id="aba-leituras">')
     p.append("<h2>Leituras Geradas</h2>")
+    if stats_idade.get("total"):
+        p.append(f'<p class="nota" style="margin:4px 0 14px 0;font-size:13px;">'
+                 f'🎂 <b>Idade dos leads:</b> Média de <b>{card_idade_val}</b> '
+                 f'(mediana de {stats_idade["mediana"]} anos, variando de {stats_idade["min"]} a {stats_idade["max"]} anos em {stats_idade["total"]} leads analisados).'
+                 f'</p>')
     bloco_leituras = _render_bloco_tabela_leituras(
         pagina=pag_leituras_int,
         por_pagina=20,
@@ -4482,6 +4761,23 @@ def painel(request: Request, _=Depends(exigir_senha),
         p.append('<p class="nota">O que mais faltou ao clicar em calcular: '
                  + ", ".join(f"{html.escape(str(k))} ({v})" for k, v in fo["faltou"]) + ".</p>")
 
+    # ---- idade dos leads ----
+    p.append("<h2>Idade dos leads que preencheram o formulário</h2>")
+    if not stats_idade.get("total"):
+        p.append('<p class="vazio">Nenhum lead com data de nascimento registrada neste período.</p>')
+    else:
+        p.append('<div class="cards">'
+                 f'<div class="card" title="Média aritmética das idades"><b>{card_idade_val}</b><span>idade média</span></div>'
+                 f'<div class="card" title="Ponto central da amostra: metade dos leads tem mais, metade tem menos"><b>{stats_idade["mediana"]} anos</b><span>mediana</span></div>'
+                 f'<div class="card"><b>{stats_idade["min"]} anos</b><span>mais jovem</span></div>'
+                 f'<div class="card"><b>{stats_idade["max"]} anos</b><span>mais velho</span></div>'
+                 f'<div class="card"><b>{stats_idade["total"]}</b><span>leads com idade válida</span></div></div>')
+        p.append(_tabela(["faixa etária", "", "#leads", "#%"],
+                         [[html.escape(f["nome"]),
+                           f'<div class="bar">{_barra(f["pct"])}</div>',
+                           str(f["qtd"]), _n(f["pct"])] for f in stats_idade["faixas"]]))
+        p.append('<p class="nota">Calculado a partir da data de nascimento preenchida no formulário (Tela 5) pelos visitantes.</p>')
+
     # ---- horário ----
     p.append("<h2>Hora de nascimento</h2>")
     p.append(_tabela(["modo", "#sessões", "#chegaram à carta", "#chegaram à oferta", "#foram ao checkout"],
@@ -4572,7 +4868,10 @@ def painel(request: Request, _=Depends(exigir_senha),
     p.append('</div>')  # fecha #visao-dashboard
 
     # Visao Financeiro
-    p.append(_secao_financeiro(dados_fin, d1, d2, de, ate, dias_int, is_fin_ativa, pag_fin=pag_fin_int))
+    p.append(_secao_financeiro(dados_fin, d1, d2, de, ate, dias_int, is_fin_ativa, pag_fin=pag_fin_int, preset=preset_ativo))
+
+    # Visao Configuracoes
+    p.append(_secao_configuracoes(cfg_oferta, is_ativa=is_config_ativa))
 
     p.append(_modal_confirmar_exclusao())
     p.append(_modal_confirmar_compra())
@@ -5680,6 +5979,46 @@ def tabela_leituras_ajax(
         base_url="/painel",
     )
     return JSONResponse(bloco, headers=CABECALHOS)
+
+
+@router.get("/api/config-oferta")
+def api_obter_config_oferta_publico(sid: str = "", aid: str = ""):
+    """Endpoint público para o frontend do quiz verificar a variante da oferta (delay, imediato ou teste A/B)."""
+    from servicos.config_oferta import obter_variante_para_cliente
+    return JSONResponse(obter_variante_para_cliente(sid=sid, aid=aid), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/painel/api/config-oferta")
+def api_obter_config_oferta_painel(_=Depends(exigir_senha)):
+    """Retorna os dados completos da configuração da oferta para o painel administrativo."""
+    from servicos.config_oferta import obter_config_oferta
+    cfg = obter_config_oferta()
+    return JSONResponse({"ok": True, **cfg}, headers=CABECALHOS)
+
+
+@router.post("/painel/api/config-oferta")
+async def api_salvar_config_oferta(request: Request, _=Depends(exigir_senha)):
+    """Atualiza a configuração de exibição da VSL na oferta (delay, imediato ou teste_ab)."""
+    from servicos.config_oferta import salvar_config_oferta
+    try:
+        dados = await request.json()
+    except Exception:
+        raise HTTPException(400, "Corpo JSON inválido")
+
+    modo = dados.get("modo_vsl")
+    if not modo:
+        raise HTTPException(422, "Campo 'modo_vsl' é obrigatório")
+
+    webhook_url = dados.get("webhook_vsl_play_url")
+
+    try:
+        cfg = salvar_config_oferta(modo, webhook_vsl_play_url=webhook_url)
+        return JSONResponse({"ok": True, "mensagem": "Configuração salva com sucesso!", **cfg}, headers=CABECALHOS)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Erro interno ao salvar: {e}")
+
 
 
 
