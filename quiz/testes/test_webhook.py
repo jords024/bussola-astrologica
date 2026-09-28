@@ -237,6 +237,52 @@ class TestWebhook(unittest.TestCase):
         ok = disparar_webhook_vsl_play(nome="Teste", whatsapp="11999999999", url="")
         self.assertFalse(ok)
 
+    @patch("urllib.request.urlopen")
+    def test_disparar_webhook_vsl_play_prioridade_principal_painel(self, mock_urlopen):
+        from servicos.webhook import disparar_webhook_vsl_play
+        from unittest.mock import MagicMock
+
+        mock_res = MagicMock()
+        mock_res.getcode.return_value = 200
+        mock_res.read.return_value = b'{"ok": true}'
+        mock_urlopen.return_value.__enter__.return_value = mock_res
+
+        with patch("servicos.config_oferta.obter_config_oferta", return_value={"webhook_vsl_play_url": "https://outro-projeto-crm.com/vsl-play"}):
+            ok = disparar_webhook_vsl_play(
+                nome="Cliente Projeto Secundario",
+                whatsapp="11988887777",
+                video_id="vid-xyz",
+            )
+            self.assertTrue(ok)
+            args, _ = mock_urlopen.call_args
+            req = args[0]
+            # Confirma que a URL principal do projeto foi respeitada e NÃO o fallback
+            self.assertEqual(req.full_url, "https://outro-projeto-crm.com/vsl-play")
+
+    @patch("urllib.request.urlopen")
+    def test_disparar_webhook_vsl_play_fallback_quando_nao_configurado(self, mock_urlopen):
+        from servicos.webhook import disparar_webhook_vsl_play
+        import config
+        from unittest.mock import MagicMock
+
+        mock_res = MagicMock()
+        mock_res.getcode.return_value = 200
+        mock_res.read.return_value = b'{"ok": true}'
+        mock_urlopen.return_value.__enter__.return_value = mock_res
+
+        with patch("servicos.config_oferta.obter_config_oferta", return_value={}):
+            with patch.object(config, "WEBHOOK_VSL_PLAY_URL", ""):
+                ok = disparar_webhook_vsl_play(
+                    nome="Cliente Sem Config",
+                    whatsapp="11977776666",
+                    video_id="vid-padrao",
+                )
+                self.assertTrue(ok)
+                args, _ = mock_urlopen.call_args
+                req = args[0]
+                # Confirma que usou o fallback padrão
+                self.assertEqual(req.full_url, "https://turb-back.aryaraj.shop/videos/lead-play")
+
     @patch("servicos.webhook.disparar_webhook_vsl_play")
     def test_api_vsl_play_endpoint(self, mock_disparar):
         from fastapi.testclient import TestClient

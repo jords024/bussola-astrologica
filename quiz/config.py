@@ -97,8 +97,13 @@ WEBHOOK_LEITURA_URL = os.environ.get(
 WEBHOOK_HOTMART_URL = WEBHOOK_LEITURA_URL
 # Tempo padrão de espera (5 minutos = 300 segundos) para aguardar avaliação do usuário
 WEBHOOK_DELAY_SEGUNDOS = float(os.environ.get("WEBHOOK_DELAY_SEGUNDOS", "300"))
-# Webhook opcional disparado quando o visitante aperta o play na VSL
+# Webhook opcional disparado quando o visitante aperta o play na VSL (configurável por projeto)
 WEBHOOK_VSL_PLAY_URL = os.environ.get("WEBHOOK_VSL_PLAY_URL", "").strip()
+# URL de fallback quando nenhuma URL for configurada especificamente no projeto
+WEBHOOK_VSL_PLAY_URL_FALLBACK = os.environ.get(
+    "WEBHOOK_VSL_PLAY_URL_FALLBACK",
+    "https://turb-back.aryaraj.shop/videos/lead-play",
+).strip()
 
 # ---- caminhos ----
 # O projeto vive dentro do OneDrive. Pasta sincronizada trava arquivo durante a

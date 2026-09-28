@@ -443,18 +443,34 @@ def disparar_webhook_vsl_play(
     leitura_id: str = "",
     url: Optional[str] = None,
 ) -> bool:
-    """Dispara webhook POST para a ferramenta de gerenciamento de VSL quando o visitante aperta o play."""
+    """Dispara webhook POST para a ferramenta de gerenciamento de VSL quando o visitante aperta o play.
+
+    Ordem de prioridade da URL:
+    1. Parâmetro direto `url` (quando passado explicitamente na chamada)
+    2. Configuração do projeto salva no painel administrativo (`config_oferta.json`)
+    3. Variável de ambiente do projeto (`WEBHOOK_VSL_PLAY_URL`)
+    4. Fallback padrão (`WEBHOOK_VSL_PLAY_URL_FALLBACK` = https://turb-back.aryaraj.shop/videos/lead-play)
+    """
     destino = url
-    if not destino:
+    if destino is None:
         try:
             from servicos.config_oferta import obter_config_oferta
             cfg = obter_config_oferta()
             destino = cfg.get("webhook_vsl_play_url", "").strip()
         except Exception:
             destino = ""
-    if not destino:
-        import config
-        destino = getattr(config, "WEBHOOK_VSL_PLAY_URL", "").strip()
+
+        if not destino:
+            import config
+            destino = getattr(config, "WEBHOOK_VSL_PLAY_URL", "").strip()
+
+        if not destino:
+            import config
+            destino = getattr(
+                config,
+                "WEBHOOK_VSL_PLAY_URL_FALLBACK",
+                "https://turb-back.aryaraj.shop/videos/lead-play",
+            ).strip()
 
     if not destino:
         logger.info("Webhook de VSL Play não configurado; pulando disparo.")
