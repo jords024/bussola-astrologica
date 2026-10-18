@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bússola · prova do reveal da carta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ===========================================================================
+   REVEAL DA CARTA — v3
+
+   O objeto agora é VÍDEO fotorrealista (Kling), não CSS nem 3D cru. 401 KB.
+
+   A transição não pede que a garrafa abra, e isso é decisão de projeto, não
+   limitação: a luz que já existe dentro da garrafa cresce até tomar a tela, e
+   a carta nasce de dentro dela. Assim o texto continua sendo HTML de verdade
+   — selecionável, personalizado, acessível — em vez de pixel gravado no vídeo.
+   =========================================================================== */
+
+:root{
+  --bg:#0B0A09;
+  --amber:#E5A93C;
+  --sand:#F2EFE9;
+  --sand-2:rgba(242,239,233,.55);
+  --tinta:#3A2A17;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--sand);
+  font-family:'Work Sans',-apple-system,Segoe UI,Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+
+.nota{
+  position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:95;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--sand-2);background:rgba(11,10,9,.78);
+  border:1px solid #2A241C;border-radius:999px;padding:7px 15px;backdrop-filter:blur(6px);
+}
+
+.pista{position:relative;height:300vh;}
+.palco{position:sticky;top:0;height:100svh;overflow:hidden;display:grid;place-items:center;}
+
+/* ---------- a garrafa viva ---------- */
+.garrafa{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  height:min(98svh,780px);width:auto;aspect-ratio:540/960;
+  object-fit:cover;
+  /* a máscara dissolve a borda do vídeo no preto da página */
+  -webkit-mask-image:radial-gradient(ellipse 70% 62% at 50% 50%,#000 46%,transparent 92%);
+          mask-image:radial-gradient(ellipse 70% 62% at 50% 50%,#000 46%,transparent 92%);
+}
+
+
+/* ---------- a carta ---------- */
+.folha{
+  position:absolute;left:50%;top:50%;z-index:7;
+  width:min(390px,86vw);height:min(660px,80svh);
+  transform:translate(-50%,-50%) translateY(26%) scale(.9);
+  background:url('/estatico/img/pergaminho-textura.jpg') center/cover no-repeat;
+  border-radius:3px;
+  box-shadow:
+    0 0 0 1px rgba(90,66,32,.3),
+    0 -8px 26px rgba(0,0,0,.4) inset,
+    0 44px 90px rgba(0,0,0,.76);
+  color:var(--tinta);padding:48px 34px 34px;opacity:0;overflow:hidden;
+}
+.folha::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(176deg,rgba(255,232,180,.34) 0%,transparent 32%),
+    linear-gradient(0deg,rgba(60,40,14,.24) 0%,transparent 24%);
+}
+.folha > *{position:relative}
+.rosa{display:block;width:38px;margin:0 auto 16px;opacity:.55}
+.folha .de{
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(58,42,23,.5);text-align:center;margin:0 0 18px;
+}
+.folha h2{
+  font-family:'EB Garamond',Georgia,serif;font-weight:500;font-size:26px;line-height:1.24;
+  margin:0 0 16px;text-wrap:balance;
+}
+.folha h2 em{font-style:italic}
+.folha p{
+  font-family:'EB Garamond',Georgia,serif;font-size:16.5px;line-height:1.74;
+  margin:0 0 13px;color:rgba(58,42,23,.9);
+}
+
+.gatilho{
+  position:absolute;inset:0;z-index:8;background:transparent;border:0;cursor:pointer;padding:0;
+}
+.gatilho:focus-visible{outline:2px solid var(--amber);outline-offset:-14px;border-radius:16px}
+.gatilho[hidden]{display:none}
+
+.dica{
+  position:absolute;left:0;right:0;bottom:6svh;text-align:center;margin:0;z-index:9;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--sand-2);pointer-events:none;
+}
+.dica b{color:var(--amber);font-weight:500}
+
+.vinheta{
+  position:fixed;inset:0;z-index:10;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 48%,transparent 36%,rgba(0,0,0,.46) 80%,rgba(0,0,0,.82) 100%);
+}
+
+.depois{padding:14svh 22px 18svh;text-align:center;position:relative;z-index:2}
+.depois p{max-width:38ch;margin:0 auto 22px;color:var(--sand-2);font-size:15px;line-height:1.7}
+.cta{
+  display:inline-block;background:var(--amber);color:#131313;text-decoration:none;
+  font-family:'Archivo',sans-serif;font-weight:800;font-size:13.5px;
+  padding:16px 30px;border-radius:999px;box-shadow:0 10px 30px rgba(229,169,60,.26);
+}
+
+/* Movimento reduzido: sem vídeo, sem clarão, a carta é o conteúdo. */
+@media (prefers-reduced-motion:reduce){
+  .pista{height:auto}
+  .palco{position:static;height:auto;padding:30px 0}
+  .garrafa,.clarao,.dica,.gatilho{display:none}
+  .folha{position:static;transform:none;opacity:1;margin:0 auto;height:auto;width:min(560px,92vw)}
+}
+</style>
+</head>
+<body>
+
+<p class="nota">prova · aguardando o clipe de abertura</p>
+<div class="vinheta"></div>
+
+<div class="pista" id="pista">
+  <div class="palco">
+    <video class="garrafa" id="garrafa"
+           poster="/estatico/img/garrafa-poster.webp"
+           preload="metadata" muted loop playsinline autoplay
+           aria-label="Uma garrafa de vidro com uma carta enrolada dentro, iluminada por dentro">
+      <source src="/estatico/video/garrafa-viva.mp4" type="video/mp4">
+      <source src="/estatico/video/garrafa-viva.webm" type="video/webm">
+    </video>
+
+    <article class="folha" id="folha" aria-label="Sua carta">
+      <svg class="rosa" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="21" fill="none" stroke="#3A2A17" stroke-width="1" opacity=".45"/>
+        <path d="M24 4 L27 21 L44 24 L27 27 L24 44 L21 27 L4 24 L21 21 Z" fill="#3A2A17" opacity=".75"/>
+        <circle cx="24" cy="24" r="3" fill="#EFE6D4" stroke="#3A2A17" stroke-width="1"/>
+      </svg>
+      <p class="de">Bússola Astrológica · para Jordão</p>
+      <h2>A sua porta aberta agora é a da <em>carreira</em>.</h2>
+      <p>Tem uma conversa que você vem empurrando com a barriga há umas três semanas. Não é falta de coragem: é que ela não cabia no mês passado, e agora cabe.</p>
+      <p>O céu não está te mandando mudar de vida. Está abrindo uma janela estreita para você dizer em voz alta uma coisa que já decidiu em silêncio.</p>
+      <p>Marque essa conversa antes de sexta. Dez minutos resolvem o que três semanas de ensaio não resolveram.</p>
+    </article>
+
+    <button class="gatilho" id="gatilho" aria-label="Abrir a carta"></button>
+    <p class="dica" id="dica">toque para <b>abrir</b></p>
+  </div>
+</div>
+
+<div class="depois">
+  <p>Aqui entra o resto da leitura: a mandala, os detalhes do cálculo e a oferta.</p>
+  <a class="cta" href="#">Quero a Bússola completa</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.13/lenis.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !window.gsap) return;
+  gsap.registerPlugin(ScrollTrigger);
+
+  if (window.Lenis) {
+    const lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+    lenis.on("scroll", ScrollTrigger.update);
+    gsap.ticker.add((t) => lenis.raf(t * 1000));
+    gsap.ticker.lagSmoothing(0);
+  }
+
+  const video = document.getElementById("garrafa");
+  const folha = document.getElementById("folha");
+  const dica = document.getElementById("dica");
+  const gatilho = document.getElementById("gatilho");
+
+  // Autoplay silencioso é permitido, mas alguns navegadores ainda recusam.
+  // Se recusar, o poster fica — e o poster já é bonito.
+  video.play?.().catch(() => {});
+
+  gatilho.addEventListener("click", () => {
+    gatilho.hidden = true;
+
+    /* SEM transição inventada. Enquanto o clipe de abertura não existe, a
+       garrafa só recua e a carta entra — quieto. Um clarão branco crescendo
+       seria exatamente o que a gente não quer, e era o que estava aqui. */
+    gsap.timeline({ defaults: { ease: "power2.inOut" } })
+      .to(dica,  { opacity: 0, duration: 0.3 }, 0)
+      .to(video, { opacity: 0.18, scale: 0.94, duration: 1.1 }, 0)
+      .to(folha, { opacity: 1, duration: 0.9 }, 0.35)
+      .add(() => { dica.innerHTML = "continue descendo para ler"; })
+      .to(dica,  { opacity: 1, duration: 0.5 }, 1.0);
+
+    /* Depois do clarão, o scroll termina de trazer a carta. */
+    gsap.timeline({
+      scrollTrigger: { trigger: "#pista", start: "top top", end: "bottom bottom", scrub: 0.8 },
+    })
+    .fromTo(folha,
+      { yPercent: 26, scale: 0.9 },
+      { yPercent: -4, scale: 1, ease: "power1.out", duration: 1 })
+    .to(dica, { opacity: 0, duration: 0.2 }, 0.7);
+  }, { once: true });
+})();
+</script>
+</body>
+</html>

@@ -32,12 +32,44 @@ QUEBRA_TEXTO = {
     "nao": "Não sei dizer",
 }
 
+# As cinco respostas que o quiz passou a colher depois da reformulação para
+# tráfego frio. Cada uma vira frase em primeira pessoa no contexto relatado,
+# porque é assim que o agente as usa: citando de volta o que a pessoa disse.
+TEMPO_TEXTO = {
+    "semanas": "começou nas últimas semanas",
+    "meses": "dura há três ou quatro meses",
+    "ano": "dura há mais de um ano",
+    "sempre": "é assim desde sempre",
+}
+TENTOU_TEXTO = {
+    "conversa": "já conversou sobre isso com quem é próximo",
+    "estudo": "já leu e estudou sobre isso por conta própria",
+    "terapia": "já fez ou faz terapia",
+    "consulta": "já consultou astrólogo ou tarólogo antes",
+    "nada": "ainda não tentou nada; só pensa no assunto",
+}
+QUANDO_TEXTO = {
+    "semana": "essa semana",
+    "mes": "esse mês",
+    "hora": "quando a hora chegar",
+}
+
 
 class Quiz(BaseModel):
     area: Literal["dinheiro", "amor", "carreira", "casa", "corpo", "caminhos"]
-    espelho: str = ""
+    espelho: str = Field(default="", max_length=250)
+    versao: Literal["original", "contexto-v2"] = "original"
+    desejo: str = Field(default="", max_length=200)
+    vida_agora: str = Field(default="", max_length=600)
     espelho_idx: int = 0
     quebra: Literal["sim", "muitas", "nao"] = "nao"
+    tempo: Literal["", "semanas", "meses", "ano", "sempre"] = ""
+    tentou: Literal["", "conversa", "estudo", "terapia", "consulta", "nada"] = ""
+    emocao: str = Field(default="", max_length=160)
+    posse: str = Field(default="", max_length=160)
+    emocao_chave: str = Field(default="", max_length=24)
+    posse_chave: str = Field(default="", max_length=24)
+    quando: Literal["", "semana", "mes", "hora"] = ""
 
 
 class Nascimento(BaseModel):
@@ -149,6 +181,16 @@ def _pipeline(p: Pedido, agora: datetime):
 
     bloco = mod_fatos.montar(placar, veredito, mapa.presencas, quiz,
                              precisao, agora.date(), ident, porta)
+    if p.quiz.versao == "contexto-v2":
+        bloco["contexto_relatado"] = {
+            "area": p.quiz.area, "situacao": p.quiz.espelho,
+            "desejo": p.quiz.desejo.strip(), "vida_agora": p.quiz.vida_agora.strip(),
+            "ha_quanto_tempo": TEMPO_TEXTO.get(p.quiz.tempo, ""),
+            "ja_tentou": TENTOU_TEXTO.get(p.quiz.tentou, ""),
+            "o_que_sente": p.quiz.emocao.strip(),
+            "o_que_faria": p.quiz.posse.strip(),
+            "quando_quer_agir": QUANDO_TEXTO.get(p.quiz.quando, ""),
+        }
     # A roda destaca a PORTA ABERTA, que e o que a carta aponta agora.
     # Uma roda de casas calculadas com hora presumida sugere precisão inexistente.
     destaque = porta.casa if porta else None

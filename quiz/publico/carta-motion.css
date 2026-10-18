@@ -1,0 +1,59 @@
+/* A GARRAFA: SEQUENCIA DE QUADROS PRESA AO SCROLL.
+
+   O objeto deixou de ser <video> e virou <canvas>. Com isso somem daqui o
+   mix-blend-mode, a mascara e a poca de escuro, que foram tres tentativas
+   de esconder o fundo retangular do clipe e falharam cada uma por um
+   motivo: a mascara saia de registro com a imagem, o blend misturava contra
+   o contexto de empilhamento criado pela animacao de SECTION.scr, e a poca
+   ficava visivel em tela larga. O recorte agora e feito dentro do canvas,
+   nas mesmas coordenadas do desenho (ver carta-motion.js). */
+
+.motion-track{width:100%;margin:0;position:relative;}
+.motion-sticky{position:relative;width:100%;padding-bottom:6px;}
+
+/* Com a pista ativa, o objeto fica parado na tela enquanto a pagina corre
+   por baixo. Esse percurso e o que vira tempo de animacao. 1100px dao cerca
+   de 18px de rolagem por quadro: o suficiente para o gesto ser lido como
+   continuo sem exigir rolagem longa demais. */
+.motion-track.motion-active{height:calc(100svh + 1100px);}
+.motion-active .motion-sticky{position:sticky;top:48px;}
+
+/* O quadro passou a incluir a margem escura em volta da garrafa (27% de
+   cada lado), entao a caixa e mais larga e mais baixa que antes. A garrafa
+   em si ocupa so a metade do meio; o resto e o que se dissolve. */
+.motion-canvas{
+  display:block;margin:0 auto;
+  height:clamp(330px,58svh,560px);
+  width:auto;aspect-ratio:340/544;max-width:96vw;
+  will-change:opacity;
+}
+
+.motion-open{
+  display:block;margin:16px auto 0;
+  background:#d2b17b;color:#241c11;border:1px solid #e9d0a4;
+  padding:15px 22px;border-radius:3px;font:16px Georgia,serif;
+  cursor:pointer;min-width:230px;
+  transition:opacity .4s ease,background-color .4s ease,color .4s ease;
+}
+.motion-open:focus-visible{outline:2px solid #efd5a7;outline-offset:5px;}
+.motion-open[disabled]{opacity:.4;cursor:default;}
+/* Durante o gesto o botao recua, mas continua ali: quem desistir de rolar
+   abre a carta num toque. */
+.motion-active .motion-open{
+  padding:9px 15px;font-size:13px;background:transparent;
+  color:#c6ae84;border-color:#5d4d33;min-width:0;
+}
+
+.motion-hint{
+  font:13px/1.5 Georgia,serif;color:#b7a079;
+  margin:12px auto 0;min-height:20px;text-align:center;
+}
+
+.carta-conteudo{will-change:transform,opacity;}
+
+/* Sem movimento: nenhuma pista, nenhum gesto. O botao entrega a carta. */
+@media(prefers-reduced-motion:reduce){
+  .motion-track.motion-active{height:auto}
+  .motion-active .motion-sticky{position:relative;top:0}
+  .carta-conteudo.revelada{animation:none!important}
+}

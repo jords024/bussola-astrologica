@@ -1,0 +1,526 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Calculadora da Bússola</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* Layout: veredito fixo no topo, controles e resultado lado a lado no desktop,
+   empilhados no celular. Paleta tirada do proprio quiz da Bussola. */
+:root{
+  --bg:#131313; --bg2:#1A1815; --card:#201D19; --card2:#262119;
+  --line:#3A342B; --amber:#E5A93C; --amber-deep:#C88A22;
+  --sand:#F2EFE9; --mute:#9A9287; --green:#3E9166; --red:#C4544A;
+  --display:'Archivo',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,sans-serif;
+  --data:'IBM Plex Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#F7F4EE; --bg2:#EFEAE1; --card:#FFFFFF; --card2:#F3EFE7;
+    --line:#DED6C7; --amber:#A8701A; --amber-deep:#8A5A12;
+    --sand:#211E1A; --mute:#6B6358; --green:#2D6E4C; --red:#9C2A22;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#F7F4EE; --bg2:#EFEAE1; --card:#FFFFFF; --card2:#F3EFE7;
+  --line:#DED6C7; --amber:#A8701A; --amber-deep:#8A5A12;
+  --sand:#211E1A; --mute:#6B6358; --green:#2D6E4C; --red:#9C2A22;
+  color-scheme:light;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--sand);
+  font-family:var(--body); font-size:15px; line-height:1.5;
+  margin:0; padding-block:0 48px;
+}
+.wrap{max-width:1180px; margin:0 auto; padding-inline:16px}
+
+/* ---------- veredito ---------- */
+.topo{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:20;
+  background:var(--bg); border-bottom:1px solid var(--line);
+}
+.topo-in{display:flex; flex-wrap:wrap; gap:16px 28px; align-items:flex-end; padding-block:14px}
+.marca{font-family:var(--display); font-weight:800; font-size:13px;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 auto 0 0}
+.marca small{display:block; font-family:var(--body); font-weight:400; font-size:11px;
+  letter-spacing:.02em; text-transform:none; color:var(--mute); margin-top:2px}
+.vd{display:flex; flex-direction:column; gap:2px}
+.vd-rot{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--mute)}
+.vd-num{font-family:var(--display); font-weight:800; font-size:30px; line-height:1;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.vd-num.ok{color:var(--green)} .vd-num.falta{color:var(--amber)}
+.barra{height:5px; background:var(--card2); border-radius:3px; overflow:hidden; margin-top:8px}
+.barra i{display:block; height:100%; background:var(--amber); transition:width .25s}
+.barra i.ok{background:var(--green)}
+
+/* ---------- grade ---------- */
+.grade{display:grid; grid-template-columns:minmax(0,340px) minmax(0,1fr); gap:24px; margin-top:24px; align-items:start}
+@media (max-width:860px){ .grade{grid-template-columns:1fr} }
+
+.painel{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px}
+.painel + .painel{margin-top:16px}
+.painel h2{font-family:var(--display); font-weight:700; font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--amber); margin:0 0 14px}
+.nota{font-size:12px; color:var(--mute); margin:12px 0 0; line-height:1.45}
+
+/* ---------- campos ---------- */
+.campo{display:grid; grid-template-columns:1fr 104px; gap:10px; align-items:center; margin-bottom:11px}
+.campo:last-child{margin-bottom:0}
+.campo label{font-size:13px; min-width:0}
+.campo label i{display:block; font-style:normal; font-size:11px; color:var(--mute); margin-top:1px}
+.campo input{
+  font-family:var(--data); font-size:14px; font-variant-numeric:tabular-nums;
+  background:var(--bg2); color:var(--sand); border:1px solid var(--line);
+  border-radius:6px; padding:7px 9px; width:100%; text-align:right;
+}
+.campo input:focus{outline:2px solid var(--amber); outline-offset:1px; border-color:transparent}
+
+/* ---------- resultados ---------- */
+.tab{width:100%; border-collapse:collapse; font-size:14px}
+.tab th{font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--mute);
+  text-align:right; font-weight:500; padding:0 0 8px}
+.tab th:first-child{text-align:left}
+.tab td{padding:9px 0; border-top:1px solid var(--line); text-align:right;
+  font-family:var(--data); font-variant-numeric:tabular-nums}
+.tab td:first-child{text-align:left; font-family:var(--body)}
+.tab tr.somatotal td{border-top:2px solid var(--amber-deep); font-weight:600; padding-top:11px}
+.tab tr.midia td{border-top:1px solid var(--line)}
+.tab tr.resultado td{border-top:2px solid var(--amber); padding-top:12px; font-weight:700; font-size:16px}
+.tab tr.resultado td:first-child{font-family:var(--display); font-size:12px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--amber)}
+.tab td.g{color:var(--green)} .tab td.r{color:var(--red)} .tab td.m{color:var(--mute)}
+
+/* 3 colunas para os 6 cartoes encherem duas linhas exatas; auto-fit deixava
+   celulas vazias no fim da grade */
+.cartoes{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:8px; overflow:hidden}
+@media (max-width:720px){ .cartoes{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:400px){ .cartoes{grid-template-columns:1fr} }
+.cartoes div{background:var(--card2); padding:12px 13px}
+.cartoes dt{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute)}
+.cartoes dd{margin:4px 0 0; font-family:var(--data); font-size:19px; font-weight:600;
+  font-variant-numeric:tabular-nums}
+.cartoes dd span{font-size:12px; color:var(--mute); font-weight:400}
+
+.caminhos{display:grid; gap:9px}
+.cam{display:flex; gap:12px; align-items:baseline; background:var(--card2);
+  border-left:3px solid var(--amber); border-radius:0 7px 7px 0; padding:11px 13px}
+.cam b{font-family:var(--data); font-size:17px; font-weight:600; color:var(--amber);
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+.cam span{font-size:13px; line-height:1.4}
+.cam span em{font-style:normal; color:var(--mute); display:block; font-size:12px; margin-top:2px}
+
+.div-socios{display:grid; gap:8px}
+.socio{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center;
+  padding:9px 0; border-top:1px solid var(--line)}
+.socio:first-child{border-top:0}
+.socio b{font-weight:500; font-size:14px}
+.socio b em{font-style:normal; color:var(--mute); font-size:12px; margin-left:6px}
+.socio span{font-family:var(--data); font-size:16px; font-weight:600; font-variant-numeric:tabular-nums}
+
+.toggle{display:flex; gap:0; border:1px solid var(--line); border-radius:7px; overflow:hidden; margin-bottom:12px}
+.toggle button{flex:1; background:var(--bg2); color:var(--mute); border:0; padding:8px 6px;
+  font-family:var(--body); font-size:12px; cursor:pointer; line-height:1.25}
+.toggle button[aria-pressed="true"]{background:var(--amber); color:#131313; font-weight:600}
+.toggle button:focus-visible{outline:2px solid var(--amber); outline-offset:-2px}
+
+.aviso{font-size:12px; color:var(--mute); border-top:1px solid var(--line);
+  margin-top:20px; padding-top:14px; line-height:1.5}
+.aviso b{color:var(--sand); font-weight:600}
+
+/* ---------- cascata: investimento -> leads -> vendas ---------- */
+.cascata{margin-top:16px; border-top:1px solid var(--line); padding-top:14px}
+.casc-op{font-size:11px; color:var(--mute); font-family:var(--data);
+  padding:3px 0 3px 2px; letter-spacing:.02em}
+.casc-l{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:baseline;
+  padding:5px 0}
+.casc-l dt{font-size:13px; min-width:0}
+.casc-l dd{margin:0; font-family:var(--data); font-size:16px; font-weight:600;
+  font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+.casc-l dd u{text-decoration:none; display:block; font-size:11px; font-weight:400;
+  color:var(--mute); margin-top:1px}
+.casc-l.destaque{background:var(--card2); border-radius:7px; margin-inline:-9px;
+  padding:8px 9px}
+.casc-l.destaque dd{color:var(--amber)}
+.casc-fim{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:baseline;
+  border-top:1px solid var(--line); margin-top:10px; padding-top:10px}
+.casc-fim dt{font-size:12px; color:var(--mute); text-transform:uppercase; letter-spacing:.06em}
+.casc-fim dd{margin:0; font-family:var(--data); font-size:15px; font-weight:600;
+  font-variant-numeric:tabular-nums}
+</style>
+
+<div class="topo">
+  <div class="wrap">
+    <div class="topo-in">
+      <h1 class="marca">Bússola · Projeção<small>Escada de produtos, taxas e divisão</small></h1>
+      <div class="vd">
+        <span class="vd-rot">Faturamento projetado</span>
+        <span class="vd-num" id="vFat">—</span>
+      </div>
+      <div class="vd">
+        <span class="vd-rot" id="vGapRot">Falta para a meta</span>
+        <span class="vd-num falta" id="vGap">—</span>
+      </div>
+      <div class="vd">
+        <span class="vd-rot">No bolso, já sem mídia</span>
+        <span class="vd-num" id="vBolso">—</span>
+      </div>
+    </div>
+    <div class="barra"><i id="vBarra" style="width:0%"></i></div>
+    <div style="height:10px"></div>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="grade">
+
+  <!-- ====================== CONTROLES ====================== -->
+  <div>
+    <section class="painel">
+      <h2>Meta e período</h2>
+      <div class="campo"><label for="meta">Meta de faturamento</label><input id="meta" type="number" step="500" value="40000"></div>
+      <div class="campo"><label for="dias">Dias no mês</label><input id="dias" type="number" step="1" value="31"></div>
+    </section>
+
+    <section class="painel">
+      <h2>Campanha</h2>
+      <div class="campo"><label for="inv">Investimento por dia<i>R$ em mídia</i></label><input id="inv" type="number" step="10" value="125"></div>
+      <div class="campo"><label for="cpl">Custo por lead<i>R$ por carta entregue</i></label><input id="cpl" type="number" step="0.05" value="2.08"></div>
+      <div class="campo"><label for="conv">Conversão lead → venda<i>% dos que recebem a carta</i></label><input id="conv" type="number" step="0.5" value="10"></div>
+      <dl class="cascata" id="cascata"></dl>
+      <p class="nota">Abre no ponto de operação da reunião de 29/09: R$125 por dia, 60 leads por dia,
+      6 vendas por dia. O CPL de R$5,65 que vocês mediram era do melhor criativo, num outro nível de verba.</p>
+    </section>
+
+    <section class="painel">
+      <h2>Produtos</h2>
+      <div class="campo"><label for="pB">Bússola<i>o front</i></label><input id="pB" type="number" step="1" value="97"></div>
+      <div class="campo"><label for="pOb">Order bump<i>Timing da Lua</i></label><input id="pOb" type="number" step="1" value="47"></div>
+      <div class="campo"><label for="aOb">Adesão ao bump<i>% das vendas</i></label><input id="aOb" type="number" step="1" value="35"></div>
+      <div class="campo"><label for="pA">Astrowake</label><input id="pA" type="number" step="1" value="1497"></div>
+      <div class="campo"><label for="aA">Compram Astrowake<i>% dos clientes da Bússola</i></label><input id="aA" type="number" step="0.5" value="3"></div>
+      <div class="campo"><label for="pM">Mentoria</label><input id="pM" type="number" step="100" value="6000"></div>
+    </section>
+
+    <section class="painel">
+      <h2>Funil da mentoria</h2>
+      <div class="campo"><label for="cand">Candidaturas no mês</label><input id="cand" type="number" step="1" value="17"></div>
+      <div class="campo"><label for="pCall">Viram call<i>% das candidaturas</i></label><input id="pCall" type="number" step="5" value="40"></div>
+      <div class="campo"><label for="pFech">Fecham na call<i>% das calls</i></label><input id="pFech" type="number" step="5" value="30"></div>
+    </section>
+
+    <section class="painel">
+      <h2>Taxas e divisão</h2>
+      <div class="campo"><label for="txPct">Taxa da plataforma<i>% sobre a transação</i></label><input id="txPct" type="number" step="0.1" value="9.9"></div>
+      <div class="campo"><label for="txFix">Taxa fixa<i>R$ por transação</i></label><input id="txFix" type="number" step="0.01" value="2.49"></div>
+      <div class="campo"><label for="sC">Crassus<i>%</i></label><input id="sC" type="number" step="1" value="65"></div>
+      <div class="campo"><label for="sJ">Jordão<i>%</i></label><input id="sJ" type="number" step="1" value="25"></div>
+      <div class="campo"><label for="sA">Ary<i>%</i></label><input id="sA" type="number" step="1" value="10"></div>
+    </section>
+  </div>
+
+  <!-- ====================== RESULTADOS ====================== -->
+  <div>
+    <section class="painel">
+      <h2>Receita por degrau</h2>
+      <div style="overflow-x:auto">
+      <table class="tab">
+        <thead><tr><th>Produto</th><th>Qtd</th><th>Bruto</th><th>Taxas</th><th>Líquido</th></tr></thead>
+        <tbody id="tBody"></tbody>
+      </table>
+      </div>
+      <p class="nota" id="notaMidia"></p>
+    </section>
+
+    <section class="painel">
+      <h2>Indicadores</h2>
+      <dl class="cartoes" id="cards"></dl>
+      <p class="nota" id="notaRoas"></p>
+    </section>
+
+    <section class="painel">
+      <h2>Para fechar a meta</h2>
+      <div class="caminhos" id="caminhos"></div>
+    </section>
+
+    <section class="painel">
+      <h2>Divisão entre sócios</h2>
+      <div class="toggle" role="group" aria-label="De onde sai o investimento em mídia">
+        <button type="button" id="mA" aria-pressed="true">Crassus paga a mídia<br>do próprio bolso</button>
+        <button type="button" id="mB" aria-pressed="false">Mídia sai de cima,<br>antes da divisão</button>
+      </div>
+      <div class="div-socios" id="socios"></div>
+      <p class="nota" id="notaDiv"></p>
+    </section>
+
+    <p class="aviso">
+      <b>Como as taxas são aplicadas.</b> O order bump entra na mesma transação da Bússola, então paga
+      uma taxa fixa só, sobre o valor somado. Astrowake e mentoria pagam a sua própria. Os padrões são
+      9,9% + R$2,49, que é a regra da Hotmart desde 21 de setembro de 2026, quando a taxa do player foi
+      embutida na fixa.
+      <br><br>
+      <b>De onde vêm os percentuais sugeridos.</b> 3% dos compradores de um front barato subindo para um
+      produto de ticket médio e 30% de fechamento em call de high ticket são médias de mercado, não números
+      medidos de vocês. Troque assim que tiver os de verdade.
+    </p>
+  </div>
+
+</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var ids = ["meta","dias","inv","cpl","conv","pB","pOb","aOb","pA","aA","pM",
+             "cand","pCall","pFech","txPct","txFix","sC","sJ","sA"];
+  var el = {};
+  ids.forEach(function(k){ el[k] = document.getElementById(k); });
+
+  var midiaDeCima = false;
+
+  var brl = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+  var brl2 = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
+  var num = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
+  var num1 = new Intl.NumberFormat("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
+
+  function v(k){ var n = parseFloat(el[k].value); return isFinite(n) ? n : 0; }
+
+  /* taxa de UMA transacao de valor x */
+  function taxa(x, pct, fix){ return x > 0 ? x * pct / 100 + fix : 0; }
+
+  function calcular(){
+    var dias = Math.max(1, v("dias"));
+    var pct = v("txPct"), fix = v("txFix");
+
+    /* ---- front ---- */
+    var investMes = v("inv") * dias;
+    var cpl = v("cpl");
+    var leads = cpl > 0 ? investMes / cpl : 0;
+    var vB = leads * v("conv") / 100;
+
+    /* o bump viaja na mesma transacao: uma taxa fixa so, sobre o valor somado */
+    var comBump = vB * v("aOb") / 100;
+    var semBump = vB - comBump;
+    var valorComBump = v("pB") + v("pOb");
+
+    var brutoB = vB * v("pB");
+    var brutoOb = comBump * v("pOb");
+    var taxaFront = semBump * taxa(v("pB"), pct, fix) + comBump * taxa(valorComBump, pct, fix);
+
+    /* ---- astrowake ---- */
+    var vA = vB * v("aA") / 100;
+    var brutoA = vA * v("pA");
+    var taxaA = vA * taxa(v("pA"), pct, fix);
+
+    /* ---- mentoria ---- */
+    var vM = v("cand") * v("pCall") / 100 * v("pFech") / 100;
+    var brutoM = vM * v("pM");
+    var taxaM = vM * taxa(v("pM"), pct, fix);
+
+    /* ---- totais ---- */
+    var bruto = brutoB + brutoOb + brutoA + brutoM;
+    var taxas = taxaFront + taxaA + taxaM;
+    var liquido = bruto - taxas;
+    var transacoes = vB + vA + vM;
+    var ticket = transacoes > 0 ? bruto / transacoes : 0;
+    var cpa = vB > 0 ? investMes / vB : 0;
+    var roas = investMes > 0 ? bruto / investMes : 0;
+    var meta = v("meta");
+    var gap = meta - bruto;
+
+    return {
+      dias:dias, investMes:investMes, leads:leads, pct:pct, fix:fix,
+      vB:vB, comBump:comBump, brutoB:brutoB, brutoOb:brutoOb, taxaFront:taxaFront,
+      vA:vA, brutoA:brutoA, taxaA:taxaA,
+      vM:vM, brutoM:brutoM, taxaM:taxaM,
+      bruto:bruto, taxas:taxas, liquido:liquido,
+      ticket:ticket, cpa:cpa, roas:roas, meta:meta, gap:gap,
+      transacoes:transacoes
+    };
+  }
+
+  /* taxas e liq em null = celula vazia, para as duas linhas que compoem o front
+     e so ganham taxa quando somadas numa transacao so */
+  function linha(nome, qtd, bruto, taxas, liq, forte){
+    return "<tr" + (forte ? " class='somatotal'" : "") + ">" +
+      "<td>" + nome + "</td>" +
+      "<td class='m'>" + qtd + "</td>" +
+      "<td>" + brl.format(bruto) + "</td>" +
+      (taxas === null ? "<td class='m'>—</td>" : "<td class='r'>−" + brl.format(taxas) + "</td>") +
+      (liq === null ? "<td class='m'>—</td>" : "<td class='g'>" + brl.format(liq) + "</td>") +
+      "</tr>";
+  }
+
+  function render(){
+    var r = calcular();
+
+    /* ---------- veredito ---------- */
+    document.getElementById("vFat").textContent = brl.format(r.bruto);
+    var gEl = document.getElementById("vGap"), gRot = document.getElementById("vGapRot");
+    if (r.gap > 0){
+      gRot.textContent = "Falta para a meta";
+      gEl.textContent = brl.format(r.gap);
+      gEl.className = "vd-num falta";
+    } else {
+      gRot.textContent = "Acima da meta";
+      gEl.textContent = "+" + brl.format(-r.gap);
+      gEl.className = "vd-num ok";
+    }
+    var p = r.meta > 0 ? Math.min(100, r.bruto / r.meta * 100) : 0;
+    var b = document.getElementById("vBarra");
+    b.style.width = p + "%";
+    b.className = r.gap <= 0 ? "ok" : "";
+
+    var bolsoEl = document.getElementById("vBolso");
+    bolsoEl.textContent = brl.format(r.liquido - r.investMes);
+    bolsoEl.className = "vd-num" + ((r.liquido - r.investMes) >= 0 ? " ok" : " falta");
+
+    /* ---------- tabela ---------- */
+    var liqFront = r.brutoB + r.brutoOb - r.taxaFront;
+    /* o que sobra de verdade: liquido ja sem a midia que comprou as vendas */
+    var resultado = r.liquido - r.investMes;
+    document.getElementById("tBody").innerHTML =
+      linha("Bússola", num.format(Math.round(r.vB)), r.brutoB, null, null) +
+      linha("Order bump", num.format(Math.round(r.comBump)), r.brutoOb, null, null) +
+      linha("<span style='color:var(--mute);font-size:13px'>Front, já somado</span>", "", r.brutoB + r.brutoOb, r.taxaFront, liqFront) +
+      linha("Astrowake", num.format(Math.round(r.vA)), r.brutoA, r.taxaA, r.brutoA - r.taxaA) +
+      linha("Mentoria", num1.format(r.vM), r.brutoM, r.taxaM, r.brutoM - r.taxaM) +
+      linha("Subtotal", num.format(Math.round(r.transacoes)), r.bruto, r.taxas, r.liquido, true) +
+      /* a midia nao e taxa de plataforma, entao desce numa linha propria */
+      "<tr class='midia'><td>Mídia paga no mês</td><td class='m'></td>" +
+        "<td class='m'>" + brl.format(v("inv")) + "/dia</td><td class='m'></td>" +
+        "<td class='r'>−" + brl.format(r.investMes) + "</td></tr>" +
+      "<tr class='resultado'><td>No bolso dos três</td><td></td><td></td><td></td>" +
+        "<td class='" + (resultado >= 0 ? "g" : "r") + "'>" + brl.format(resultado) + "</td></tr>";
+
+    /* ---------- cascata da campanha ----------
+       mostra a derivacao onde ela acontece: a verba vira leads pelo CPL, os
+       leads viram vendas pela conversao, e o CPA cai como consequencia. */
+    var passo = function(rot, val, sub, destaque){
+      return "<div class='casc-l" + (destaque ? " destaque" : "") + "'>" +
+             "<dt>" + rot + "</dt><dd>" + val + (sub ? "<u>" + sub + "</u>" : "") + "</dd></div>";
+    };
+    var oper = function(txt){ return "<div class='casc-op'>" + txt + "</div>"; };
+
+    document.getElementById("cascata").innerHTML =
+      passo("Investimento no mês", brl.format(r.investMes),
+            brl.format(v("inv")) + " × " + num.format(r.dias) + " dias") +
+      oper("÷ CPL de " + brl2.format(v("cpl"))) +
+      passo("Leads no mês", num.format(Math.round(r.leads)),
+            num.format(Math.round(r.leads / r.dias)) + " por dia", true) +
+      oper("× conversão de " + num1.format(v("conv")) + "%") +
+      passo("Vendas da Bússola", num.format(Math.round(r.vB)),
+            num1.format(r.vB / r.dias) + " por dia", true) +
+      "<div class='casc-fim'><dt>CPA que isso dá</dt><dd>" + brl2.format(r.cpa) + "</dd></div>";
+
+    /* A midia compra o FRONT. Astrowake e mentoria saem de gente que o front ja
+       pagou, entao a leitura por degrau muda bastante quando se atribui assim. */
+    var frontReal = liqFront - r.investMes;
+    var cimaReal = (r.brutoA - r.taxaA) + (r.brutoM - r.taxaM);
+    document.getElementById("notaMidia").innerHTML =
+      "A mídia compra o front, e os outros dois degraus saem de gente que o front já pagou. " +
+      "Atribuindo assim: o front rende <b style='color:var(--sand)'>" + brl.format(frontReal) +
+      "</b> depois do anúncio, e Astrowake e mentoria rendem <b style='color:var(--sand)'>" +
+      brl.format(cimaReal) + "</b> praticamente sem custo de aquisição" +
+      (cimaReal > frontReal
+        ? " — <b style='color:var(--amber)'>mais que o front inteiro.</b>"
+        : ".");
+
+    /* ---------- indicadores ---------- */
+    var cartao = function(rot, val, sub){
+      return "<div><dt>" + rot + "</dt><dd>" + val + (sub ? " <span>" + sub + "</span>" : "") + "</dd></div>";
+    };
+    /* sem repetir o que a cascata da campanha ja mostra */
+    document.getElementById("cards").innerHTML =
+      cartao("Ticket médio", brl2.format(r.ticket), "todas as transações") +
+      cartao("ROAS", num1.format(r.roas) + "x", "bruto ÷ mídia") +
+      cartao("Transações no mês", num.format(Math.round(r.transacoes))) +
+      cartao("Taxas da plataforma", brl.format(r.taxas), num1.format(r.bruto > 0 ? r.taxas / r.bruto * 100 : 0) + "% do bruto") +
+      cartao("Margem líquida", num1.format(r.bruto > 0 ? resultado / r.bruto * 100 : 0) + "%", "do faturamento bruto") +
+      cartao("Sobra por venda do front", brl2.format(r.vB > 0 ? (liqFront - r.investMes) / r.vB : 0), "já sem mídia");
+
+    var tetoCpa = r.vB > 0 ? (r.brutoB + r.brutoOb - r.taxaFront) / r.vB : 0;
+    document.getElementById("notaRoas").innerHTML =
+      "O CPA de empate do front é <b style='color:var(--sand)'>" + brl2.format(tetoCpa) +
+      "</b> — é o líquido por venda, já descontada a taxa. Acima disso, cada venda do front dá prejuízo.";
+
+    /* ---------- caminhos para a meta ---------- */
+    var c = document.getElementById("caminhos");
+    if (r.gap <= 0){
+      c.innerHTML = "<div class='cam' style='border-left-color:var(--green)'><b>✓</b>" +
+        "<span>A meta fecha com esses números.<em>Sobra de " + brl.format(-r.gap) + " sobre os " + brl.format(r.meta) + ".</em></span></div>";
+    } else {
+      var precoB = v("pB") + v("pOb") * v("aOb") / 100;   /* ticket medio do front */
+      var nB = precoB > 0 ? Math.ceil(r.gap / precoB) : 0;
+      var investExtra = r.cpa > 0 ? nB * r.cpa : 0;
+      var nA = v("pA") > 0 ? Math.ceil(r.gap / v("pA")) : 0;
+      var nM = v("pM") > 0 ? Math.ceil(r.gap / v("pM")) : 0;
+      var candNec = (v("pCall") > 0 && v("pFech") > 0)
+        ? Math.ceil(nM / (v("pCall")/100 * v("pFech")/100)) : 0;
+
+      c.innerHTML =
+        "<div class='cam'><b>+" + num.format(nB) + "</b><span>vendas da Bússola" +
+          "<em>" + num1.format(nB / r.dias) + " a mais por dia · mais " + brl.format(investExtra) +
+          " de mídia no CPA atual</em></span></div>" +
+        "<div class='cam'><b>+" + num.format(nA) + "</b><span>vendas de Astrowake" +
+          "<em>equivale a " + num.format(Math.ceil(v("pA") * nA / Math.max(precoB,1))) + " vendas do front</em></span></div>" +
+        "<div class='cam'><b>+" + num1.format(nM) + "</b><span>mentorias" +
+          "<em>cerca de " + num.format(candNec) + " candidaturas no funil atual</em></span></div>";
+    }
+
+    /* ---------- divisão ---------- */
+    var base = midiaDeCima ? Math.max(0, r.liquido - r.investMes) : r.liquido;
+    var socios = [["Crassus", v("sC")], ["Jordão", v("sJ")], ["Ary", v("sA")]];
+    var soma = socios.reduce(function(a, s){ return a + s[1]; }, 0);
+    document.getElementById("socios").innerHTML = socios.map(function(s){
+      var val = base * s[1] / 100;
+      if (!midiaDeCima && s[0] === "Crassus") val -= r.investMes;
+      return "<div class='socio'><b>" + s[0] + "<em>" + num.format(s[1]) + "%</em></b>" +
+             "<span" + (val < 0 ? " style='color:var(--red)'" : "") + ">" + brl.format(val) + "</span></div>";
+    }).join("");
+
+    document.getElementById("notaDiv").innerHTML = midiaDeCima
+      ? "Os " + brl.format(r.investMes) + " de mídia saem do líquido antes da divisão. Os três financiam o crescimento na proporção da sociedade."
+      : "A divisão incide sobre o líquido cheio e o Crassus paga os " + brl.format(r.investMes) +
+        " de mídia depois. Quem decide escalar é quem paga." +
+        (soma !== 100 ? " <b style='color:var(--amber)'>Os percentuais somam " + num.format(soma) + "%, não 100%.</b>" : "");
+
+    salvar();
+  }
+
+  /* ---------- persistência local, por conveniência ---------- */
+  function salvar(){
+    try{
+      var o = {midia: midiaDeCima};
+      ids.forEach(function(k){ o[k] = el[k].value; });
+      localStorage.setItem("bussola-calc", JSON.stringify(o));
+    }catch(e){}
+  }
+  function carregar(){
+    try{
+      var o = JSON.parse(localStorage.getItem("bussola-calc") || "null");
+      if (!o) return;
+      ids.forEach(function(k){ if (o[k] !== undefined && o[k] !== "") el[k].value = o[k]; });
+      if (o.midia) modo(true);
+    }catch(e){}
+  }
+
+  function modo(cima){
+    midiaDeCima = cima;
+    document.getElementById("mA").setAttribute("aria-pressed", String(!cima));
+    document.getElementById("mB").setAttribute("aria-pressed", String(cima));
+  }
+
+  document.getElementById("mA").addEventListener("click", function(){ modo(false); render(); });
+  document.getElementById("mB").addEventListener("click", function(){ modo(true); render(); });
+  ids.forEach(function(k){ el[k].addEventListener("input", render); });
+
+  carregar();
+  render();
+})();
+</script>
+</body></html>

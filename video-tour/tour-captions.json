@@ -1,0 +1,104 @@
+{
+  "audio": "tour-narration.mp3",
+  "duration": 76.54,
+  "totalFrames": 2296,
+  "sceneStarts": {
+    "0": 0.1,
+    "1": 14.596,
+    "2": 31.768,
+    "3": 49.293,
+    "4": 61.528
+  },
+  "captions": [
+    {
+      "start": 0.1,
+      "end": 5.782,
+      "text": "Sabe aquela sensação de acordar na segunda-feira sem saber onde colocar a sua energia?",
+      "scene": 0
+    },
+    {
+      "start": 5.732,
+      "end": 10.253,
+      "text": "Ou passar semanas insistindo em coisas que simplesmente não andam?",
+      "scene": 0
+    },
+    {
+      "start": 10.253,
+      "end": 14.596,
+      "text": "Foi exatamente para acabar com essa dúvida que criamos a Bússola.",
+      "scene": 0
+    },
+    {
+      "start": 14.596,
+      "end": 19.154,
+      "text": "Aqui dentro, nada de termos difíceis ou astrologia confusa.",
+      "scene": 1
+    },
+    {
+      "start": 19.154,
+      "end": 26.073,
+      "text": "Logo de cara, você vê suas três forças essenciais: seu Sol, sua Lua e seu Ascendente.",
+      "scene": 1
+    },
+    {
+      "start": 26.073,
+      "end": 31.768,
+      "text": "Tudo explicado de forma prática, direto ao ponto, com foco na sua vida real.",
+      "scene": 1
+    },
+    {
+      "start": 31.768,
+      "end": 36.263,
+      "text": "Mas o grande diferencial está aqui: O Mais Forte de Hoje.",
+      "scene": 2
+    },
+    {
+      "start": 36.263,
+      "end": 39.167,
+      "text": "O céu se move todos os dias.",
+      "scene": 2
+    },
+    {
+      "start": 39.167,
+      "end": 43.712,
+      "text": "A ferramenta cruza os planetas de agora com a sua data de nascimento.",
+      "scene": 2
+    },
+    {
+      "start": 43.712,
+      "end": 49.293,
+      "text": "Para te responder uma pergunta: qual porta está aberta para você avançar nesta semana?",
+      "scene": 2
+    },
+    {
+      "start": 49.293,
+      "end": 54.495,
+      "text": "Em vez de previsões vagas de jornal, você recebe um plano de ação claro.",
+      "scene": 3
+    },
+    {
+      "start": 54.495,
+      "end": 61.528,
+      "text": "Onde acelerar no trabalho, onde segurar a ansiedade, e onde os seus resultados fluem com naturalidade.",
+      "scene": 3
+    },
+    {
+      "start": 61.528,
+      "end": 65.429,
+      "text": "Basta abrir o painel por dois minutos logo pela manhã.",
+      "scene": 4
+    },
+    {
+      "start": 65.429,
+      "end": 71.061,
+      "text": "Você para de remar contra a maré e ganha a clareza de quem sabe exatamente o próximo passo.",
+      "scene": 4
+    },
+    {
+      "start": 71.061,
+      "end": 74.04,
+      "text": "Bem-vindo à sua Bússola Astrológica.",
+      "scene": 4
+    }
+  ]
+}

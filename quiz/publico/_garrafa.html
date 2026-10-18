@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Garrafa · banco de teste</title>
+
+<!-- BANCO DE TESTE DA GARRAFA.
+
+     Esta pagina existe para abrir a animacao direto, sem responder o quiz
+     inteiro. Ela usa EXATAMENTE o mesmo CSS e o mesmo JS da tela 7, com os
+     mesmos ids: o que voce testa aqui e o que vai ao ar. Nada e duplicado,
+     entao nao ha como as duas versoes divergirem.
+
+     O que muda e so o redor: as variaveis de cor, a tipografia e um texto
+     de carta de mentira, para a revelacao ter onde acontecer. -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&family=Work+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/estatico/carta-motion.css?v=14">
+
+<style>
+  :root{
+    --bg:#131313; --card:#201D19; --line:#3A342B;
+    --sand:#F2EFE9; --sand-2:rgba(242,239,233,.72); --sand-3:rgba(242,239,233,.48);
+    --amber:#E5A93C;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);}
+  body{
+    color:var(--sand);font-family:'Work Sans',system-ui,sans-serif;
+    background:
+      radial-gradient(120% 42% at 50% 0%,rgba(229,169,60,.09),transparent 60%),
+      var(--bg);
+    min-height:100svh;
+  }
+  .barra{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;gap:10px;align-items:center;justify-content:center;
+    padding:9px 12px;background:rgba(19,19,19,.88);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--sand-3);
+  }
+  .barra b{color:var(--amber);font-weight:500;}
+  .barra button{
+    background:transparent;border:1px solid var(--line);color:var(--sand-2);
+    font:inherit;padding:5px 10px;border-radius:999px;cursor:pointer;
+  }
+  .palco{max-width:470px;margin:0 auto;padding:54px 22px 0;text-align:center;}
+  .eye{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--amber);margin-bottom:12px;
+  }
+  .carta-entrada h2{
+    font-family:'EB Garamond',Georgia,serif;font-weight:400;
+    font-size:clamp(24px,6vw,31px);line-height:1.22;margin:0 0 10px;
+  }
+  .carta-entrada h2 em{font-style:italic;color:#d8c49a;}
+  .carta-entrada > p{color:var(--sand-2);font-size:14.5px;line-height:1.6;margin:0 0 6px;}
+  .abrir-label{
+    font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--sand-3);margin-top:12px;
+  }
+  /* carta de mentira, so para a revelacao ter onde acontecer */
+  .carta-folha{
+    background:linear-gradient(90deg,#c9aa71 0%,#f1e1bd 8%,#f4e6c9 49.7%,
+      #d9c29a 50%,#f0dfba 50.5%,#e8d2aa 93%,#c6a571 100%);
+    color:#3f3424;text-align:left;padding:34px 26px;border-radius:2px;
+    box-shadow:0 20px 60px #0008;margin-top:10px;
+  }
+  .carta-folha h2{font:400 clamp(23px,5vw,31px)/1.2 Georgia,serif;margin:0 0 16px;color:#3f3424;}
+  .carta-folha p{font:17px/1.8 Georgia,serif;margin:0 0 16px;color:#42382b;}
+  .depois{padding:60px 22px 90px;text-align:center;color:var(--sand-3);font-size:12px;}
+  .carta-conteudo.revelada{animation:surge .7s ease both;}
+  @keyframes surge{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <span>banco de teste · <b>garrafa</b></span>
+  <button type="button" id="recomecar">recomeçar</button>
+  <span id="leitura">quadros: —</span>
+</div>
+
+<!-- O JS procura por [data-s="7"] com a classe .on; o nome das coisas aqui
+     e o mesmo da tela 7 do quiz, de proposito. -->
+<section class="scr on flow" data-s="7">
+  <div class="palco">
+
+    <div class="carta-entrada" id="cartaEntrada">
+      <div class="eye">✦ sua leitura está pronta</div>
+      <h2>Entre o céu e a sua história,<br><em>uma carta para você.</em></h2>
+      <p>Uma mensagem guardada. Um instante só seu.</p>
+
+      <div id="motionTrack" class="motion-track">
+        <div id="motionSticky" class="motion-sticky">
+          <canvas id="garrafaCanvas" class="motion-canvas" width="340" height="544"
+                  role="img" aria-label="Animação: a rolha sai da garrafa e o pergaminho sobe pelo gargalo conforme você rola a página"></canvas>
+          <button type="button" class="motion-open" id="abrirCarta" aria-expanded="false" aria-controls="cartaConteudo" disabled>Preparando...</button>
+          <p id="motionHint" class="motion-hint" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <p class="abrir-label" id="cartaDestinatario">Uma mensagem para você</p>
+    </div>
+
+    <div id="cartaConteudo" class="carta-conteudo" hidden>
+      <article class="carta-folha">
+        <h2 id="readTitle" tabindex="-1">Virar a página dentro de casa</h2>
+        <p>Este é um texto de teste. Ele existe só para a revelação ter onde acontecer, e para você conferir como a carta entra enquanto a garrafa sai.</p>
+        <p>No quiz, aqui entra a leitura de verdade: a frase que a pessoa escolheu, o trânsito calculado no mapa dela e o que dá para fazer com ele nesta semana.</p>
+        <p>Role de volta para cima e a carta recolhe, a rolha volta para o gargalo. O gesto é reversível inteiro.</p>
+      </article>
+      <div class="depois">fim do teste · role para cima para refazer o gesto</div>
+    </div>
+
+  </div>
+</section>
+
+<script src="/estatico/carta-motion.js?v=14"></script>
+<script>
+  /* No quiz, go() chama estas duas ao entrar na tela 7. Aqui elas sao
+     chamadas na carga, que e o unico motivo de esta pagina existir. */
+  window.ritualCartaCarregar?.();
+  window.ritualCartaPreparar?.('teste', 'Bruno');
+
+  /* Contador de quadros carregados, para dar para ver o preload acontecendo. */
+  (function(){
+    const alvo = document.getElementById('leitura');
+    const botao = document.getElementById('abrirCarta');
+    const t = setInterval(() => {
+      alvo.textContent = botao.disabled ? 'carregando quadros...' : 'quadros prontos';
+      if (!botao.disabled) clearInterval(t);
+    }, 300);
+  })();
+
+  document.getElementById('recomecar').addEventListener('click', () => {
+    scrollTo({ top: 0, behavior: 'instant' });
+    window.ritualCartaPreparar('teste-' + Date.now(), 'Bruno');
+  });
+</script>
+</body>
+</html>

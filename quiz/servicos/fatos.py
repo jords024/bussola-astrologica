@@ -439,14 +439,14 @@ def _fatos_do_aspecto(a: AspectoNorm, casas_ok: bool, hoje: Optional[date],
         q = quando_exato(a, hoje)
         if q:
             linhas.append(f"{rotulo}QUANDO: {q}")
-        linhas.append(f"{rotulo}ate quando isso pesa: {janela_em_palavras(a, hoje)}")
+        linhas.append(f"{rotulo}janela de oportunidade para virar a chave: {janela_em_palavras(a, hoje)}")
 
-    linhas.append(f"{rotulo}forca: " + ("muito fechado, pesa bastante"
-                  if abs(a.orbe) <= 2 else "fechado" if abs(a.orbe) <= 4
-                  else "ainda largo"))
+    linhas.append(f"{rotulo}momento do ciclo: " + ("momento de pico, hora exata de mudar de postura e assumir o controle"
+                  if abs(a.orbe) <= 2 else "ativo e presente, pedindo atitude clara" if abs(a.orbe) <= 4
+                  else "em aproximacao"))
     if a.retrogrado:
         linhas.append(f"{rotulo}VOLTANDO sobre o proprio caminho: e hora de rever, "
-                      "retomar e renegociar, nunca de comecar do zero"
+                      "retomar e renegociar com firmeza, nunca de comecar do zero"
                       if not rotulo else
                       f"{rotulo}tambem esta VOLTANDO: assunto que ja passou por aqui antes")
     return linhas
@@ -541,23 +541,19 @@ def bloco_porta(porta, solares: bool = False, casa_do_tema=None,
     # porta como assunto concorrente e o texto se contorcia para ligar os dois.
     if casa_do_tema and casa_do_tema == porta.casa:
         relacao = (f"ELA QUER TRABALHAR {tema.upper()} E A PORTA ABERTA E EXATAMENTE "
-                   "ESSA AREA. Diga isso com todas as letras, e sem soar surpreso: "
-                   "aqui o esforco dela rende, e e hora de empurrar. "
-                   "A ABERTURA ja anuncia isso, entao o PARAGRAFO nao repete que "
-                   "e a mesma area: ele diz o que muda na pratica por causa "
-                   "disso.")
+                   "ESSA AREA. Celebre esse alinhamento com calor e certeza: "
+                   "aqui o esforco dela rende, e o momento de avancar com confianca e agora. "
+                   "A ABERTURA ja anuncia isso com alegria, e o PARAGRAFO "
+                   "mostra o que muda na pratica para destravar essa area de vez.")
     elif casa_do_tema:
-        relacao = (f"ela quer trabalhar {tema}, e a porta aberta e OUTRA area. "
-                   "Isso e BOA NOTICIA e se escreve como boa noticia: e ali que "
-                   "existe energia sobrando agora, e por isso e por ali que se "
-                   f"destrava {tema} gastando menos forca. "
-                   "ABRA ANUNCIANDO O QUE ESTA ABERTO, nao a escolha dela: "
-                   "primeiro a oportunidade, e so depois, no paragrafo, a ponte "
-                   f"com {tema}. PROIBIDO verbo de concessao - nada de 'o que "
-                   "cede', 'o que resta', 'o jeito e', 'abrir mao'. PROIBIDO "
-                   "dizer que ela olhou para o lugar errado. E PROIBIDO inventar "
-                   "elo astrologico entre as duas: a ligacao e pratica, de por "
-                   "onde comecar, nao de causa e efeito.")
+        relacao = (f"ela quer trabalhar {tema}, e a porta aberta no ceu agora e {CASA_VIDA.get(porta.casa, '')}. "
+                   "Isso e uma EXCELENTE NOTICIA (BOA NOTICIA): essa porta aberta e a CHAVE DE ENTRADA estrategica "
+                   f"para destravar {tema} gastando muito menos forca e gerando resultado real. "
+                   f"No paragrafo, faca a ponte cristalina e acolhedora: mostre por que agir nesta porta aberta "
+                   f"e o passo que finalmente destrava {tema}. "
+                   "PROIBIDO verbo de concessao (nada de 'o que cede', 'o que resta', 'o jeito e', 'abrir mao'). "
+                   "PROIBIDO sugerir que ela olhou para o lugar errado: ela olhou para onde doia, e o ceu agora "
+                   "mostra por onde se entra para resolver.")
     else:
         relacao = ""
 
