@@ -51,10 +51,22 @@ def validar_token_ws(token: str) -> bool:
     return bool(token and token in _TOKENS_WS)
 
 
+from servicos.autenticacao_painel import (
+    COOKIE_SESSAO_NOME,
+    PainelNaoAutenticadoError,
+    criar_sessao_painel,
+    encerrar_sessao_painel,
+    renderizar_tela_login,
+    validar_credenciais_painel,
+    validar_sessao_painel,
+)
+
+
 @router.websocket("/painel/ws")
 async def ws_painel(websocket: WebSocket, token: Optional[str] = None):
     autorizado = False
-    if token and validar_token_ws(token):
+    cookie_sess = websocket.cookies.get(COOKIE_SESSAO_NOME)
+    if (token and validar_token_ws(token)) or validar_sessao_painel(cookie_sess):
         autorizado = True
     else:
         auth_h = websocket.headers.get("authorization", "")
@@ -62,7 +74,7 @@ async def ws_painel(websocket: WebSocket, token: Optional[str] = None):
             try:
                 import base64
                 u, p = base64.b64decode(auth_h[6:]).decode("utf-8").split(":", 1)
-                if secrets.compare_digest(u, config.PAINEL_USUARIO) and secrets.compare_digest(p, config.PAINEL_SENHA):
+                if validar_credenciais_painel(u, p):
                     autorizado = True
             except Exception:
                 pass
@@ -95,19 +107,61 @@ CABECALHOS = {"Cache-Control": "no-store, no-cache, must-revalidate",
               "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer"}
 
 
-def exigir_senha(cred: Optional[HTTPBasicCredentials] = Depends(seguranca)) -> str:
+def exigir_senha(request: Request, cred: Optional[HTTPBasicCredentials] = Depends(seguranca)) -> str:
     if not config.PAINEL_SENHA:
         raise HTTPException(503, "PAINEL_SENHA não definida no .env")
+    cookie_token = request.cookies.get(COOKIE_SESSAO_NOME)
+    usuario_sessao = validar_sessao_painel(cookie_token)
+    if usuario_sessao:
+        return usuario_sessao
     if cred is None:
-        raise HTTPException(401, "autenticação necessária",
-                            headers={"WWW-Authenticate": "Basic"})
-    ok_u = secrets.compare_digest(cred.username, config.PAINEL_USUARIO)
-    ok_s = secrets.compare_digest(cred.password, config.PAINEL_SENHA)
-    if not (ok_u and ok_s):
+        raise PainelNaoAutenticadoError("autenticação necessária")
+    usuario_valido = validar_credenciais_painel(cred.username, cred.password)
+    if not usuario_valido:
         time.sleep(0.3)          # atrito contra tentativa em rajada
-        raise HTTPException(401, "senha incorreta",
-                            headers={"WWW-Authenticate": "Basic"})
-    return cred.username
+        raise PainelNaoAutenticadoError("senha incorreta")
+    return usuario_valido
+
+
+@router.get("/painel/login", response_class=HTMLResponse)
+def pagina_login_painel():
+    return HTMLResponse(content=renderizar_tela_login(), headers=CABECALHOS)
+
+
+@router.post("/painel/login")
+async def api_login_painel(request: Request):
+    if not config.PAINEL_SENHA:
+        raise HTTPException(503, "PAINEL_SENHA não definida no .env")
+    try:
+        dados = await request.json()
+    except Exception:
+        raise HTTPException(400, "Corpo JSON inválido")
+    identificador = str(dados.get("email") or dados.get("usuario") or "").strip()
+    senha = str(dados.get("senha") or dados.get("password") or "").strip()
+    usuario = validar_credenciais_painel(identificador, senha)
+    if not usuario:
+        time.sleep(0.3)
+        return JSONResponse(status_code=401, content={"ok": False, "detail": "E-mail ou senha incorretos."})
+    token = criar_sessao_painel(usuario)
+    resp = JSONResponse({"ok": True, "usuario": usuario}, headers=CABECALHOS)
+    resp.set_cookie(
+        key=COOKIE_SESSAO_NOME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=86400 * 7,
+        path="/",
+    )
+    return resp
+
+
+@router.post("/painel/logout")
+def api_logout_painel(request: Request):
+    cookie_token = request.cookies.get(COOKIE_SESSAO_NOME)
+    encerrar_sessao_painel(cookie_token)
+    resp = JSONResponse({"ok": True}, headers=CABECALHOS)
+    resp.delete_cookie(key=COOKIE_SESSAO_NOME, path="/")
+    return resp
 
 
 # ---------------------------------------------------------------- mascaramento
@@ -3123,7 +3177,7 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
                         if isinstance(de_val, int) and isinstance(ms_ant, (int, float)):
                             if de_val == 0 and para_val == 1:
                                 soma_ms_sid[ev_sid] = int(ms_ant)
-                            elif 1 <= de_val <= 5:
+                            elif 1 <= de_val <= 12:
                                 soma_ms_sid[ev_sid] = soma_ms_sid.get(ev_sid, 0) + int(ms_ant)
 
                     if not alvos:
@@ -3136,10 +3190,18 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
                             para_val = props.get("para")
                             for k in ("para", "de"):
                                 val = props.get(k)
-                                if isinstance(val, int) and 0 <= val <= 10:
-                                    if val > info["max_tela"]:
+                                if isinstance(val, int):
+                                    if val in (15, 17):
+                                        val = 10
+                                    elif val == 14:
+                                        val = 7
+                                    elif val == 13:
+                                        val = 6
+                                    elif val == 12:
+                                        val = 5
+                                    if 0 <= val <= 10 and val > info["max_tela"]:
                                         info["max_tela"] = val
-                            if de_val == 5 and para_val == 6:
+                            if (de_val == 5 and para_val == 6) or (de_val == 12 and para_val == 13):
                                 if info.get("tempo_ativo_ms") is None and ev_sid in soma_ms_sid:
                                     info["tempo_ativo_ms"] = soma_ms_sid[ev_sid]
                         elif evt == "oferta_clique":
@@ -3148,8 +3210,12 @@ def obter_progresso_leituras(itens: list[tuple[str, dict]]) -> dict[str, dict]:
                                 info["max_tela"] = 10
                         elif evt == "saida":
                             t_saida = props.get("tela")
-                            if isinstance(t_saida, int) and 0 <= t_saida <= 10:
-                                if t_saida > info["max_tela"]:
+                            if isinstance(t_saida, int):
+                                if t_saida in (15, 17):
+                                    t_saida = 10
+                                elif t_saida == 14:
+                                    t_saida = 7
+                                if 0 <= t_saida <= 10 and t_saida > info["max_tela"]:
                                     info["max_tela"] = t_saida
                         elif evt == "leitura_entregue":
                             if info["max_tela"] < 7:
@@ -4523,6 +4589,7 @@ def painel(request: Request, _=Depends(exigir_senha),
         '      </button>',
         '    </nav>',
         '    <div class="sidebar-footer">',
+        '      <button type="button" onclick="fetch(\'/painel/logout\', {method:\'POST\'}).then(function(){window.location.reload();});" style="width:100%;margin-bottom:10px;padding:8px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.28);border-radius:8px;color:#fca5a5;font-size:12px;font-weight:600;cursor:pointer;">🚪 Sair da conta</button>',
         '      <small>Bússola Astrológica</small>',
         '    </div>',
         '  </aside>',
@@ -4553,7 +4620,7 @@ def painel(request: Request, _=Depends(exigir_senha),
                  'movem decisão que não deveria ser movida. Os números absolutos valem.</div>')
 
     g = d["geracao"]
-    oferta_item = next((f for f in d["funil"] if f["tela"] == 10), None)
+    oferta_item = next((f for f in d["funil"] if f.get("nome") == "A oferta" or f["tela"] == 15), None)
     chegaram_oferta_sessoes = oferta_item["sessoes"] if oferta_item else 0
     chegaram_oferta_pessoas = oferta_item.get("pessoas", chegaram_oferta_sessoes) if oferta_item else 0
 
@@ -4561,7 +4628,7 @@ def painel(request: Request, _=Depends(exigir_senha),
     clicaram_checkout_sessoes = checkout_item["sessoes"] if checkout_item else d.get("checkout", {}).get("cliques", 0)
     clicaram_checkout_pessoas = checkout_item.get("pessoas", clicaram_checkout_sessoes) if checkout_item else clicaram_checkout
 
-    dados_item = next((f for f in d["funil"] if f["tela"] == 5), None)
+    dados_item = next((f for f in d["funil"] if f.get("nome") == "Os dados" or f["tela"] == 12), None)
     chegaram_dados_sessoes = dados_item["sessoes"] if dados_item else 0
     chegaram_dados_pessoas = dados_item.get("pessoas", chegaram_dados_sessoes) if dados_item else 0
 

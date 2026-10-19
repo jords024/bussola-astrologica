@@ -16,11 +16,45 @@ from typing import Iterable, Optional
 
 FUSO_BSB = timezone(timedelta(hours=-3))
 
+TELA_DADOS = 12
+TELA_CALCULO = 13
+TELA_LEITURA = 14
+TELA_OFERTA = 15
+
 TELAS = [
-    (0, "O chamado"), (1, "O mecanismo"), (2, "A área"), (3, "O espelho"),
-    (4, "A quebra"), (5, "Os dados"), (6, "O cálculo"), (7, "A leitura"),
-    (10, "A oferta"),
+    (0, "O chamado"),
+    (1, "A área"),
+    (2, "O espelho"),
+    (3, "Há quanto tempo"),
+    (4, "A prova calibrada"),
+    (5, "O que já tentou"),
+    (6, "O desejo"),
+    (7, "O eco"),
+    (8, "O que sente"),
+    (9, "A posse"),
+    (10, "Quando"),
+    (11, "A ponte"),
+    (12, "Os dados"),
+    (13, "O cálculo"),
+    (14, "A leitura"),
+    (15, "A oferta"),
 ]
+
+
+def _normalizar_tela(v: object) -> Optional[int]:
+    """Normaliza o índice da tela enviado pelo navegador (scr[]) para 0..15.
+
+    No DOM do index.html, as seções Portas (scr[15]) e Caminho (scr[16]) ficam
+    inativas antes da Oferta (scr[17]), então T.oferta envia 17 e é mapeada
+    para a etapa 15 ('A oferta') do funil.
+    """
+    if not isinstance(v, int) or isinstance(v, bool):
+        return None
+    if v == 17:
+        return TELA_OFERTA
+    if 0 <= v <= TELA_OFERTA:
+        return v
+    return None
 
 # Abaixo disto, porcentagem engana mais do que informa: "33%" a partir de três
 # sessões move decisão que não deveria ser movida.
@@ -110,16 +144,16 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         evt, props = ev.get("evt"), (ev.get("props") or {})
         if evt == "tela":
             for k in ("de", "para"):
-                v = props.get(k)
-                if isinstance(v, int) and 0 <= v <= 10:
+                v = _normalizar_tela(props.get(k))
+                if v is not None:
                     s["telas"].add(v)
-            de_tela = props.get("de")
-            para_tela = props.get("para")
+            de_tela = _normalizar_tela(props.get("de"))
+            para_tela = _normalizar_tela(props.get("para"))
             ms_ant = props.get("ms_na_anterior")
-            if isinstance(de_tela, int) and 0 <= de_tela <= 10 and isinstance(ms_ant, (int, float)) and 0 <= ms_ant < 1800000:
+            if de_tela is not None and isinstance(ms_ant, (int, float)) and 0 <= ms_ant < 1800000:
                 s["duracoes_tela"][de_tela].append(float(ms_ant))
             ms_acum = props.get("ms_acumulado")
-            if isinstance(para_tela, int) and 0 <= para_tela <= 10 and para_tela not in s["cronometro_tela"]:
+            if para_tela is not None and para_tela not in s["cronometro_tela"]:
                 if isinstance(ms_acum, (int, float)) and ms_acum >= 0:
                     s["cronometro_tela"][para_tela] = float(ms_acum)
                 elif t and s["primeiro"] and t >= s["primeiro"]:
@@ -140,7 +174,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
             s["modo_hora"] = props.get("modo_hora")
             ms_tela5 = props.get("ms_na_tela5")
             if isinstance(ms_tela5, (int, float)) and 0 <= ms_tela5 < 1800000:
-                s["duracoes_tela"][5].append(float(ms_tela5))
+                s["duracoes_tela"][TELA_DADOS].append(float(ms_tela5))
         elif evt == "leitura_entregue":
             s["leitura"] = props
             s["modo_hora"] = s["modo_hora"] or props.get("modo_hora")
@@ -155,16 +189,16 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
             s["oferta"] = True
             ms_tela = props.get("ms_na_tela")
             if isinstance(ms_tela, (int, float)) and 0 <= ms_tela < 1800000:
-                s["duracoes_tela"][10].append(float(ms_tela))
+                s["duracoes_tela"][TELA_OFERTA].append(float(ms_tela))
             ms_acum = props.get("ms_acumulado")
             if isinstance(ms_acum, (int, float)) and ms_acum >= 0:
                 s["tempo_checkout"] = float(ms_acum)
             elif t and s["primeiro"] and t >= s["primeiro"]:
                 s["tempo_checkout"] = (t - s["primeiro"]).total_seconds() * 1000
         elif evt == "saida":
-            tela_s = props.get("tela")
+            tela_s = _normalizar_tela(props.get("tela"))
             ms_tela = props.get("ms_na_tela")
-            if isinstance(tela_s, int) and 0 <= tela_s <= 10 and isinstance(ms_tela, (int, float)) and 0 <= ms_tela < 1800000:
+            if tela_s is not None and isinstance(ms_tela, (int, float)) and 0 <= ms_tela < 1800000:
                 s["duracoes_tela"][tela_s].append(float(ms_tela))
         elif evt == "contato_enviado":
             s["contato"] = True
@@ -195,7 +229,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
 
     tempos = {
         "mediana_sessao_ms": _mediana(duracoes_sessoes),
-        "mediana_ate_oferta_ms": _mediana([s["cronometro_tela"][10] for s in sessoes if 10 in s.get("cronometro_tela", {})]),
+        "mediana_ate_oferta_ms": _mediana([s["cronometro_tela"][TELA_OFERTA] for s in sessoes if TELA_OFERTA in s.get("cronometro_tela", {})]),
         "mediana_ate_checkout_ms": _mediana([s["tempo_checkout"] for s in sessoes if s.get("tempo_checkout") is not None]),
     }
 
@@ -209,7 +243,7 @@ def agregar(eventos: Iterable[dict], de: date, ate: date,
         "funil": _funil(sessoes),
         "checkout": {
             "cliques": sum(1 for s in sessoes if s["oferta"]),
-            "pct_da_oferta": pct(sum(1 for s in sessoes if s["oferta"]), sum(1 for s in sessoes if 10 in s["telas"])),
+            "pct_da_oferta": pct(sum(1 for s in sessoes if s["oferta"]), sum(1 for s in sessoes if TELA_OFERTA in s["telas"])),
         },
         "tempos": tempos,
         "formulario": _formulario(sessoes),
@@ -236,8 +270,8 @@ def _funil(sessoes: list[dict]) -> list[dict]:
     """Conta quem CHEGOU pelo menos uma vez em cada tela.
 
     Nunca "tela atual": com o botão voltar, o conjunto de telas de uma sessão
-    não é um prefixo, e quem chegou na 7 e voltou para a 5 apareceria como
-    abandono na 5.
+    não é um prefixo, e quem chegou na 14 e voltou para a 12 apareceria como
+    abandono na 12.
     """
     base = sum(1 for s in sessoes if 0 in s["telas"]) or len(sessoes)
     linhas = []
@@ -246,10 +280,8 @@ def _funil(sessoes: list[dict]) -> list[dict]:
         alcanceou = sum(1 for s in sessoes if n in s["telas"])
         alcanceou_pessoas = len({_chave_pessoa(s) for s in sessoes if n in s["telas"] and _chave_pessoa(s)})
         # quem parou aqui: nunca passou desta tela e nao esta com a sessao aberta
-        if n == 10:
-            parou = sum(1 for s in sessoes if s["max_tela"] == 10 and not s["oferta"] and not s["aberta"])
-        elif n == 7:
-            parou = sum(1 for s in sessoes if s["max_tela"] in (7, 8, 9) and not s["aberta"])
+        if n == TELA_OFERTA:
+            parou = sum(1 for s in sessoes if s["max_tela"] == TELA_OFERTA and not s["oferta"] and not s["aberta"])
         else:
             parou = sum(1 for s in sessoes if s["max_tela"] == n and not s["aberta"])
         duracoes = [d for s in sessoes for d in s.get("duracoes_tela", {}).get(n, [])]
@@ -270,7 +302,7 @@ def _funil(sessoes: list[dict]) -> list[dict]:
     # Etapa de conversão final: clique no botão da oferta direcionando ao checkout da Hotmart
     clicou_checkout = sum(1 for s in sessoes if s["oferta"])
     clicou_checkout_pessoas = len({_chave_pessoa(s) for s in sessoes if s["oferta"] and _chave_pessoa(s)})
-    duracoes_checkout = [d for s in sessoes if s.get("oferta") for d in s.get("duracoes_tela", {}).get(10, [])]
+    duracoes_checkout = [d for s in sessoes if s.get("oferta") for d in s.get("duracoes_tela", {}).get(TELA_OFERTA, [])]
     cronos_checkout = [s["tempo_checkout"] for s in sessoes if s.get("tempo_checkout") is not None]
     linhas.append({
         "tela": "✦",
@@ -287,8 +319,8 @@ def _funil(sessoes: list[dict]) -> list[dict]:
 
 
 def _formulario(sessoes: list[dict]) -> dict:
-    """Onde a tela 5 trava."""
-    chegou = [s for s in sessoes if 5 in s["telas"]]
+    """Onde a tela de dados trava."""
+    chegou = [s for s in sessoes if TELA_DADOS in s["telas"] or s["form_envio"] or s["campos"] or s["form_erros"]]
     travou = [s for s in chegou if not s["form_envio"] and not s["aberta"]]
     # "chegou e nao tocou em nada" e um problema diferente de "preencheu 4 de 5":
     # o primeiro e a tela assustando, o segundo e a tela derrotando
@@ -467,9 +499,9 @@ def _horario(sessoes: list[dict]) -> list[dict]:
             continue
         g = grupos[m]
         g["n"] += 1
-        if s["leitura"] or 7 in s["telas"]:
+        if s["leitura"] or TELA_LEITURA in s["telas"]:
             g["leitura"] += 1
-        if 10 in s["telas"] or s["oferta"]:
+        if TELA_OFERTA in s["telas"] or s["oferta"]:
             g["oferta"] += 1
         if s["oferta"]:
             g["checkout"] += 1

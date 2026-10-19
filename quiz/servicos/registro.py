@@ -106,6 +106,13 @@ ETAPAS_ROTULOS = {
     8: "Tela 8 (Portas)",
     9: "Tela 9 (Ponte)",
     10: "Tela 10 (Oferta)",
+    11: "Tela 11 (A ponte)",
+    12: "Tela 12 (Os dados)",
+    13: "Tela 13 (O cálculo)",
+    14: "Tela 14 (A leitura)",
+    15: "Tela 15 (A oferta)",
+    16: "Tela 16 (Caminho)",
+    17: "Tela 15 (A oferta)",
 }
 
 

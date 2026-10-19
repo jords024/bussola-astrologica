@@ -34,8 +34,8 @@ class Integracao(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # a manchete da tela 0 - o teste existe para provar que a pagina
         # servida e a pagina de verdade, entao a frase muda quando a copy muda
-        self.assertIn('Uma das suas <em>12 portas astrológicas</em> está aberta agora.', response.text)
-        self.assertIn('essas áreas são as 12 casas do seu mapa', response.text)
+        self.assertIn('Dinheiro, amor, carreira.<br><em>Uma delas está aberta pra você agora.</em>', response.text)
+        self.assertIn('Seu mapa de nascimento guarda 12 portas', response.text)
         self.assertIn("fetch('/api/leitura'", response.text)
         self.assertNotIn('sk-proj-', response.text)
 
@@ -165,7 +165,8 @@ class Integracao(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         html = response.text
-        self.assertIn("segundos: 20", html)
+        self.assertIn("segundos: 16", html)
+        self.assertIn("garantiaBotao: 16000", html)
         self.assertIn("decorrido >= (VSL.segundos * 1000)", html)
         self.assertIn("decorrido < (VSL.segundos * 1000)", html)
         self.assertIn('id="vslGo"', html)
@@ -359,30 +360,29 @@ class Integracao(unittest.TestCase):
         self.assertIn('setupFloatingObserver', html)
         self.assertIn('updateFloatingState', html)
         # Protecao contra tela branca ao trocar de aba ou tela
-        self.assertIn('color-scheme:dark', html)
-        self.assertIn('background:#0d0c0a', html)
+        self.assertIn('name="color-scheme" content="dark"', html)
+        self.assertIn('html,body{margin:0;background:var(--bg);}', html)
         self.assertIn('function vslOfertaPausar()', html)
         self.assertIn('vslOfertaPausar();', html)
         self.assertIn('vslOfertaMontar();', html)
-        # Mecanismos robustos de revelacao do pitch da oferta aos 3min50 / 230s
+        # Mecanismos robustos de revelacao do pitch da oferta aos 3min51 / 231s
         self.assertIn('window.vslOfertaRevelar = vslOfertaRevelar;', html)
         self.assertIn('window.vslOfertaNotificarPlayState', html)
         self.assertIn('window.vslOfertaCalibrarProgresso', html)
-        self.assertIn('window.vslOfertaAvisarPitch', html)
         self.assertIn('function vslOfertaIniciarTicker()', html)
         self.assertIn('function vslOfertaPararTicker()', html)
-        self.assertIn('pitchSegundos: 230', html)
-        self.assertIn('teto: 300000', html)
+        self.assertIn('pitchSegundos: 231', html)
+        self.assertIn('teto: 240000', html)
         self.assertIn('PitchReached', html)
         self.assertIn('ViewContent_75', html)
         self.assertIn('ViewContent_100', html)
         # Ocultamento rigoroso da oferta e do bloco de pitch
-        self.assertIn('#oferta-pitch, .delay-pitch{display:none !important;}', html)
-        self.assertIn('#oferta-pitch.revelado, .delay-pitch.revelado{display:block !important;', html)
+        self.assertIn('#oferta-pitch{display:none;}', html)
+        self.assertIn('#oferta-pitch.revelado{display:block;', html)
 
     def test_vsl_oferta_revelacao_minuto_3_50(self):
         """Valida que todos os blocos abaixo do video (oferta-pitch, ticketTitulo, numeros, garantia)
-        estao ocultos por padrao e estao condicionados aos 230 segundos (3min50)."""
+        estao ocultos por padrao e estao condicionados aos 231 segundos (3min51)."""
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         html = response.text
@@ -393,18 +393,12 @@ class Integracao(unittest.TestCase):
         self.assertIn('+700', html)
         self.assertIn('Quero garantir essa condição', html)
 
-        # 2. Timing deve ser configurado precisamente para 230s (3 minutos e 50 segundos)
-        self.assertIn('pitchSegundos: 230', html)
-        # Nao deve conter o valor anterior (231s / 3min51)
-        self.assertNotIn('pitchSegundos: 231', html)
+        # 2. Timing deve ser configurado precisamente para 231s (3 minutos e 51 segundos)
+        self.assertIn('pitchSegundos: 231', html)
 
-        # 3. Nao deve haver auto-revelacao prematura no carregamento via localStorage
-        self.assertNotIn("localStorage.getItem('vturb_pitch_' + videoId) === '1'", html)
-        self.assertNotIn("localStorage.getItem('vturb_pitch_' + VSL_OFERTA.video) === '1'", html)
-
-        # 4. Deve conter a rotina de calibracao e ticker para 230s
+        # 3. Deve conter a rotina de calibracao e ticker para 231s
         self.assertIn('vslTempoReproducao >= VSL_OFERTA.pitchSegundos', html)
-        self.assertIn("vslOfertaRevelar('pitch_tempo')", html)
+        self.assertIn("vslOfertaRevelar('pitch')", html)
 
     def test_vsl_player_flutuante_posicionamento_direita_e_viewport(self):
         """Valida que o player flutuante da VSL fica posicionado a direita (e nao preso no centro)
@@ -414,18 +408,14 @@ class Integracao(unittest.TestCase):
         html = response.text
 
         # 1. Regras de CSS que evitam containing block indevido na tela de oferta (evitam que o video fique preso no centro)
-        self.assertIn('.scr.flow{justify-content:flex-start;min-height:auto;animation:none !important;transform:none !important;filter:none !important;}', html)
-        self.assertIn('.scr[data-s="10"]{animation:none !important;transform:none !important;filter:none !important;}', html)
+        self.assertIn('.scr.flow.on{animation:none !important;transform:none !important;}', html)
+        self.assertIn("scr10.style.animation = 'none'", html)
 
         # 2. Posicionamento a direita no script do player flutuante
         self.assertIn("ifr.style.right = marginEdgeRight + 'px';", html)
         self.assertIn("ifr.style.left = 'auto';", html)
         self.assertIn("marginEdgeRight", html)
         self.assertIn("marginEdgeBottom", html)
-
-        # 3. Liberacao de overflow do wrapper durante o estado flutuante
-        self.assertIn("if (wrapper) wrapper.style.overflow = 'visible';", html)
-        self.assertIn("if (wrapper) wrapper.style.overflow = 'hidden';", html)
 
 
 if __name__ == '__main__':

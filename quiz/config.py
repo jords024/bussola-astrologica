@@ -83,6 +83,9 @@ MAX_TOKENS_SAIDA = int(os.environ.get("MAX_TOKENS_SAIDA", "16000"))
 # pessoas reais.
 PAINEL_SENHA = os.environ.get("PAINEL_SENHA", "").strip()
 PAINEL_USUARIO = os.environ.get("PAINEL_USUARIO", "crassus").strip()
+SUPER_ADMIN_NAME = os.environ.get("SUPER_ADMIN_NAME", "Aryaraj").strip()
+SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "aryarajmarketing@gmail.com").strip()
+SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "123456").strip()
 EVENTOS_RETENCAO_DIAS = int(os.environ.get("EVENTOS_RETENCAO_DIAS", "180"))
 LEITURAS_RETENCAO_DIAS = int(os.environ.get("LEITURAS_RETENCAO_DIAS", "180"))
 

@@ -97,27 +97,57 @@ class Agregador(unittest.TestCase):
     def test_clique_checkout_no_funil(self):
         """Verifica se o clique no checkout na tela da oferta é agregado corretamente no funil."""
         d = [
-            ev("chk", 1, "tela", {"de": 0, "para": 10}),
+            ev("chk", 1, "tela", {"de": 0, "para": 17}),
             ev("chk", 2, "oferta_clique", {"botao": "principal"}),
         ]
         r = agregar(d, HOJE, HOJE)
         self.assertEqual(r["checkout"]["cliques"], 1)
         funil_map = {f["tela"]: f for f in r["funil"]}
-        self.assertEqual(funil_map[10]["nome"], "A oferta")
-        self.assertEqual(funil_map[10]["sessoes"], 1)
+        self.assertEqual(funil_map[15]["nome"], "A oferta")
+        self.assertEqual(funil_map[15]["sessoes"], 1)
         self.assertEqual(funil_map["✦"]["nome"], "Clique no Checkout")
         self.assertEqual(funil_map["✦"]["sessoes"], 1)
-        # Telas 8 e 9 inativas (substituídas pela VSL) não devem poluir o funil
-        self.assertNotIn(8, funil_map)
-        self.assertNotIn(9, funil_map)
+        # Índices brutos 16 e 17 do DOM não aparecem como linhas avulsas no funil
+        self.assertNotIn(16, funil_map)
+        self.assertNotIn(17, funil_map)
+
+    def test_funil_completo_16_telas_quiz(self):
+        """Verifica se todas as 16 telas ativas do quiz (0 a 15) + Checkout estão presentes no funil."""
+        d = [
+            ev("s-full", idx + 1, "tela", {"de": idx, "para": (17 if idx == 14 else idx + 1)})
+            for idx in range(15)
+        ]
+        r = agregar(d, HOJE, HOJE)
+        nomes = [(f["tela"], f["nome"]) for f in r["funil"]]
+        self.assertEqual(nomes, [
+            (0, "O chamado"),
+            (1, "A área"),
+            (2, "O espelho"),
+            (3, "Há quanto tempo"),
+            (4, "A prova calibrada"),
+            (5, "O que já tentou"),
+            (6, "O desejo"),
+            (7, "O eco"),
+            (8, "O que sente"),
+            (9, "A posse"),
+            (10, "Quando"),
+            (11, "A ponte"),
+            (12, "Os dados"),
+            (13, "O cálculo"),
+            (14, "A leitura"),
+            (15, "A oferta"),
+            ("✦", "Clique no Checkout"),
+        ])
+        for f in r["funil"][:16]:
+            self.assertEqual(f["sessoes"], 1, f"Falha na tela {f['tela']} ({f['nome']})")
 
     def test_cronometro_e_tempos_por_tela(self):
         """Verifica se o tempo em cada tela e o cronômetro acumulado são calculados."""
         d = [
             ev("time1", 1, "tela", {"de": 0, "para": 1, "ms_na_anterior": 4000, "ms_acumulado": 4000}),
-            ev("time1", 2, "tela", {"de": 1, "para": 5, "ms_na_anterior": 2000, "ms_acumulado": 6000}),
+            ev("time1", 2, "tela", {"de": 1, "para": 12, "ms_na_anterior": 2000, "ms_acumulado": 6000}),
             ev("time1", 3, "form_envio", {"ms_na_tela5": 15000}),
-            ev("time1", 4, "tela", {"de": 5, "para": 10, "ms_na_anterior": 15000, "ms_acumulado": 21000}),
+            ev("time1", 4, "tela", {"de": 12, "para": 17, "ms_na_anterior": 15000, "ms_acumulado": 21000}),
             ev("time1", 5, "oferta_clique", {"ms_na_tela": 8000, "ms_acumulado": 29000}),
         ]
         r = agregar(d, HOJE, HOJE)
@@ -128,12 +158,12 @@ class Agregador(unittest.TestCase):
         # Tela 1: durou 2000ms, cronômetro acumulado 4000ms
         self.assertEqual(funil[1]["tempo_na_tela_ms"], 2000.0)
         self.assertEqual(funil[1]["cronometro_ms"], 4000.0)
-        # Tela 5: durou 15000ms, cronômetro acumulado 6000ms
-        self.assertEqual(funil[5]["tempo_na_tela_ms"], 15000.0)
-        self.assertEqual(funil[5]["cronometro_ms"], 6000.0)
-        # Tela 10 (A oferta): durou 8000ms, cronômetro acumulado 21000ms
-        self.assertEqual(funil[10]["tempo_na_tela_ms"], 8000.0)
-        self.assertEqual(funil[10]["cronometro_ms"], 21000.0)
+        # Tela 12 (Os dados): durou 15000ms, cronômetro acumulado 6000ms
+        self.assertEqual(funil[12]["tempo_na_tela_ms"], 15000.0)
+        self.assertEqual(funil[12]["cronometro_ms"], 6000.0)
+        # Tela 15 (A oferta, mapeada de scr[17]): durou 8000ms, cronômetro acumulado 21000ms
+        self.assertEqual(funil[15]["tempo_na_tela_ms"], 8000.0)
+        self.assertEqual(funil[15]["cronometro_ms"], 21000.0)
         # Checkout (✦): cronômetro acumulado 29000ms
         self.assertEqual(funil["✦"]["cronometro_ms"], 29000.0)
         # Resumo de tempos
@@ -2612,6 +2642,7 @@ class TestFeedbackNoPainel(unittest.TestCase):
     def test_busca_contatos_por_nome_e_whatsapp(self):
         """Valida busca de contatos por nome e WhatsApp no painel, leituras e exportação CSV."""
         hoje_pfx = date.today().strftime("%Y%m%d")
+        hoje_bsb_str = date.today().strftime("%d/%m/%Y")
         lid1 = f"{hoje_pfx}-100000-11111111"
         lid2 = f"{hoje_pfx}-100001-22222222"
         lid3 = f"{hoje_pfx}-100002-33333333"
@@ -2624,8 +2655,8 @@ class TestFeedbackNoPainel(unittest.TestCase):
                 "nome_completo": "Aryaraj Fernandes",
                 "whatsapp": "+55 (85) 99825-9497",
                 "cidade": {"nome": "Fortaleza", "uf": "CE", "pais": "Brasil"},
-                "gravado_em_bsb": "26/09/2026 10:00:00",
-                "chegou_em_bsb": "26/09/2026 09:55:00",
+                "gravado_em_bsb": f"{hoje_bsb_str} 10:00:00",
+                "chegou_em_bsb": f"{hoje_bsb_str} 09:55:00",
             }), encoding="utf-8")
 
             # Contato 2: Mariana Souza com WhatsApp SP
@@ -2634,8 +2665,8 @@ class TestFeedbackNoPainel(unittest.TestCase):
                 "nome_completo": "Mariana Souza",
                 "whatsapp": "+55 (11) 98765-4321",
                 "cidade": {"nome": "São Paulo", "uf": "SP", "pais": "Brasil"},
-                "gravado_em_bsb": "26/09/2026 10:05:00",
-                "chegou_em_bsb": "26/09/2026 10:01:00",
+                "gravado_em_bsb": f"{hoje_bsb_str} 10:05:00",
+                "chegou_em_bsb": f"{hoje_bsb_str} 10:01:00",
             }), encoding="utf-8")
 
             # Contato 3: Carlos Santos sem WhatsApp
@@ -2644,8 +2675,8 @@ class TestFeedbackNoPainel(unittest.TestCase):
                 "nome_completo": "Carlos Santos",
                 "whatsapp": "",
                 "cidade": {"nome": "Belo Horizonte", "uf": "MG", "pais": "Brasil"},
-                "gravado_em_bsb": "26/09/2026 10:10:00",
-                "chegou_em_bsb": "26/09/2026 10:08:00",
+                "gravado_em_bsb": f"{hoje_bsb_str} 10:10:00",
+                "chegou_em_bsb": f"{hoje_bsb_str} 10:08:00",
             }), encoding="utf-8")
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
@@ -2703,6 +2734,7 @@ class TestFeedbackNoPainel(unittest.TestCase):
             dir_leituras = Path(tmpdir)
             # Cria 26 contatos no total; apenas 4 fizeram checkout
             hoje_pfx = date.today().strftime("%Y%m%d")
+            hoje_bsb_str = date.today().strftime("%d/%m/%Y")
             for i in range(26):
                 lid = f"{hoje_pfx}-12{i:02d}00-chk{i:04d}"
                 fez_chk = (i in [2, 5, 21, 24])  # 2 na primeira página e 2 na segunda página
@@ -2712,8 +2744,8 @@ class TestFeedbackNoPainel(unittest.TestCase):
                     "whatsapp": f"+55 (11) 90000-{i:04d}",
                     "checkout": fez_chk,
                     "etapa_max": 10 if fez_chk else 6,
-                    "gravado_em_bsb": "26/09/2026 10:00:00",
-                    "chegou_em_bsb": "26/09/2026 09:50:00",
+                    "gravado_em_bsb": f"{hoje_bsb_str} 10:00:00",
+                    "chegou_em_bsb": f"{hoje_bsb_str} 09:50:00",
                 }), encoding="utf-8")
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
@@ -2787,6 +2819,7 @@ class TestTempoQuizAtivoEDuplo(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             dir_leituras = Path(tmpdir)
             hoje_pfx = date.today().strftime("%Y%m%d")
+            hoje_bsb_str = date.today().strftime("%d/%m/%Y")
             lid = f"{hoje_pfx}-183500-abcdef01"
             (dir_leituras / f"{lid}.json").write_text(json.dumps({
                 "cliente_id": "cid-tempo-1",
@@ -2795,8 +2828,8 @@ class TestTempoQuizAtivoEDuplo(unittest.TestCase):
                 "etapa_max": 7,
                 "tempo_ativo_ms": 28000,
                 "tempo_quiz_ms": 1268334,
-                "gravado_em_bsb": "26/09/2026 18:35:00",
-                "chegou_em_bsb": "26/09/2026 18:14:00",
+                "gravado_em_bsb": f"{hoje_bsb_str} 18:35:00",
+                "chegou_em_bsb": f"{hoje_bsb_str} 18:14:00",
             }), encoding="utf-8")
 
             with mock.patch.object(config, "DIR_LEITURAS", dir_leituras):
@@ -2865,10 +2898,9 @@ class TestTempoQuizAtivoEDuplo(unittest.TestCase):
             caminho_html = Path("quiz/publico/index.html")
         conteudo = caminho_html.read_text(encoding="utf-8")
 
-        self.assertIn("msAtivoQuiz", conteudo)
-        self.assertIn("tempo_ativo_ms", conteudo)
-        self.assertIn("telaOcultou", conteudo)
-        self.assertIn("msOcultoTela", conteudo)
+        self.assertIn("ms_na_anterior", conteudo)
+        self.assertIn("ms_acumulado", conteudo)
+        self.assertIn("FLUXO_ATIVO", conteudo)
 
     def test_tabela_leituras_ajax_endpoint_auth_e_filtros(self):
         """Verifica o endpoint /painel/tabela-leituras-ajax: autenticação, resposta JSON, filtros e badges."""

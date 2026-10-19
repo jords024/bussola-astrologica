@@ -1,4 +1,4 @@
-# 🌌 Bússola Astrológica: Quiz, Leitura Personalizada & Painel de Leads
+# 🌌 Bússola Astrológica: Quiz, Leitura Personalizada & Painel de Leads (v1.4.0)
 
 Plataforma astrológica completa desenvolvida para o astrólogo **Crassus Gobbi**, integrando quiz interativo com leitura personalizada via IA, cálculo de precisão astrológica, painel administrativo com atualização em tempo real via WebSockets e landing pages de alta conversão.
 
@@ -9,7 +9,7 @@ Plataforma astrológica completa desenvolvida para o astrólogo **Crassus Gobbi*
 O ecossistema da **Bússola Astrológica** é composto por duas aplicações integradas:
 
 1. **Aplicação do Quiz & Painel de Leads (`quiz/`)**:
-   - Desenvolvida em **Python 3.10+ / FastAPI / WebSockets**, servindo na raiz `/` o quiz em 11 etapas, cálculo astrológico de casas e trânsitos (Swiss Ephemeris / Kerykeion), geração de carta personalizada por IA, acompanhamento em tempo real e painel administrativo protegido (`/painel`).
+   - Desenvolvida em **Python 3.10+ / FastAPI / WebSockets**, servindo na raiz `/` o quiz em 16 etapas ativas, cálculo astrológico de casas e trânsitos (Swiss Ephemeris / Kerykeion), geração de carta personalizada por IA, players VSL com modo flutuante (mini-player), acompanhamento em tempo real e painel administrativo protegido (`/painel` e `/painel/login`).
 2. **Landing Pages & Vendas (`frontend/`)**:
    - Desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**.
    - **Página Principal da Bússola (`/bussola` e `/`)**: Apresentação das 12 casas (as 12 portas da vida), narrativa astrológica imersiva, animações em Framer Motion/GSAP e checkout integrado.
@@ -20,23 +20,24 @@ O ecossistema da **Bússola Astrológica** é composto por duas aplicações int
 
 ## ✨ Recursos do Quiz e Leitura Personalizada (`quiz/`)
 
-- **Quiz Dinâmico em 11 Etapas:** Interface responsiva guiando o visitante desde a identificação até a escolha de áreas da vida e preenchimento de nascimento (data, hora e cidade com geolocalização).
+- **Quiz Dinâmico em 16 Etapas Ativas:** Interface responsiva guiando o visitante por todas as etapas de diagnóstico (`0 · O chamado` até `15 · A oferta`), com preservação de escolhas e botão **Continuar** visível ao navegar para trás, além de retorno fluido entre leitura, vídeo e formulário em 3 passos.
 - **Cálculo Astrológico de Precisão:** Cálculo real de casas astrológicas e posicionamentos planetários.
 - **Carta Personalizada por IA:** Análise profunda e personalizada com fallback automático para carta de reserva.
-- **Mandala Interativa & Oferta:** Apresentação visual da mandala astrológica e transição para a oferta das aulas.
+- **Mandala Interativa & VSL com Mini-Player Flutuante:** Apresentação visual da mandala astrológica e transição para a oferta com player VTurb no formato vertical 9:16 e mini-player flutuante compacto e responsivo (140px no desktop e até 130px no mobile) ao rolar a página.
 
 ---
 
 ## ⚡ Painel Administrativo em Tempo Real (`/painel`)
 
-O painel administrativo (`/painel`, protegido por autenticação HTTP Basic) conta com:
+O painel administrativo (`/painel`, protegido por tela de login dedicada em `/painel/login` com sessão via cookie HttpOnly e suporte a `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`) conta com:
 
+- **Funil Completo por Tela (16 Etapas + Checkout):** Rastreamento detalhado de pessoas únicas, sessões, mediana de tempo na tela, cronômetro acumulado, queda e retenção em cada uma das 16 telas ativas do quiz até o clique no checkout.
 - **Sincronização em Tempo Real via WebSocket (`/painel/ws`):** Atualizações instantâneas de novos leads, avanço de etapas no funil, cliques no checkout e status de compra sem recarregar a página (F5).
 - **Filtro de Visitantes Ao Vivo (`🟢 Ao vivo agora`):** Monitoramento instantâneo de quem está com o quiz aberto nos últimos 90s e qual tela está visualizando.
 - **Marcação de Compra com Confirmação Segura:** Botão interativo (`💰 Comprou` / `✅ Comprou`) com popup modal centralizado e elegante (com proteção contra fechamento ao clicar fora) e filtro rápido `"💰 Só quem comprou"`.
 - **Agrupamento de Múltiplos Envios:** Detecção automática de contatos repetidos com acordeão expansível (`▶ 2x`, `▶ 3x`) e opção de exclusão individual ou coletiva.
 - **Arrasto Horizontal com o Mouse (`drag-to-scroll`):** Navegação horizontal rápida com o botão esquerdo do mouse na tabela de Leituras.
-- **5 Abas de Controle:** Funil por Tela, Leituras, Formulário & Horário, Áreas & Casas e Saúde do Agente.
+- **Abas de Controle e Gestão Financeira:** Funil por Tela, Leituras, Formulário & Horário, Áreas & Casas, Financeiro e Configurações da VSL.
 
 ---
 
@@ -133,7 +134,7 @@ O projeto conta com cobertura completa e testes automatizados em ambas as aplica
 ```bash
 cd quiz
 .\.venv\Scripts\pytest -o pythonpath=. testes
-# 105 testes cobrindo integração, painel, tempo real, websocket, webhooks, filtros por data e UF, importação/exportação CSV e persistência
+# 287 testes cobrindo integração, painel, tempo real, websocket, webhooks, filtros por data e UF, importação/exportação CSV, VSL flutuante e persistência
 ```
 
 ### Frontend (Vitest)

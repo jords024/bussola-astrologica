@@ -173,6 +173,90 @@ class TestConfigOferta(unittest.TestCase):
         self.assertIn("window.S = S", conteudo)
         self.assertIn('data-src="https://turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061', conteudo)
         self.assertIn("!nome && !whatsapp && !leituraId", conteudo)
+        self.assertIn("segundos: 16", conteudo)
+        self.assertIn("garantiaBotao: 16000", conteudo)
+        self.assertIn("decorrido < (VSL.segundos * 1000)", conteudo)
+        self.assertIn("function vslPlayer()", conteudo)
+        self.assertIn("btn.scrollIntoView", conteudo)
+        self.assertIn("atualizarBotaoContinuarEscolha", conteudo)
+        self.assertIn("btn-continuar-escolha", conteudo)
+        self.assertIn("dadosPasso(de > T.dados ? 2 : 0)", conteudo)
+        self.assertIn("const SKIP = {[T.oferta]:T.leitura};", conteudo)
+        self.assertIn("if(S.leitura){", conteudo)
+        self.assertIn("embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=350px&transparent=1", conteudo)
+        self.assertIn("var floatingWidth = 140;", conteudo)
+
+    def test_login_painel_tela_customizada_e_super_admin(self):
+        """Verifica que GET /painel sem auth retorna a tela HTML bonita (sem popup WWW-Authenticate) e aceita login via Super Admin."""
+        with mock.patch.object(config, "PAINEL_SENHA", "senha_teste"), \
+             mock.patch.object(config, "SUPER_ADMIN_EMAIL", "aryarajmarketing@gmail.com"), \
+             mock.patch.object(config, "SUPER_ADMIN_PASSWORD", "123456"):
+            # 1. GET /painel sem login -> 401 com HTML da tela de login e SEM cabeçalho WWW-Authenticate
+            r_login_html = self.client.get("/painel", headers={"Accept": "text/html"})
+            self.assertEqual(r_login_html.status_code, 401)
+            self.assertNotIn("www-authenticate", {k.lower(): v for k, v in r_login_html.headers.items()})
+            self.assertIn('id="form-login-painel"', r_login_html.text)
+            self.assertIn('id="login-email"', r_login_html.text)
+            self.assertIn('id="login-senha"', r_login_html.text)
+
+            # 2. POST /painel/login com senha errada -> 401
+            r_erro = self.client.post("/painel/login", json={"email": "aryarajmarketing@gmail.com", "senha": "000"})
+            self.assertEqual(r_erro.status_code, 401)
+
+            # 3. POST /painel/login com aryarajmarketing@gmail.com e 123456 -> 200 e cookie de sessão
+            r_ok = self.client.post("/painel/login", json={"email": "aryarajmarketing@gmail.com", "senha": "123456"})
+            self.assertEqual(r_ok.status_code, 200)
+            self.assertTrue(r_ok.json().get("ok"))
+
+            # 4. GET /painel agora autenticado pelo cookie -> 200
+            r_painel = self.client.get("/painel")
+            self.assertEqual(r_painel.status_code, 200)
+            self.assertIn("Sair da conta", r_painel.text)
+
+            # 5. POST /painel/logout -> encerra a sessão
+            r_out = self.client.post("/painel/logout")
+            self.assertEqual(r_out.status_code, 200)
+            self.assertEqual(self.client.get("/painel").status_code, 401)
+
+    def test_vsl_oferta_formato_vertical_9_16(self):
+        """Garante que a VSL da oferta está configurada no formato vertical (9:16) e não 16:9."""
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.text
+        self.assertIn("vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1", html)
+        self.assertIn("padding-top:177.77%", html)
+        self.assertIn("ratio=9:16", html)
+        self.assertIn("videoRatio = '9:16'", html)
+        self.assertNotIn("ratio=16:9", html)
+        self.assertNotIn("videoRatio = '16:9'", html)
+
+    def test_atalho_dev_ultimo_slide_localhost(self):
+        """Valida que o atalho dev para o último slide existe apenas para localhost / 127.0.0.1."""
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.text
+        self.assertIn("['localhost', '127.0.0.1'].includes(window.location.hostname)", html)
+        self.assertIn("devJumpInicioBtn", html)
+        self.assertIn("devFloatJumpBtn", html)
+        self.assertIn("go(T.oferta)", html)
+
+    def test_player_flutuante_sem_bloqueio_de_transform(self):
+        """Garante que .scr.flow.on não possui animação/transform ativo que prenda o iframe flutuante."""
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.text
+        self.assertIn(".scr.flow.on{animation:none !important;transform:none !important;}", html)
+        self.assertIn("scr10.style.transform = 'none'", html)
+
+    def test_player_flutuante_tamanho_pequeno_vertical(self):
+        """Garante que o player flutuante no formato vertical 9:16 usa dimensões compactas proporcionais (140px desktop e <=130px mobile)."""
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.text
+        self.assertIn("var floatingWidth = 140;", html)
+        self.assertIn("var isVertical = videoRatio === '9:16';", html)
+        self.assertIn("Math.min(130, Math.round(window.innerWidth * 0.35)) : 140", html)
+        self.assertIn("floatHeight = isVertical ? Math.round((actualWidth * 16) / 9)", html)
 
 
 if __name__ == "__main__":

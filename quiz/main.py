@@ -15,14 +15,15 @@ import mimetypes
 mimetypes.add_type("image/webp", ".webp")
 mimetypes.add_type("image/svg+xml", ".svg")
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import config
 from api.evento import router as router_evento
 from api.leitura import router as router_leitura
 from api.painel import router as router_painel
+from servicos.autenticacao_painel import PainelNaoAutenticadoError, renderizar_tela_login
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +32,30 @@ logging.basicConfig(
 logger = logging.getLogger("bussola")
 
 app = FastAPI(title="Bússola Astrológica", docs_url="/api/docs")
+
+
+@app.exception_handler(PainelNaoAutenticadoError)
+async def painel_nao_autenticado_handler(request: Request, exc: PainelNaoAutenticadoError):
+    path = request.url.path
+    accept = (request.headers.get("accept") or "").lower()
+    eh_api = (
+        request.method != "GET"
+        or path.startswith("/painel/api")
+        or path.endswith("-ajax")
+        or path.endswith("/mensagem")
+        or path.endswith("/exportar-csv")
+        or ("application/json" in accept and "text/html" not in accept)
+    )
+    if eh_api:
+        return JSONResponse(status_code=401, content={"detail": exc.detail})
+    erro_msg = "E-mail ou senha incorretos." if exc.detail == "senha incorreta" else ""
+    return HTMLResponse(
+        content=renderizar_tela_login(erro=erro_msg),
+        status_code=401,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
 app.include_router(router_leitura)
 app.include_router(router_evento)
 app.include_router(router_painel)
