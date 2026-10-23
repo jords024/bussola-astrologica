@@ -81,18 +81,18 @@ PLANETA_VIDA = {
 }
 
 CASA_VIDA = {
-    1: "você mesma, seu corpo, sua presença e o jeito como chega nos lugares",
-    2: "o que você tem, o quanto cobra e o quanto acha que vale",
-    3: "as conversas do dia a dia, as mensagens, os combinados curtos, o vaivém com quem está perto",
-    4: "a casa, a família, o que vem de antes e o que se herda sem escolher",
-    5: "o que você cria, a diversão, o namoro e o que você faz por gosto",
-    6: "a rotina, o trabalho de todo dia, o corpo e o cuidado que ele pede",
-    7: "os vínculos de igual para igual: quem escolhe você e quem você escolhe",
-    8: "o que é dividido com alguém: dívida, herança, dinheiro que depende do outro, e o assunto que ninguém toca",
-    9: "estudo, viagem, fé, e a vontade de ver mais longe que o mês que vem",
-    10: "a carreira, o lugar público, o que você constrói para ser visto",
-    11: "os grupos, as amizades, e o futuro que você quer alcançar",
-    12: "o bastidor: o que você resolve sozinho, longe de todo mundo",
+    1: "seu posicionamento: sua postura, sua presença e a clareza de como você se coloca no mundo",
+    2: "valores e recursos: o que você constrói, a sua remuneração e a valorização da sua entrega",
+    3: "comunicação e acordos: conversas diretas, negociações objetivas e alinhamento prático de decisões",
+    4: "casa e raízes: sua base íntima, estrutura familiar e o chão seguro onde você recarrega",
+    5: "autenticidade e criação: projetos autorais, expressão viva, verdade e o que leva a sua assinatura",
+    6: "rotina e métodos: método de trabalho, ritmo prático e a organização que sustenta a sua energia diária",
+    7: "parcerias e alianças: acordos de igual para igual, compromissos mútuos e escolhas conscientes",
+    8: "transformação e estratégia: cortes estratégicos, gestão de recursos compartilhados e encerramento de ciclos",
+    9: "visão e expansão: estratégia de longo prazo, estudo direcionado e ampliação do seu horizonte",
+    10: "carreira e autoridade: posicionamento profissional, visibilidade, liderança e reconhecimento do que constrói",
+    11: "alianças e futuro: rede de contatos, projetos estratégicos em grupo e portas abertas para os próximos anos",
+    12: "bastidores e planejamento: estratégia silenciosa, filtro de ruídos e preparação calculada nos bastidores",
 }
 
 # ---- Parte 2: o que se abre em cada porta, e o que pede cuidado ----
@@ -119,44 +119,30 @@ PLANETA_ALIVIO = {
 
 
 CASA_PORTA = {
-    1: ("aparecer, tomar a frente, mudar algo no visual ou no jeito de se "
-        "apresentar, comecar o que depende so de voce",
-        "atropelar os outros na pressa de se afirmar"),
-    2: ("cobrar o que vale, renegociar preco, organizar as contas, comprar "
-        "ou vender o que estava parado",
-        "confundir seguranca com acumular, ou gastar para se sentir melhor"),
-    3: ("mandar a mensagem que estava parada, retomar contato, estudar algo "
-        "curto, resolver combinados e burocracia do dia a dia",
-        "falar demais e fechar de menos; dispersar em mil assuntos"),
-    4: ("cuidar da casa, aproximar-se da familia, resolver o que ficou "
-        "pendente com quem veio antes, criar uma base para recuar",
-        "se recolher tanto que o resto da vida para"),
-    5: ("criar, se expor, namorar, brincar, mostrar o trabalho, fazer pelo "
-        "gosto e nao pela obrigacao",
-        "querer plateia para tudo, ou se cansar quando o aplauso demora"),
-    6: ("ajustar a rotina, cuidar do corpo, melhorar o metodo de trabalho, "
-        "resolver o detalhe que trava o resto",
-        "virar refem da lista de tarefas e chamar isso de produtividade"),
-    7: ("conversar com quem importa, fechar parceria, alinhar expectativa, "
-        "definir o que estava no ar entre voce e alguem",
-        "ceder demais para manter a paz, e chamar isso de acordo"),
-    8: ("acertar o que e dividido, renegociar divida, encerrar o que ja "
-        "acabou, falar do que costuma ficar sem nome",
-        "remoer em vez de resolver; transformar intimidade em cobranca"),
-    # "publicar" virava "publique uma hipotese" na carta, que nao e portugues
-    # de gente. O sentido e mostrar o proprio trabalho para fora do circulo.
-    9: ("estudar de verdade, viajar, mostrar o seu trabalho para gente de fora, "
-        "procurar sentido, olhar mais longe do que o mes que vem",
-        "trocar a decisao concreta por um plano grande que nunca comeca"),
-    10: ("aparecer no trabalho, pedir o que merece, assumir o passo publico, "
-         "deixar claro onde quer chegar",
-         "medir o proprio valor so pelo que os outros reconhecem"),
-    11: ("procurar gente, entrar num grupo, pedir ajuda na rede, comecar o "
-         "que so anda com mais de uma pessoa",
-         "diluir o proprio projeto no projeto de todo mundo"),
-    12: ("descansar de verdade, fechar ciclos em silencio, cuidar do que "
-         "ninguem ve, terapia, sono, o bastidor",
-         "sumir do mundo e chamar de recolhimento o que e fuga"),
+    1: ("assumir a frente com firmeza, definir limites inegociáveis, bancar as suas escolhas e projetar autoridade na sua presença",
+        "esperar que os outros aprovem suas decisões ou recuar por medo de incomodar"),
+    2: ("precificar com firmeza, cobrar o valor justo pelo que entrega, valorizar seus recursos e renegociar acordos materiais",
+        "misturar autovalor com escassez ou gastar impulsivamente para aliviar tensão"),
+    3: ("abrir conversas diretas, alinhar expectativas com clareza, negociar com objetividade e botar as cartas na mesa",
+        "dispersar a atenção em mil assuntos sem fechar o que é prioridade"),
+    4: ("organizar a sua base íntima, proteger o seu refúgio, estabelecer acordos claros no ambiente pessoal e criar chão para recuar",
+        "isolar-se em ressentimentos antigos ou paralisar as decisões práticas da vida"),
+    5: ("assumir sua assinatura única, expor projetos autorais, agir com entusiasmo genuíno e dar espaço para a criação e a verdade",
+        "depender de aplauso alheio ou dispersar energia em vaidades passageiras"),
+    6: ("organizar o método de trabalho, otimizar processos práticos, cuidar da energia diária e eliminar gargalos que travam o dia",
+        "virar refém de perfeccionismo inútil e se sobrecarregar com excesso de tarefas"),
+    7: ("fechar acordos claros de igual para igual, alinhar expectativas com transparência e escolher conscientemente quem caminha com você",
+        "fazer concessões unilaterais só para evitar atrito e chamar isso de acordo"),
+    8: ("renegociar termos estruturais, cortar dependências financeiras ou emocionais, encerrar o que esgotou e renascer com força estratégica",
+        "alimentar mágoas em vez de virar a página com pragmatismo e foco"),
+    9: ("expandir a visão de longo prazo, estudar o que realmente dá tração, buscar novos mercados e pensar estrategicamente",
+        "ficar desenhando planos gigantes no papel sem dar o primeiro passo no chão"),
+    10: ("assumir o protagonismo profissional, exigir reconhecimento pelo que entrega, posicionar-se com liderança e definir rumos claros",
+         "trabalhar nos bastidores esperando que alguém adivinhe o seu mérito"),
+    11: ("ativar a sua rede de alianças, aproximar-se de pessoas que abrem portas, propor projetos conjuntos e olhar para o futuro",
+         "diluir sua energia com quem não tem o mesmo nível de compromisso"),
+    12: ("filtrar o excesso de ruído externo, fazer o planejamento estratégico nos bastidores e recuperar a clareza mental e o fôlego",
+         "usar o recolhimento como desculpa para fugir da ação necessária"),
 }
 
 

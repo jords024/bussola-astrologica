@@ -4056,9 +4056,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     const janela=(carta.janela||'').trim().replace(/[.\s]+$/,'');
     /* Fragmento temporal ("ate meados de marco", "Nos proximos dias") vira frase;
        frase inteira ("Essa configuracao perde forca...") entra como veio. */
-    const fragmento=/^(até|nos|nas|no|na|ao longo|por volta|durante|pelas|pelos|em torno)(\s|$)/i.test(janela);
+    const fragmento=/^(até|nos|nas|no|na|ao longo|por volta|durante|pelas|pelos|em torno|daqui)(\s|$)/i.test(janela);
     const janelaFrase=!janela?'':(fragmento
-      ?'Isso segura '+janela.charAt(0).toLowerCase()+janela.slice(1)+'.'
+      ?'Esta janela de oportunidade permanece aberta '+janela.charAt(0).toLowerCase()+janela.slice(1)+'.'
       :janela.charAt(0).toUpperCase()+janela.slice(1)+'.');
     /* O agente varia caixa e pontuacao. Normaliza antes de juntar, senao uma
        frase cola na outra sem ponto. */

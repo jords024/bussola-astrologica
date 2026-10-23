@@ -100,15 +100,15 @@ def quando_exato(a: Optional[AspectoNorm], hoje: date) -> str:
     passou = (a.movimento == "Separating")
 
     if n <= 1:
-        return "fica exato HOJE ou amanha" if not passou else "ficou exato ontem ou hoje"
+        return "atinge o ápice HOJE ou amanhã" if not passou else "atingiu o ápice ontem ou hoje"
     if n <= 6:
-        return (f"fica exato daqui a uns {n} dias" if not passou
-                else f"ficou exato ha uns {n} dias")
+        return (f"atinge o ponto máximo daqui a uns {n} dias" if not passou
+                else f"passou pelo ápice há uns {n} dias")
     alvo = _somar_dias(hoje, -n if passou else n)
     data = f"{alvo.day} de {MES_PT[alvo.month - 1]}"
     if passou:
-        return f"ficou exato por volta de {data}, ha {n} dias"
-    return f"fica exato por volta de {data}, daqui a {n} dias"
+        return f"passou pelo ponto de virada por volta de {data}, há {n} dias"
+    return f"o ápice deste movimento se consolida por volta de {data}, daqui a {n} dias"
 
 
 def descrever_aspecto(a: AspectoNorm, casas_ok: bool) -> str:
@@ -123,12 +123,12 @@ def descrever_aspecto(a: AspectoNorm, casas_ok: bool) -> str:
     n = PLANETA_VIDA.get(a.natal, _pt_planeta(a.natal))
     humano = ASPECTO_HUMANO.get(a.aspecto, "")
     mov = {
-        "Applying": "esta CHEGANDO, ainda vai apertar",
-        "Separating": "JA PASSOU o pico, agora e assimilacao",
-        "Static": "esta parado, sem se aproximar nem se afastar",
+        "Applying": "se aproximando do ponto máximo: momento de virada e decisão prática",
+        "Separating": "já passou o ponto mais tenso, agora é assimilar e consolidar o avanço",
+        "Static": "estacionário: momento de sustentação e foco estratégico",
     }.get(a.movimento, a.movimento)
-    forca = "muito fechado, pesa bastante" if abs(a.orbe) <= 2 else (
-            "fechado" if abs(a.orbe) <= 4 else "ainda largo, pesa menos")
+    forca = "alinhamento direto e potente: momento de virar a chave" if abs(a.orbe) <= 2 else (
+            "alinhamento ativo e claro" if abs(a.orbe) <= 4 else "influência em formação")
 
     partes = [f"o que chega de fora: {t}"]
     partes.append(f"toca em voce: {n}")
@@ -364,10 +364,10 @@ def _allow_list(aspectos, presencas, placar, veredito, casas_ok: bool,
 # ======================================================================
 
 CRITERIO_HUMANO = {
-    1: "esta apertando agora",
-    2: "acabou de entrar nessa area da vida",
-    3: "ja passou o pico e agora e assimilacao",
-    4: "ainda esta se formando, vai apertar nas proximas semanas",
+    1: "momento de virada ativa e posicionamento firme",
+    2: "início de um novo ciclo com energia renovada",
+    3: "fase de consolidar o aprendizado e avançar no chão firme",
+    4: "momento exato de planejar os próximos passos e agir com clareza",
 }
 
 
@@ -483,7 +483,7 @@ def bloco_identificacao(ident, hoje: Optional[date] = None,
     s = ident.segundo
     if s is not None:
         linhas.append("")
-        linhas.append("AO MESMO TEMPO, um SEGUNDO movimento esta pegando ela:")
+        linhas.append("AO MESMO TEMPO, um SEGUNDO movimento amplia as possibilidades no mapa:")
         linhas += _fatos_do_aspecto(s, casas_ok, hoje, "2) ")
         linhas.append("")
         linhas.append(
@@ -540,20 +540,20 @@ def bloco_porta(porta, solares: bool = False, casa_do_tema=None,
     # confirma, ou e o caminho de entrada. Sem esta linha o modelo tratava a
     # porta como assunto concorrente e o texto se contorcia para ligar os dois.
     if casa_do_tema and casa_do_tema == porta.casa:
-        relacao = (f"ELA QUER TRABALHAR {tema.upper()} E A PORTA ABERTA E EXATAMENTE "
-                   "ESSA AREA. Celebre esse alinhamento com calor e certeza: "
-                   "aqui o esforco dela rende, e o momento de avancar com confianca e agora. "
-                   "A ABERTURA ja anuncia isso com alegria, e o PARAGRAFO "
-                   "mostra o que muda na pratica para destravar essa area de vez.")
+        relacao = (f"A PORTA ABERTA É EXATAMENTE A ÁREA ESCOLHIDA ({tema.upper()}). "
+                   "O céu confirma a oportunidade direta de avançar nesta área agora. "
+                   "Mostre esse alinhamento com firmeza, calor e certeza tática: "
+                   "aqui o esforço rende o dobro e o momento de destravar é agora. "
+                   "A ABERTURA anuncia a oportunidade com autoridade e o PARÁGRAFO "
+                   "entrega a alavanca prática com passos no chão.")
     elif casa_do_tema:
-        relacao = (f"ela quer trabalhar {tema}, e a porta aberta no ceu agora e {CASA_VIDA.get(porta.casa, '')}. "
-                   "Isso e uma EXCELENTE NOTICIA (BOA NOTICIA): essa porta aberta e a CHAVE DE ENTRADA estrategica "
-                   f"para destravar {tema} gastando muito menos forca e gerando resultado real. "
-                   f"No paragrafo, faca a ponte cristalina e acolhedora: mostre por que agir nesta porta aberta "
-                   f"e o passo que finalmente destrava {tema}. "
-                   "PROIBIDO verbo de concessao (nada de 'o que cede', 'o que resta', 'o jeito e', 'abrir mao'). "
-                   "PROIBIDO sugerir que ela olhou para o lugar errado: ela olhou para onde doia, e o ceu agora "
-                   "mostra por onde se entra para resolver.")
+        relacao = (f"A PESSOA QUER DESTRAVAR {tema.upper()}, E A SUA PORTA ABERTA NESTA SEMANA É: {CASA_VIDA.get(porta.casa, '')}. "
+                   "Esta é a sua maior OPORTUNIDADE TÁTICA e a CHAVE MESTRA da leitura: "
+                   f"ao agir nesta porta aberta, ela destrava {tema} com muito menos esforço e muito mais poder. "
+                   "No parágrafo, faça a ponte direta, executiva e acolhedora: "
+                   f"mostre com autoridade como assumir essa postura específica destrava {tema} no dia a dia. "
+                   "PROIBIDO tom pessimista, proibido frases de peso duradouro ou sofrimento, proibido verbos de concessão. "
+                   "Mostre a alavanca com autoridade, clareza e poder de ação imediato.")
     else:
         relacao = ""
 
