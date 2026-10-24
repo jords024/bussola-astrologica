@@ -42,16 +42,16 @@ TEMPO_TEXTO = {
     "sempre": "é assim desde sempre",
 }
 TENTOU_TEXTO = {
-    "conversa": "já conversou sobre isso com quem é próximo",
-    "estudo": "já leu e estudou sobre isso por conta própria",
-    "terapia": "já fez ou faz terapia",
-    "consulta": "já consultou astrólogo ou tarólogo antes",
-    "nada": "ainda não tentou nada; só pensa no assunto",
+    "conversa": "já conversou sobre isso com quem é próximo em busca de conselhos",
+    "estudo": "já leu, assistiu e tentou resolver por conta própria",
+    "terapia": "já fez ou faz acompanhamento profissional",
+    "consulta": "já consultou astrologia, tarot ou outras ferramentas antes",
+    "nada": "ainda não tomou uma atitude prática; só vem pensando no assunto",
 }
 QUANDO_TEXTO = {
-    "semana": "essa semana",
-    "mes": "esse mês",
-    "hora": "quando a hora chegar",
+    "semana": "ainda nesta semana",
+    "mes": "ao longo deste mês",
+    "hora": "assim que tiver clareza do caminho certo",
 }
 
 
@@ -63,8 +63,13 @@ class Quiz(BaseModel):
     vida_agora: str = Field(default="", max_length=600)
     espelho_idx: int = 0
     quebra: Literal["sim", "muitas", "nao"] = "nao"
+    # Default "" para que uma leitura antiga em cache, ou um cliente numa
+    # versão anterior da página, continue valendo.
     tempo: Literal["", "semanas", "meses", "ano", "sempre"] = ""
     tentou: Literal["", "conversa", "estudo", "terapia", "consulta", "nada"] = ""
+    # Emoção e posse variam por área (são 30 e 24 opções, não 4), então
+    # chegam como o próprio texto, já na segunda pessoa, e não como chave. A
+    # chave vem junto só para telemetria e para a chave de cache.
     emocao: str = Field(default="", max_length=160)
     posse: str = Field(default="", max_length=160)
     emocao_chave: str = Field(default="", max_length=24)
@@ -118,7 +123,6 @@ class Pedido(BaseModel):
     nascimento: Nascimento
     cidade: Cidade
     ms_ate_gerar: Optional[int] = None
-    tempo_ativo_ms: Optional[int] = None
 
 
 class Contato(BaseModel):
@@ -421,8 +425,6 @@ async def gerar(p: Pedido):
         "ms_llm": meta.get("ms_llm", 0),
         "ms_astro": t_astro,
         "ms_total": resposta["meta"]["ms"]["total"],
-        "ms_ate_gerar": p.ms_ate_gerar,
-        "tempo_ativo_ms": p.tempo_ativo_ms,
     })
 
     # o lead é gravado agora, antes de qualquer tela de oferta
@@ -434,7 +436,6 @@ async def gerar(p: Pedido):
         "cidade": p.cidade.model_dump(),
         "quiz": p.quiz.model_dump(),
         "tempo_quiz_ms": p.ms_ate_gerar,
-        "tempo_ativo_ms": p.tempo_ativo_ms,
         "veredito": resposta["veredito"],
         "precisao": precisao,
         "placar": {str(k): round(v, 1) for k, v in placar.casas.items()},
@@ -467,29 +468,21 @@ async def gerar(p: Pedido):
             "veredito": resposta["veredito"],
             "precisao": precisao,
             "tempo_quiz_ms": p.ms_ate_gerar,
-            "tempo_ativo_ms": p.tempo_ativo_ms,
             "ao_vivo": True,
         },
         "total_ao_vivo": len(rastreador_presenca.obter_ativos(90.0))
     })
 
-    # Agendamento do disparo do webhook para ZapVoice / zapjords (timer de 5 min)
-    # Se o usuário preencher a nota ou pular na tela da mensagem antes dos 5 min,
-    # o cronômetro é cancelado e o webhook é enviado imediatamente com a nota/estrelas.
+    # Disparo assíncrono do webhook para ZapVoice (nome completo, número e mensagem da leitura)
     if p.whatsapp:
-        webhook.agendar_webhook_leitura(
-            leitura_id=leitura_id,
-            nome_completo=p.nome_completo,
-            whatsapp=p.whatsapp,
-            carta=resposta["carta"],
-            meta={
-                "casa_aberta": veredito.casa_aberta,
-                "area": p.quiz.area,
-                "nascimento": p.nascimento.model_dump(),
-                "cidade": p.cidade.model_dump(),
-                "quiz": p.quiz.model_dump(),
-            },
-        )
+        asyncio.create_task(asyncio.to_thread(
+            webhook.disparar_webhook_leitura,
+            p.nome_completo,
+            p.whatsapp,
+            resposta["carta"],
+            leitura_id,
+            {"casa_aberta": veredito.casa_aberta, "area": p.quiz.area},
+        ))
 
     return resposta
 
@@ -511,53 +504,13 @@ async def contato(c: Contato):
             arq = registro.DIR_LEITURAS / f"{c.leitura_id}.json"
             if arq.exists():
                 d = json.loads(arq.read_text(encoding="utf-8"))
-                meta_contato = {
-                    "nascimento": d.get("nascimento"),
-                    "cidade": d.get("cidade"),
-                    "quiz": d.get("quiz"),
-                }
-                if d.get("feedback_estrelas") is not None or d.get("feedback_pulou"):
-                    asyncio.create_task(asyncio.to_thread(
-                        webhook.disparar_webhook_leitura,
-                        d.get("nome_completo", ""),
-                        c.whatsapp,
-                        d.get("carta", {}),
-                        c.leitura_id,
-                        meta_contato,
-                        None,
-                        d.get("feedback_estrelas"),
-                        bool(d.get("feedback_pulou")),
-                    ))
-                else:
-                    webhook.agendar_webhook_leitura(
-                        leitura_id=c.leitura_id,
-                        nome_completo=d.get("nome_completo", ""),
-                        whatsapp=c.whatsapp,
-                        carta=d.get("carta", {}),
-                        meta=meta_contato,
-                    )
+                asyncio.create_task(asyncio.to_thread(
+                    webhook.disparar_webhook_leitura,
+                    d.get("nome_completo", ""),
+                    c.whatsapp,
+                    d.get("carta", {}),
+                    c.leitura_id,
+                ))
         except Exception:
             pass
     return {"ok": ok}
-
-
-class VslPlayPayload(BaseModel):
-    video_id: str = ""
-    video_tipo: str = "oferta"
-    leitura_id: str = ""
-    nome: str = ""
-    whatsapp: str = ""
-
-
-@router.post("/api/vsl-play")
-async def registrar_vsl_play(payload: VslPlayPayload):
-    """Recebe notificação quando o contato aperta o play na VSL e dispara o webhook assíncrono."""
-    asyncio.create_task(asyncio.to_thread(
-        webhook.disparar_webhook_vsl_play,
-        nome=payload.nome,
-        whatsapp=payload.whatsapp,
-        video_id=payload.video_id,
-        video_tipo=payload.video_tipo,
-        leitura_id=payload.leitura_id,
-    ))
-    return {"ok": True, "event": "vsl_play"}

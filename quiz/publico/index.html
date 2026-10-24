@@ -90,7 +90,6 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     min-height:calc(100dvh - 46px);justify-content:center;padding:34px 0 40px;}
   .scr.on{display:flex;animation:rise .55s cubic-bezier(.2,.9,.3,1) both;}
   .scr.flow{justify-content:flex-start;min-height:auto;}
-  .scr.flow.on{animation:none !important;transform:none !important;}
   @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 
@@ -382,19 +381,11 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
   .dial .flash{transform-origin:100px 100px;}
   .dial .glow{fill:none;stroke:var(--amber);stroke-width:1.4;opacity:0;transition:opacity .9s ease;}
   .dial .glow.on{opacity:.85;}
-  #vturb-wrapper-65cb9c18-e117-4734-a983-2fc6275c2061,
-  #vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1 {
-    max-width: min(350px, 84vw, calc((100dvh - 230px) * .5625)) !important;
-    width: 100%;
-    margin: 0 auto 16px !important;
-    background: transparent;
-  }
-  #vslGo {
-    margin: 18px auto 0;
-  }
-  .scr.com-video #vslGo {
-    animation: rise .4s ease both;
-  }
+  .vsl{width:min(340px, 84vw, calc((100dvh - 250px) * .5625));margin:0 auto 20px;
+    aspect-ratio:9/16;border-radius:14px;background:rgba(242,239,233,.035);}
+  .vsl vturb-smartplayer{display:block;width:100%;border-radius:14px;overflow:hidden;
+    box-shadow:0 22px 60px -30px rgba(0,0,0,.9);}
+  .vsl vturb-smartplayer .thumbnail{border-radius:14px;overflow:hidden;}
   /* Com video, a bussola grande competiria com ele pela atencao e empurraria
      o botao para fora da dobra no celular. A roda da tela 7 ja entrega esse
      pagamento visual. Sem video, a classe nao entra e a tela fica como era. */
@@ -949,7 +940,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
 <!-- 3 · A PROVA CALIBRADA -->
 <section class="scr" data-s="12">
-  <div class="eye">✦ primeira leitura</div>
+  <div class="eye">✦ diagnóstico estratégico</div>
   <h2 class="big" id="provaTitulo"></h2>
   <p class="sub" id="provaTexto"></p>
   <div class="gap"></div>
@@ -958,52 +949,52 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
 <!-- 4 · O QUE JÁ TENTOU -->
 <section class="scr" data-s="13">
-  <div class="eye">✦ o que já veio antes</div>
+  <div class="eye">✦ histórico prático</div>
   <h2 class="big">O que você já tentou para resolver isso?</h2>
-  <p class="sub q">Não existe resposta errada aqui. Saber por onde você já passou muda o que faz sentido te dizer.</p>
+  <p class="sub q">Entender por onde você já passou evita conselhos genéricos. Eu preciso ir direto na raiz.</p>
   <div class="gap"></div>
   <div class="opts" id="tentouOpts">
-    <button class="opt" data-v="conversa">Conversei com quem é próximo</button>
-    <button class="opt" data-v="estudo">Li, assisti, estudei por conta</button>
-    <button class="opt" data-v="terapia">Já fiz ou faço terapia</button>
-    <button class="opt" data-v="consulta">Já consultei astrólogo ou tarólogo antes</button>
-    <button class="opt" data-v="nada">Nada ainda. Só fico pensando nisso</button>
+    <button class="opt" data-v="conversa">Já tive conversas difíceis e tentei alinhar expectativas</button>
+    <button class="opt" data-v="estudo">Estudei, li e tentei encontrar soluções por conta própria</button>
+    <button class="opt" data-v="terapia">Fiz ou faço terapia / acompanhamento profissional</button>
+    <button class="opt" data-v="consulta">Consultei astrólogo, tarólogo ou outros métodos</button>
+    <button class="opt" data-v="nada">Ainda não tomei uma atitude prática; só venho pensando no assunto</button>
   </div>
 </section>
 
 <!-- 4 · CONTEXTO ATUAL -->
 <section class="scr" data-s="4">
-  <div class="eye">✦ a sua pergunta</div>
-  <h2 class="big" id="desejoTitulo">O que você gostaria de <em>compreender melhor</em>?</h2>
+  <div class="eye">✦ foco do destrave</div>
+  <h2 class="big" id="desejoTitulo">O que você mais precisa <em>destravar</em>?</h2>
   <div class="gap"></div>
   <div class="opts" id="desejoOpts"></div>
 </section>
 
 <!-- 6 · O ECO E O QUE MAIS ELA QUISER CONTAR -->
 <section class="scr" data-s="18">
-  <div class="eye">✦ anotado</div>
+  <div class="eye">✦ contexto específico</div>
   <p id="contextoEco" class="contexto-eco"></p>
   <div class="contexto-campo">
-    <label for="vidaAgora">Tem mais alguma coisa que eu deveria saber antes de abrir o seu mapa?</label>
-    <textarea id="vidaAgora" rows="4" maxlength="600" aria-describedby="contextoAjuda contextoContador" placeholder="Uma situação, uma decisão, uma data que está pesando…"></textarea>
+    <label for="vidaAgora">Tem algum detalhe específico que eu deva levar em conta ao abrir o seu mapa?</label>
+    <textarea id="vidaAgora" rows="4" maxlength="600" aria-describedby="contextoAjuda contextoContador" placeholder="Uma meta prioritária, uma decisão entre duas opções, alguém envolvido ou um prazo..."></textarea>
     <small id="contextoContador">0 / 600 caracteres</small>
-    <p class="hint" id="contextoAjuda">Opcional, mas é o que mais deixa a leitura com a sua cara. Evite dados sensíveis.</p>
+    <p class="hint" id="contextoAjuda">Opcional. Quanto mais direto for o seu contexto, mais cirúrgica e personalizada será a resposta do seu mapa.</p>
   </div>
   <button class="go" data-go id="brkGo">Continuar</button>
 </section>
 
 <!-- 6 · O CUSTO DE NÃO MEXER -->
 <section class="scr" data-s="14">
-  <div class="eye">✦ o que você sente</div>
+  <div class="eye">✦ o que está em jogo</div>
   <h2 class="big" id="emocaoTitulo"></h2>
-  <p class="sub q">Não existe resposta bonita aqui. A verdadeira é a que serve.</p>
+  <p class="sub q">Sem filtros. A sua resposta real é o que orienta a precisão da leitura.</p>
   <div class="gap"></div>
   <div class="opts" id="emocaoOpts"></div>
 </section>
 
 <!-- 7 · A POSSE -->
 <section class="scr" data-s="15">
-  <div class="eye">✦ o próximo passo</div>
+  <div class="eye">✦ decisão e ação</div>
   <h2 class="big" id="posseTitulo"></h2>
   <div class="gap"></div>
   <div class="opts" id="posseOpts"></div>
@@ -1011,24 +1002,24 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
 <!-- 8 · QUANDO -->
 <section class="scr" data-s="16">
-  <div class="eye">✦ o seu tempo</div>
-  <h2 class="big">Quando você quer dar esse passo?</h2>
-  <p class="sub q">A resposta muda o fecho da sua leitura.</p>
+  <div class="eye">✦ prazo de movimento</div>
+  <h2 class="big">Em quanto tempo você quer ver esse movimento acontecer?</h2>
+  <p class="sub q">Isso define a urgência e a profundidade da orientação do seu mapa.</p>
   <div class="gap"></div>
   <div class="opts" id="quandoOpts">
-    <button class="opt" data-v="semana">Essa semana</button>
-    <button class="opt" data-v="mes">Esse mês</button>
-    <button class="opt" data-v="hora">Quando a hora chegar</button>
+    <button class="opt" data-v="semana">O quanto antes (preciso de clareza imediata)</button>
+    <button class="opt" data-v="mes">Nas próximas semanas (estou planejando o próximo passo)</button>
+    <button class="opt" data-v="hora">No momento certo (quero entender o tempo de maturação)</button>
   </div>
 </section>
 
 <!-- 9 · A PONTE PARA OS DADOS -->
 <section class="scr" data-s="17">
-  <div class="eye">✦ falta pouco</div>
-  <h2 class="big">Já sei o que procurar.<br><em>Agora preciso do seu mapa.</em></h2>
+  <div class="eye">✦ coordenadas natais</div>
+  <h2 class="big">Diagnóstico definido.<br><em>Agora preciso das coordenadas do seu nascimento.</em></h2>
   <p class="sub" id="ponteTexto"></p>
   <div class="gap"></div>
-  <button class="go" data-go>Montar o meu mapa</button>
+  <button class="go" data-go>Calcular o meu mapa natal</button>
 </section>
 
 <!-- 5 · OS DADOS -->
@@ -1154,241 +1145,8 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
 <!-- 6 · O CÁLCULO -->
 <section class="scr" data-s="6">
-  <div id="vturb-wrapper-65cb9c18-e117-4734-a983-2fc6275c2061" style="max-width:640px;width:100%;margin:0 auto;background:transparent;display:none;">
-    <div style="position:relative;width:100%;padding-top:177.77%;background:transparent;">
-      <iframe id="vsl01Iframe" src="https://turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061&ratio=9:16&width=640px&transparent=1" data-src="https://turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:20px;background:transparent;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
-    </div>
-  </div>
-  <script>
-  (function() {
-    var videoId = '65cb9c18-e117-4734-a983-2fc6275c2061';
-    var videoRatio = '9:16';
-    var isFloatingConfig = true;
-    var floatingPos = 'bottom-right';
-    var floatingWidth = 320;
-    var isCloseable = true;
-
-    var isFloatingDismissed = false;
-    var isVideoPlaying = false;
-    var isIntersecting = true;
-
-    var updateFloatingState = function() {};
-
-    window.addEventListener('message', function(e) {
-      if (!e.data) return;
-      if (e.data.videoId && e.data.videoId !== videoId) return;
-      if (e.data.type === 'VTURB_PLAY_STATE') {
-        isVideoPlaying = Boolean(e.data.isPlaying);
-        updateFloatingState();
-      }
-      if (e.data.type === 'VTURB_PITCH_REACHED') {
-        var sel = e.data.targetSelector || '.delay-pitch';
-        document.querySelectorAll(sel).forEach(function(el) { el.style.display = 'block'; });
-        if (e.data.autoScroll) {
-          var first = document.querySelector(sel);
-          if (first) {
-            var top = first.getBoundingClientRect().top + window.pageYOffset - (e.data.scrollOffset || 50);
-            window.scrollTo({ top: top, behavior: 'smooth' });
-          }
-        }
-        if (e.data.persistence && e.data.videoId) {
-          try { localStorage.setItem('vturb_pitch_' + e.data.videoId, '1'); } catch(err) {}
-        }
-      }
-      if (e.data.type === 'VTURB_PIXEL_TRACK') {
-        var evt = e.data.eventName;
-        if (typeof window.fbq === 'function') window.fbq('trackCustom', evt, { video_id: e.data.videoId });
-        if (typeof window.gtag === 'function') window.gtag('event', evt, { video_id: e.data.videoId });
-        if (window.ttq && typeof window.ttq.track === 'function') window.ttq.track(evt, { video_id: e.data.videoId });
-      }
-    });
-
-    var trackingConfig = {};
-    if (trackingConfig && trackingConfig.enabled) {
-      if (trackingConfig.facebook_pixel_id && !window.fbq) {
-        (function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
-        window.fbq('init', trackingConfig.facebook_pixel_id);
-        window.fbq('track', 'PageView');
-      }
-      if (trackingConfig.google_analytics_id && !window.gtag) {
-        var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(trackingConfig.google_analytics_id); document.head.appendChild(gs);
-        window.dataLayer = window.dataLayer || [];
-        window.gtag = function(){window.dataLayer.push(arguments);};
-        window.gtag('js', new Date());
-        window.gtag('config', trackingConfig.google_analytics_id);
-      }
-      if (trackingConfig.tiktok_pixel_id && !window.ttq) {
-        (function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(t,e);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];ttq._i[e]._u=i;ttq._t=ttq._t||{};ttq._t[e]=+new Date;ttq._o=ttq._o||{};ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript";o.async=!0;o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load(trackingConfig.tiktok_pixel_id);ttq.page();})(window,document,'ttq');
-      }
-    }
-
-    var unlocked = false;
-    function notifyIframe() {
-      if (unlocked) return;
-      unlocked = true;
-      var ifr = document.querySelector('iframe[src*="' + videoId + '"]');
-      if (ifr && ifr.contentWindow) {
-        try { ifr.contentWindow.postMessage({ type: 'VTURB_PARENT_INTERACTION' }, '*'); } catch(e) {}
-      }
-    }
-    ['click', 'touchstart', 'scroll', 'keydown'].forEach(function(evt) {
-      window.addEventListener(evt, notifyIframe, { once: true, passive: true });
-    });
-
-    try {
-      var parentSid = localStorage.getItem('vturb_visitor_id');
-      if (!parentSid) {
-        parentSid = 'vis_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
-        localStorage.setItem('vturb_visitor_id', parentSid);
-      }
-      var ifrSid = document.querySelector('iframe[src*="' + videoId + '"]');
-      if (ifrSid && ifrSid.src && ifrSid.src.indexOf('sid=') === -1) {
-        ifrSid.src = ifrSid.src + (ifrSid.src.indexOf('?') !== -1 ? '&' : '?') + 'sid=' + encodeURIComponent(parentSid);
-      }
-    } catch(err) {}
-
-    function setupFloatingObserver() {
-      var wrapper = document.getElementById('vturb-wrapper-' + videoId);
-      var ifr = document.querySelector('iframe[src*="' + videoId + '"]');
-      if (wrapper && ifr && 'IntersectionObserver' in window) {
-        var visObserver = new IntersectionObserver(function(entries) {
-          entries.forEach(function(entry) {
-            if (entry.isIntersecting && ifr.contentWindow) {
-              try { ifr.contentWindow.postMessage({ type: 'VTURB_VISIBILITY', visible: true }, '*'); } catch(e) {}
-            }
-          });
-        }, { threshold: 0.05 });
-        visObserver.observe(wrapper);
-      }
-      if (!isFloatingConfig || !wrapper || !ifr) return;
-
-      var closeBtn = document.getElementById('vturb-close-floating-' + videoId);
-      if (!closeBtn && isCloseable) {
-        closeBtn = document.createElement('button');
-        closeBtn.id = 'vturb-close-floating-' + videoId;
-        closeBtn.innerHTML = '&#x2715;';
-        closeBtn.title = 'Fechar mini player';
-        closeBtn.style.position = 'fixed';
-        closeBtn.style.zIndex = '100000';
-        closeBtn.style.width = '28px';
-        closeBtn.style.height = '28px';
-        closeBtn.style.borderRadius = '50%';
-        closeBtn.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-        closeBtn.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-        closeBtn.style.color = '#ffffff';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.display = 'none';
-        closeBtn.style.alignItems = 'center';
-        closeBtn.style.justifyContent = 'center';
-        closeBtn.style.fontSize = '14px';
-        closeBtn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.4)';
-        closeBtn.onclick = function(ev) {
-          ev.stopPropagation();
-          isFloatingDismissed = true;
-          updateFloatingState(false);
-          try {
-            if (ifr && ifr.contentWindow) {
-              ifr.contentWindow.postMessage({ type: 'VTURB_COMMAND', action: 'pause' }, '*');
-            }
-          } catch(err) {}
-        };
-        document.body.appendChild(closeBtn);
-      }
-
-      var isCurrentlyFloating = false;
-
-      updateFloatingState = function(forceState) {
-        if (!wrapper || !ifr) return;
-        var scr6 = wrapper.closest('.scr[data-s="6"]');
-        var isScr6Active = !scr6 || scr6.classList.contains('on');
-        var shouldFloat = (typeof forceState === 'boolean' ? forceState : isCurrentlyFloating) && isFloatingConfig && !isFloatingDismissed && isScr6Active;
-        isCurrentlyFloating = shouldFloat;
-
-        if (shouldFloat) {
-          var isVertical = videoRatio === '9:16';
-          var actualWidth = isVertical ? Math.min(floatingWidth, 250) : floatingWidth;
-          var floatHeight = isVertical ? Math.round((actualWidth * 16) / 9) : Math.round((actualWidth * 9) / 16);
-          var marginEdge = 32;
-          var marginEdgeRight = 56;
-          ifr.style.position = 'fixed';
-          ifr.style.top = 'auto';
-          ifr.style.bottom = marginEdge + 'px';
-          if (floatingPos === 'bottom-left') {
-            ifr.style.left = marginEdge + 'px';
-            ifr.style.right = 'auto';
-          } else {
-            ifr.style.right = marginEdgeRight + 'px';
-            ifr.style.left = 'auto';
-          }
-          ifr.style.width = actualWidth + 'px';
-          ifr.style.height = floatHeight + 'px';
-          ifr.style.zIndex = '99999';
-          ifr.style.backgroundColor = '#000000';
-          ifr.style.borderRadius = '12px';
-          ifr.style.boxShadow = '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.15)';
-          ifr.style.transition = 'box-shadow 0.2s ease, border-radius 0.2s ease';
-
-          if (closeBtn) {
-            closeBtn.style.display = 'flex';
-            closeBtn.style.top = 'auto';
-            closeBtn.style.bottom = (marginEdge + floatHeight - 14) + 'px';
-            if (floatingPos === 'bottom-left') {
-              closeBtn.style.left = (marginEdge + actualWidth - 14) + 'px';
-              closeBtn.style.right = 'auto';
-            } else {
-              closeBtn.style.right = (marginEdgeRight - 12) + 'px';
-              closeBtn.style.left = 'auto';
-            }
-          }
-        } else {
-          ifr.style.transition = 'none';
-          ifr.style.position = 'absolute';
-          ifr.style.top = '0';
-          ifr.style.left = '0';
-          ifr.style.right = 'auto';
-          ifr.style.bottom = 'auto';
-          ifr.style.width = '100%';
-          ifr.style.height = '100%';
-          ifr.style.zIndex = '1';
-          ifr.style.borderRadius = '20px';
-          ifr.style.boxShadow = 'none';
-
-          if (closeBtn) {
-            closeBtn.style.display = 'none';
-          }
-        }
-      };
-
-      if ('IntersectionObserver' in window) {
-        var observer = new IntersectionObserver(function(entries) {
-          entries.forEach(function(entry) {
-            var rect = entry.boundingClientRect;
-            var pastTop = rect.bottom < 80;
-            if (!pastTop || entry.intersectionRatio > 0.35) {
-              isFloatingDismissed = false;
-            }
-            if (!isCurrentlyFloating) {
-              if (pastTop && entry.intersectionRatio < 0.15) {
-                updateFloatingState(true);
-              }
-            } else {
-              if (!pastTop || entry.intersectionRatio > 0.35) {
-                updateFloatingState(false);
-              }
-            }
-          });
-        }, { threshold: [0, 0.1, 0.2, 0.35, 0.5] });
-        observer.observe(wrapper);
-      }
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupFloatingObserver);
-    } else {
-      setupFloatingObserver();
-    }
-  })();
-  </script>
+  <!-- o player e montado por JS ao entrar nesta tela; ver vslIniciar() -->
+  <div class="vsl" id="vslBox" hidden></div>
   <svg class="dial" viewBox="0 0 200 200" role="img" aria-label="Bússola localizando qual das doze portas está aberta">
     <defs>
       <linearGradient id="ndlN" x1="0" y1="0" x2="0" y2="1">
@@ -1539,9 +1297,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     <h2 class="big" id="ofertaVslTitulo" tabindex="-1">Você acabou de ler uma porta.<br><em>Faltam onze.</em></h2>
     <p class="sub" id="ofertaSub">A que você viu agora fecha em algumas semanas. Depois dela vem outra, e outra, e nenhuma delas avisa. A Bússola te ensina a achar a próxima sem depender de ninguém.</p>
   </header>
-  <div id="vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1" style="max-width:min(350px, 84vw, calc((100dvh - 230px) * .5625));width:100%;margin:0 auto 16px;background:transparent;">
-    <div style="position:relative;width:100%;padding-top:177.77%;background:transparent;">
-      <iframe id="ofertaVsl" data-src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=350px&transparent=1" src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=350px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:16px;background:transparent;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
+  <div id="vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1" style="max-width:640px;width:100%;margin:0 auto 20px;background:#0d0c0a;border-radius:12px;overflow:hidden;">
+    <div style="position:relative;width:100%;padding-top:177.77%;background:#0d0c0a;">
+      <iframe id="ofertaVsl" data-src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" src="https://turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1&ratio=9:16&width=640px&transparent=1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:1px;background:#0d0c0a;color-scheme:dark;" allow="autoplay *; fullscreen *; encrypted-media *" allowfullscreen allowtransparency="true"></iframe>
     </div>
   </div>
   <script>
@@ -1550,32 +1308,28 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     var videoRatio = '9:16';
     var isFloatingConfig = true;
     var floatingPos = 'bottom-right';
-    var floatingWidth = 140;
+    var floatingWidth = 320;
     var isCloseable = true;
 
     var isFloatingDismissed = false;
     var isVideoPlaying = false;
     var isIntersecting = true;
-    var updateFloatingState = function() {};
 
     window.addEventListener('message', function(e) {
-      if (!e.data) return;
-      if (e.data.videoId && e.data.videoId !== videoId) return;
       var playerFrame = document.getElementById('ofertaVsl');
-      if (!e.data.videoId && playerFrame && e.source && e.source !== playerFrame.contentWindow) return;
+      if (!e.data || !playerFrame || e.source !== playerFrame.contentWindow || e.origin !== 'https://turb-front.aryaraj.shop') return;
       if (e.data.type === 'VTURB_PLAY_STATE') {
         isVideoPlaying = Boolean(e.data.isPlaying);
-        updateFloatingState();
+        if (typeof window.updateFloatingState === 'function') window.updateFloatingState();
         if (typeof window.vslOfertaNotificarPlayState === 'function') window.vslOfertaNotificarPlayState(isVideoPlaying);
-        if (isVideoPlaying && typeof window.vslNotificarPlay === 'function') {
-          window.vslNotificarPlay(videoId, 'oferta');
-        }
       }
       if (e.data.type === 'VTURB_PITCH_REACHED') {
-        var sel = e.data.targetSelector || '.delay-pitch';
+        var sel = e.data.targetSelector || '.delay-pitch, #oferta-pitch';
         document.querySelectorAll(sel).forEach(function(el) { el.style.display = 'block'; });
         if (typeof window.vslOfertaRevelar === 'function') {
           window.vslOfertaRevelar('pitch');
+        } else if (typeof vslOfertaRevelar === 'function') {
+          vslOfertaRevelar('pitch');
         }
         if (e.data.autoScroll) {
           var first = document.querySelector(sel);
@@ -1592,12 +1346,22 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         var evt = e.data.eventName;
         if (typeof window.fbq === 'function') window.fbq('trackCustom', evt, { video_id: e.data.videoId });
         if (typeof window.gtag === 'function') window.gtag('event', evt, { video_id: e.data.videoId });
-        if (window.ttq && typeof window.ttq.track === 'function') window.ttq.track(evt, { video_id: e.data.videoId });
+        if (typeof window.ttq === 'function' && typeof window.ttq.track === 'function') window.ttq.track(evt, { video_id: e.data.videoId });
+        if (typeof A !== 'undefined' && A.ev) A.ev('oferta_vsl', {estado:'marco', marco:String(evt).slice(0,40)});
+        if (evt === 'PitchReached' || e.data.trigger === 'pitch') {
+          if (typeof window.vslOfertaRevelar === 'function') window.vslOfertaRevelar('pitch');
+        }
+        if (evt === 'ViewContent_75' || e.data.trigger === 'percent_75') {
+          if (typeof window.vslOfertaCalibrarProgresso === 'function') window.vslOfertaCalibrarProgresso(210);
+        }
+        if (evt === 'ViewContent_100' || e.data.trigger === 'percent_100') {
+          if (typeof window.vslOfertaRevelar === 'function') window.vslOfertaRevelar('fim_video');
+        }
       }
     });
 
     // Inicialização autônoma de Pixels de Rastreamento (Facebook, Google, TikTok) se configurados
-    var trackingConfig = {};
+    var trackingConfig = {"enabled":true,"facebook_pixel_id":"776532458708522","google_analytics_id":"","tiktok_pixel_id":"","events":[{"trigger":"percent_25","event_name":"ViewContent_25","enabled":true},{"trigger":"percent_50","event_name":"ViewContent_50","enabled":true},{"trigger":"percent_75","event_name":"ViewContent_75","enabled":true},{"trigger":"percent_100","event_name":"ViewContent_100","enabled":true},{"trigger":"pitch","event_name":"PitchReached","enabled":true}]};
     if (trackingConfig && trackingConfig.enabled) {
       if (trackingConfig.facebook_pixel_id && !window.fbq) {
         (function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
@@ -1621,7 +1385,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     function notifyIframe() {
       if (unlocked) return;
       unlocked = true;
-      var ifr = document.querySelector('iframe[src*="' + videoId + '"]');
+      var ifr = document.getElementById('ofertaVsl') || document.querySelector('iframe[src*="' + videoId + '"]');
       if (ifr && ifr.contentWindow) {
         try { ifr.contentWindow.postMessage({ type: 'VTURB_PARENT_INTERACTION' }, '*'); } catch(e) {}
       }
@@ -1630,41 +1394,24 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       window.addEventListener(evt, notifyIframe, { once: true, passive: true });
     });
 
-    // Sincronização de ID de visitante 1st-party (evita duplicação no Safari iOS / Instagram Ads)
-    try {
-      var parentSid = localStorage.getItem('vturb_visitor_id');
-      if (!parentSid) {
-        parentSid = 'vis_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
-        localStorage.setItem('vturb_visitor_id', parentSid);
-      }
-      var ifrSid = document.querySelector('iframe[src*="' + videoId + '"]');
-      if (ifrSid && ifrSid.src && ifrSid.src.indexOf('sid=') === -1) {
-        ifrSid.src = ifrSid.src + (ifrSid.src.indexOf('?') !== -1 ? '&' : '?') + 'sid=' + encodeURIComponent(parentSid);
-      }
-    } catch(err) {}
-
     try {
       if (localStorage.getItem('vturb_pitch_' + videoId) === '1') {
-        var sel = '.delay-pitch';
+        var sel = '.delay-pitch, #oferta-pitch';
         document.querySelectorAll(sel).forEach(function(el) { el.style.display = 'block'; });
+        if (typeof window.vslOfertaRevelar === 'function') {
+          window.vslOfertaRevelar('ja_viu');
+        } else if (typeof vslOfertaRevelar === 'function') {
+          vslOfertaRevelar('ja_viu');
+        }
       }
     } catch(err) {}
 
-    // Lógica do Player Flutuante e Visibilidade Real na Tela
+    // Lógica do Player Flutuante (Picture-in-Picture no site externo)
     function setupFloatingObserver() {
+      if (!isFloatingConfig) return;
       var wrapper = document.getElementById('vturb-wrapper-' + videoId);
-      var ifr = document.querySelector('iframe[src*="' + videoId + '"]');
-      if (wrapper && ifr && 'IntersectionObserver' in window) {
-        var visObserver = new IntersectionObserver(function(entries) {
-          entries.forEach(function(entry) {
-            if (entry.isIntersecting && ifr.contentWindow) {
-              try { ifr.contentWindow.postMessage({ type: 'VTURB_VISIBILITY', visible: true }, '*'); } catch(e) {}
-            }
-          });
-        }, { threshold: 0.05 });
-        visObserver.observe(wrapper);
-      }
-      if (!isFloatingConfig || !wrapper || !ifr) return;
+      var ifr = document.getElementById('ofertaVsl') || document.querySelector('iframe[src*="' + videoId + '"]');
+      if (!wrapper || !ifr) return;
 
       // Cria botão de fechar flutuante se não existir
       var closeBtn = document.getElementById('vturb-close-floating-' + videoId);
@@ -1690,7 +1437,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         closeBtn.onclick = function(ev) {
           ev.stopPropagation();
           isFloatingDismissed = true;
-          window.updateFloatingState(false);
+          if (typeof window.updateFloatingState === 'function') window.updateFloatingState(false);
           try {
             if (ifr && ifr.contentWindow) {
               ifr.contentWindow.postMessage({ type: 'VTURB_COMMAND', action: 'pause' }, '*');
@@ -1702,7 +1449,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
       var isCurrentlyFloating = false;
 
-      updateFloatingState = window.updateFloatingState = function(forceState) {
+      window.updateFloatingState = function(forceState) {
         if (!wrapper || !ifr) return;
         var scr10 = wrapper.closest('.scr[data-s="10"]');
         var isScreen10Active = !scr10 || scr10.classList.contains('on');
@@ -1710,20 +1457,14 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         isCurrentlyFloating = shouldFloat;
 
         if (shouldFloat) {
-          if (scr10) {
-            scr10.style.transform = 'none';
-            scr10.style.animation = 'none';
-          }
           var isVertical = videoRatio === '9:16';
-          var isMobile = window.innerWidth <= 600;
-          var actualWidth = isVertical ? (isMobile ? Math.min(130, Math.round(window.innerWidth * 0.35)) : 140) : floatingWidth;
+          var actualWidth = isVertical ? Math.min(floatingWidth, 250) : floatingWidth;
           var floatHeight = isVertical ? Math.round((actualWidth * 16) / 9) : Math.round((actualWidth * 9) / 16);
-          var marginEdge = isMobile ? 84 : 32;
-          var marginEdgeBottom = marginEdge;
-          var marginEdgeRight = isMobile ? 16 : 32;
+          var marginEdge = 32;
+          var marginEdgeRight = 56;
           ifr.style.position = 'fixed';
           ifr.style.top = 'auto';
-          ifr.style.bottom = marginEdgeBottom + 'px';
+          ifr.style.bottom = marginEdge + 'px';
           if (floatingPos === 'bottom-left') {
             ifr.style.left = marginEdge + 'px';
             ifr.style.right = 'auto';
@@ -1747,7 +1488,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
               closeBtn.style.left = (marginEdge + actualWidth - 14) + 'px';
               closeBtn.style.right = 'auto';
             } else {
-              closeBtn.style.right = (marginEdgeRight - 10) + 'px';
+              closeBtn.style.right = (marginEdgeRight - 12) + 'px';
               closeBtn.style.left = 'auto';
             }
           }
@@ -1761,7 +1502,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
           ifr.style.width = '100%';
           ifr.style.height = '100%';
           ifr.style.zIndex = '1';
-          ifr.style.borderRadius = '0px';
+          ifr.style.borderRadius = '1px';
           ifr.style.boxShadow = 'none';
 
           if (closeBtn) {
@@ -1779,7 +1520,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
               isFloatingDismissed = false;
             }
             if (!isCurrentlyFloating) {
-              if (pastTop && entry.intersectionRatio < 0.15) {
+              if (pastTop && entry.intersectionRatio < 0.15 && isVideoPlaying) {
                 window.updateFloatingState(true);
               }
             } else {
@@ -2103,7 +1844,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   let i = 0;
   const S = {area:null,mirror:null,brk:'nao',desejo:'',vidaAgora:'',nome:'',signo:'',whatsapp:'',
              tempo:'',tentou:'',emocao:'',posse:'',quando:'',desejoIdx:-1};
-  window.S = S;
 
   /* Heartbeat de presença ativa: a cada 20s enquanto a aba estiver visível */
   setInterval(() => {
@@ -2138,7 +1878,10 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     /* Ao sair da preparação, o vídeo não acompanha a leitura em segundo plano. */
     if(de === T.calculo && n !== T.calculo){
       clearInterval(vslRelogio);
-      vslPausar01();
+      const player = vslPlayer();
+      if(player && typeof player.pause === 'function'){
+        try{ player.pause(); }catch(e){}
+      }
     }
     scr[i].classList.remove('on');
     i = Math.max(0, Math.min(scr.length-1, n));
@@ -2179,7 +1922,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if (i === T.eco)     montarEco();
     if (i === T.desejo)  buildContexto();
     if (i === T.ponte)   montarPonte();
-    if (i === T.dados)   dadosPasso(de > T.dados ? 2 : 0);
+    if (i === T.dados)   dadosPasso(0);
     if (i === T.leitura){ prepararPonte();
       const chave=S.leitura?.leitura_id||'atual';
       $('#cartaConteudo').dataset.leitura=chave;
@@ -2200,27 +1943,9 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       ofertaPersonalizar();
       $('#ofertaVslTitulo').focus({preventScroll:true});
     }
-    atualizarBotaoContinuarEscolha(scr[i]);
     atualizarBtnWhatsApp(i);
   }
-  function atualizarBotaoContinuarEscolha(telaEl){
-    if (!telaEl) return;
-    const lista = telaEl.querySelector('.opts');
-    if (!lista) return;
-    lista.classList.remove('indo');
-    let btn = telaEl.querySelector('.btn-continuar-escolha');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'go btn-continuar-escolha';
-      btn.textContent = 'Continuar';
-      btn.style.display = 'none';
-      btn.addEventListener('click', () => go(i + 1));
-      lista.insertAdjacentElement('afterend', btn);
-    }
-    const jaTemSelecao = Boolean(lista.querySelector('.opt.sel'));
-    btn.style.display = jaTemSelecao ? 'block' : 'none';
-  }
+  window.T = T; window.go = go; window.S = S; window.dadosPasso = dadosPasso;
   function atualizarBtnWhatsApp(etapaIndex){
     const waWrap = document.getElementById('whatsappSuporteWrapper');
     if (!waWrap) return;
@@ -2260,99 +1985,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   let vslOfertaRelogios = [];
   let vslTempoReproducao = 0;       /* segundos acumulados de video reproduzido */
   let vslPlayTicker = null;
-  let vslConfigOferta = null;
-
-  var _vslPlaysEnviados = {};
-  window.vslNotificarPlay = function(vid, tipo) {
-    if (!vid) return;
-    var chave = vid + '_' + (tipo || 'video');
-
-    var nome = '';
-    var whatsapp = '';
-    var leituraId = '';
-
-    try {
-      var sObj = (typeof S !== 'undefined' && S) ? S : (window.S || null);
-      if (sObj) {
-        nome = (sObj.nomeCompleto || sObj.nome || '').trim();
-        whatsapp = (sObj.whatsapp || '').trim();
-        if (sObj.leitura && sObj.leitura.leitura_id) {
-          leituraId = sObj.leitura.leitura_id;
-        }
-      }
-    } catch(e) {}
-
-    try {
-      if (!nome) {
-        var nmEl = document.getElementById('nm');
-        if (nmEl && nmEl.value) nome = nmEl.value.trim();
-      }
-      if (!nome) {
-        nome = (localStorage.getItem('bsl_lead_nome') || '').trim();
-      }
-      if (!whatsapp) {
-        var telEl = document.getElementById('tel');
-        var ddiEl = document.getElementById('ddi');
-        if (telEl && telEl.value) {
-          var ddi = ddiEl ? ddiEl.value : '+55';
-          whatsapp = (ddi + ' ' + telEl.value).trim();
-        }
-      }
-      if (!whatsapp) {
-        whatsapp = (localStorage.getItem('bsl_lead_whatsapp') || '').trim();
-      }
-      if (!leituraId) {
-        leituraId = (localStorage.getItem('bsl_leitura_id') || '').trim();
-      }
-    } catch(e) {}
-
-    if (!nome && !whatsapp && !leituraId) {
-      return;
-    }
-
-    var temDados = Boolean(nome || whatsapp);
-    if (_vslPlaysEnviados[chave] && (!temDados || _vslPlaysEnviados[chave] === 'completo')) {
-      return;
-    }
-    _vslPlaysEnviados[chave] = temDados ? 'completo' : 'parcial';
-
-    var payload = {
-      video_id: vid,
-      video_tipo: tipo || 'oferta',
-      nome: nome,
-      whatsapp: whatsapp,
-      leitura_id: leituraId
-    };
-
-    try {
-      fetch('/api/vsl-play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        keepalive: true
-      }).catch(function() {});
-    } catch(e) {}
-  };
-
-  function vslCarregarConfig(){
-    if(vslConfigOferta) return Promise.resolve(vslConfigOferta);
-    const sid = (typeof S !== 'undefined' && S.sid) ? S.sid : (typeof A !== 'undefined' && A.sid ? A.sid : '');
-    const aid = (typeof S !== 'undefined' && S.aid) ? S.aid : (typeof A !== 'undefined' && A.aid ? A.aid : '');
-    return fetch('/api/config-oferta?sid=' + encodeURIComponent(sid) + '&aid=' + encodeURIComponent(aid))
-      .then(r => r.json())
-      .then(data => {
-        vslConfigOferta = data;
-        if(data && data.pitch_imediato){
-          vslOfertaRevelar('pitch_imediato');
-        }
-        return data;
-      })
-      .catch(() => {
-        vslConfigOferta = {modo: 'delay', variante: 'B', pitch_imediato: false};
-        return vslConfigOferta;
-      });
-  }
-  try{ vslCarregarConfig(); }catch(e){}
 
   function vslOfertaIniciarTicker(){
     if(vslPlayTicker || vslOfertaRevelada) return;
@@ -2547,7 +2179,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     vslOfertaPararTicker();
     vslOfertaRelogios.forEach(clearTimeout);
     vslOfertaRelogios = [];
-    if (typeof window.updateFloatingState === 'function') window.updateFloatingState(false);
     vslOfertaPausar();
   }
 
@@ -2673,48 +2304,12 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     }
   }
 
-  /* Atalho Dev exclusivo para localhost / 127.0.0.1: pular direto para o último slide */
-  if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-    const devPularParaOferta = () => {
-      if (!S.nome) S.nome = 'Visitante';
-      if (!S.desejo) S.desejo = 'compreender seu momento';
-      if (!S.area) S.area = 'carreira';
-      go(T.oferta);
-      if (typeof vslOfertaRevelar === 'function') vslOfertaRevelar('dev_atalho');
-    };
-
-    // 1. Botão no slide inicial (data-s="0") logo abaixo de #portalGo
-    const portalGo = document.getElementById('portalGo');
-    if (portalGo) {
-      const devBtn = document.createElement('button');
-      devBtn.type = 'button';
-      devBtn.id = 'devJumpInicioBtn';
-      devBtn.className = 'dev-jump-btn';
-      devBtn.textContent = '⚡ Pular para o último slide (Dev)';
-      devBtn.style.cssText = 'margin:12px auto 0;display:block;background:rgba(217,119,6,0.18);border:1px dashed #d97706;color:#fbbf24;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:all .2s ease;';
-      devBtn.onmouseover = () => { devBtn.style.background = 'rgba(217,119,6,0.35)'; };
-      devBtn.onmouseout = () => { devBtn.style.background = 'rgba(217,119,6,0.18)'; };
-      devBtn.onclick = devPularParaOferta;
-      portalGo.insertAdjacentElement('afterend', devBtn);
-    }
-
-    // 2. Atalho flutuante no topo direito para poder pular de qualquer etapa
-    const devFloatBtn = document.createElement('button');
-    devFloatBtn.type = 'button';
-    devFloatBtn.id = 'devFloatJumpBtn';
-    devFloatBtn.textContent = '⚡ Pular para Oferta (Dev)';
-    devFloatBtn.title = 'Atalho de desenvolvimento: pular direto para a tela de oferta';
-    devFloatBtn.style.cssText = 'position:fixed;top:14px;right:16px;z-index:999999;background:rgba(20,20,20,0.85);backdrop-filter:blur(8px);border:1px solid #d97706;color:#fbbf24;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.5);transition:all .2s ease;font-family:sans-serif;';
-    devFloatBtn.onmouseover = () => { devFloatBtn.style.transform = 'scale(1.05)'; devFloatBtn.style.borderColor = '#f59e0b'; };
-    devFloatBtn.onmouseout = () => { devFloatBtn.style.transform = 'scale(1)'; devFloatBtn.style.borderColor = '#d97706'; };
-    devFloatBtn.onclick = devPularParaOferta;
-    document.body.appendChild(devFloatBtn);
-  }
-
-  /* voltar: da leitura volta para a tela do video; da oferta volta para a leitura */
+  /* voltar: da leitura pula o cálculo e cai direto nos dados */
   function back(){
     if (i === 0) return;
-    const SKIP = {[T.oferta]:T.leitura};
+    /* da leitura pula o calculo e cai direto nos dados; da oferta volta para
+       a leitura, nao para a tela do caminho que a VSL substituiu */
+    const SKIP = {[T.leitura]:T.dados, [T.oferta]:T.leitura};
     /* Da tela do video da para voltar, mas nao e so trocar de tela: existe
        uma geracao em andamento e um video tocando. cancelarLeitura() desfaz
        as duas coisas e avisa o catch do spin() que isto foi escolha da
@@ -2871,14 +2466,14 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
      astronomica. O que a pessoa precisa sentir aqui e que foi reconhecida,
      nao que foi instruida. */
   const CICLO = {
-    semanas: ['Isso chegou de repente.',
-      'O que aperta assim, do nada, costuma ir embora no mesmo ritmo em que chegou. É uma porta que abre rápido e fecha rápido. Dá pra usar, mas não dá pra deixar pra depois.'],
-    meses:   ['Esse é o tempo mais enganoso de todos.',
-      'É longo o bastante pra cansar você e curto o bastante pra parecer que ainda vai passar sozinho. Quase nunca passa. Alguma coisa se abriu nesse período e continua aberta, esperando você olhar.'],
-    ano:     ['Mais de um ano não é fase.',
-      'Isso não é falta de sorte e não é coisa da sua cabeça. O que dura tanto tempo assim é um ciclo longo, desses que voltam a cobrar a mesma coisa até serem resolvidos. E ciclo longo tem hora de virar.'],
-    sempre:  ['Se é desde sempre, muda tudo.',
-      'Então não é fase ruim nem momento difícil. É um jeito seu, que veio junto com você. Isso não se resolve: se compreende. E quando a pessoa entende, para de doer do mesmo jeito.']
+    semanas: ['Um movimento recente no seu céu.',
+      'Quando uma inquietação surge ou se intensifica nas últimas semanas, não é acaso: é um gatilho rápido de trânsito planetário. O risco aqui é agir por impulso ou deixar passar uma janela clara de oportunidade. O seu mapa mostra exatamente onde essa energia deve ser canalizada agora.'],
+    meses:   ['Um ciclo de transição em aberto.',
+      'Três a quatro meses é o intervalo em que uma situação deixa de ser pontual e exige posicionamento. Quem não decide estrategicamente nessa fase acaba sendo empurrado pelas circunstâncias. Há uma porta ativa no seu céu agora cobrando clareza e direção prática.'],
+    ano:     ['Um padrão estrutural do seu momento.',
+      'Mais de um ano enfrentando a mesma barreira ou com a ambição represada não é fase passageira. É a cobrança direta de um trânsito de planetas lentos pedindo reestruturação profunda. Todo ciclo longo tem um ponto de virada definitivo quando você entende as regras do jogo.'],
+    sempre:  ['Uma configuração central da sua matriz natal.',
+      'Sentir isso desde sempre revela que não se trata de uma crise passageira, mas de uma força estrutural do seu próprio mapa de nascimento. Não é algo para suportar passivamente, e sim uma potência que ainda não foi orientada para o lugar certo. Quando você entende essa mecânica, ela deixa de ser um peso e vira sua maior alavanca.']
   };
   const AREA_NOME = {dinheiro:'dinheiro', amor:'amor', carreira:'trabalho',
                      casa:'casa e família', corpo:'corpo e rotina', caminhos:'direção'};
@@ -2899,9 +2494,8 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   function montarProva(){
     const c = CICLO[S.tempo] || CICLO.meses;
     $('#provaTitulo').textContent = c[0];
-    const frase = S.mirror ? ('Você me disse: <i>“' + S.mirror + '”</i>. ') : '';
-    const fecho = ' Daqui a pouco eu abro a porta ' + areaArt().replace(/^o /,'do ').replace(/^a /,'da ')
-      + ' no seu mapa e vejo o que está se movendo ali agora.';
+    const frase = S.mirror ? ('Você pontuou: <i>“' + S.mirror + '”</i>. ') : '';
+    const fecho = ' Na sequência, vou abrir o seu mapa natal para te mostrar com precisão o que está se movimentando ' + areaEm() + ' agora.';
     $('#provaTexto').innerHTML = frase + c[1] + fecho;
   }
 
@@ -2949,30 +2543,33 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
               ['pressa','Pressa. Sinto que estou atrasada na minha vida','pressa, a sensação de estar atrasada na própria vida']]
   };
   const POSSE = {
-    dinheiro:[['encarar','Olharia de frente para os números que venho evitando','olhar de frente para os números que vem evitando'],
-              ['cobrar','Cobraria o que já é meu, ou pediria o aumento','cobrar o que já é seu, ou pedir o aumento'],
-              ['decidir','Decidiria de uma vez entre as opções que estão na mesa','decidir de uma vez entre as opções que estão na mesa'],
-              ['comecar','Começaria o que venho adiando por medo de errar','começar o que vem adiando por medo de errar']],
-    amor:[['conversar','Teria a conversa que venho ensaiando há semanas','ter a conversa que vem ensaiando há semanas'],
-          ['agir','Daria o primeiro passo em vez de ficar esperando','dar o primeiro passo em vez de ficar esperando'],
-          ['decidir','Decidiria se fico ou se sigo em frente','decidir se fica ou se segue em frente'],
-          ['soltar','Pararia de me cobrar por algo que não depende só de mim','parar de se cobrar por algo que não depende só de você']],
-    carreira:[['pedir','Pediria o que eu sei que mereço','pedir o que sabe que merece'],
-              ['conversar','Teria a conversa que venho adiando com quem decide','ter a conversa que vem adiando com quem decide'],
-              ['decidir','Decidiria de uma vez se fico ou se mudo','decidir de uma vez se fica ou se muda'],
-              ['comecar','Começaria o projeto que vive na minha cabeça','começar o projeto que vive na sua cabeça']],
-    casa:[['conversar','Teria a conversa que a família toda evita','ter a conversa que a família toda evita'],
-          ['limite','Poria um limite que eu nunca pus','pôr um limite que nunca pôs'],
-          ['mudar','Decidiria sobre a mudança que está no ar','decidir sobre a mudança que está no ar'],
-          ['soltar','Pararia de carregar o que não é meu','parar de carregar o que não é seu']],
-    corpo:[['marcar','Marcaria aquilo que venho empurrando com a barriga','marcar aquilo que vem empurrando com a barriga'],
-           ['rotina','Mudaria uma coisa só na rotina, e sustentaria','mudar uma coisa só na rotina e sustentar'],
-           ['descanso','Tiraria o descanso da última posição da lista','tirar o descanso da última posição da lista'],
-           ['soltar','Pararia de cuidar de todo mundo antes de mim','parar de cuidar de todo mundo antes de você']],
-    caminhos:[['escolher','Escolheria um caminho e pararia de olhar os outros','escolher um caminho e parar de olhar os outros'],
-              ['comecar','Começaria o que venho ensaiando há meses','começar o que vem ensaiando há meses'],
-              ['dizer','Diria em voz alta o que eu já decidi em silêncio','dizer em voz alta o que já decidiu em silêncio'],
-              ['mexer','Pararia de esperar ter certeza para me mexer','parar de esperar ter certeza para se mexer']]
+    dinheiro:[['multiplicar','Traçaria uma rota clara para aumentar minha renda ou patrimônio','traçar uma rota clara para aumentar sua renda ou patrimônio'],
+              ['organizar','Cortaria desperdícios e colocaria as contas em ordem definitiva','cortar desperdícios e colocar as contas em ordem definitiva'],
+              ['cobrar','Cobraria o valor justo pelo meu trabalho e renegociaria contratos','cobrar o valor justo pelo seu trabalho e renegociar contratos'],
+              ['investir','Faria investimentos com segurança, sem medo de errar a mão','fazer investimentos com segurança, sem medo de errar a mão'],
+              ['destravar','Pararia de trabalhar tanto para ver o dinheiro evaporar no fim do mês','parar de trabalhar tanto para ver o dinheiro evaporar no fim do mês']],
+    amor:[['alinhar','Teria a conversa definitiva para alinhar o futuro da relação','ter a conversa definitiva para alinhar o futuro da relação'],
+          ['decidir','Decidiria com clareza se continuo investindo ou se viro a página','decidir com clareza se continua investindo ou se vira a página'],
+          ['atrair','Pararia de repetir os mesmos erros e me abriria para uma relação compatível','parar de repetir os mesmos erros e se abrir para uma relação compatível'],
+          ['limites','Colocaria limites firmes e pararia de me doar sem reciprocidade','colocar limites firmes e parar de se doar sem reciprocidade'],
+          ['posicionar','Pararia de me anular para manter a harmonia a qualquer custo','parar de se anular para manter a harmonia a qualquer custo']],
+    carreira:[['acelerar','Aceleraria meu crescimento para o próximo nível de cargo ou faturamento','acelerar o seu crescimento para o próximo nível de cargo ou faturamento'],
+              ['transicao','Faria a transição de carreira ou começaria meu próprio negócio','fazer a transição de carreira ou começar o seu próprio negócio'],
+              ['posicionar','Cobria mais caro, pediria a promoção ou me posicionaria com autoridade','cobrar mais caro, pedir a promoção ou se posicionar com autoridade'],
+              ['decidir','Decidiria de uma vez se continuo onde estou ou se mudo de rumo','decidir de uma vez se continua onde está ou se muda de rumo'],
+              ['executar','Tiraria meu projeto do papel e pararia de adiar a execução','tirar o seu projeto do papel e parar de adiar a execução']],
+    casa:[['limites','Colocaria limites firmes e pararia de carregar problemas da família que não são meus','colocar limites firmes e parar de carregar problemas da família que não são seus'],
+          ['decidir','Bateria o martelo sobre mudança de casa, cidade ou reforma pendente','bater o martelo sobre mudança de casa, cidade ou reforma pendente'],
+          ['conversar','Teria a conversa franca que a família inteira vem evitando','ter a conversa franca que a família inteira vem evitando'],
+          ['espaco','Construiria a minha própria independência e paz no dia a dia','construir a sua própria independência e paz no dia a dia']],
+    corpo:[['rotina','Construiria uma rotina consistente de treino, alimentação e sono','construir uma rotina consistente de treino, alimentação e sono'],
+           ['desacelerar','Abaixaria o estresse antes de operar no limite do esgotamento','abaixar o estresse antes de operar no limite do esgotamento'],
+           ['cuidar','Faria os exames e consultas médicas que venho empurrando com a barriga','fazer os exames e consultas médicas que vem empurrando com a barriga'],
+           ['priorizar','Pararia de colocar todas as outras urgências acima da minha saúde','parar de colocar todas as outras urgências acima da sua saúde']],
+    caminhos:[['direcao','Escolheria uma prioridade central e pararia de me dispersar','escolher uma prioridade central e parar de se dispersar'],
+              ['decisao','Assumiria a decisão que já tomei internamente mas ainda tenho receio de bancar','assumir a decisão que já tomou internamente mas ainda tem receio de bancar'],
+              ['recomeco','Iniciaria um novo ciclo do zero com convicção e sem olhar para trás','iniciar um novo ciclo do zero com convicção e sem olhar para trás'],
+              ['foco','Recuperaria o ritmo, a ambição e a clareza sobre o meu futuro','recuperar o ritmo, a ambição e a clareza sobre o seu futuro']]
   };
 
   /* Monta uma das duas listas para a area escolhida. Guarda a chave, para a
@@ -3007,31 +2604,31 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   }
   function montarPosse(){
     $('#posseTitulo').innerHTML =
-      'Imagine que eu já te disse <em>o que está mexendo ' + areaEm() + '</em> agora. O que você faria primeiro?';
+      'Sabendo com precisão <em>o que está bloqueando ou impulsionando ' + areaPosse() + '</em> agora, qual seria a sua primeira atitude?';
     montarEscolhaPorArea('posseOpts', POSSE, 'posse');
   }
   function montarPonte(){
     $('#ponteTexto').innerHTML =
-      'Preciso saber onde o céu estava no dia em que você nasceu. São três perguntas rápidas, e a sua carta começa a ser escrita.';
+      'O céu não erra de endereço. Com sua data, hora e cidade de nascimento, eu calculo a posição exata de cada planeta no instante em que você nasceu. São três passos rápidos para traçar sua leitura.';
   }
 
   /* ---- quebra ---- */
   const DESEJOS = {
-    dinheiro:['Organizar melhor minhas prioridades','Entender minha relação com o dinheiro','Pensar nos próximos passos de um projeto'],
-    amor:['Entender o que busco em uma relação','Olhar para uma relação que já existe','Reconhecer padrões nas minhas escolhas'],
-    carreira:['Pensar em uma mudança de trabalho','Reconhecer o que quero desenvolver','Reorganizar meu ritmo e minhas prioridades'],
-    casa:['Lidar melhor com mudanças em casa','Entender meu lugar nas relações familiares','Encontrar mais espaço para minhas necessidades'],
-    corpo:['Perceber como está meu ritmo','Reorganizar minha rotina de descanso','Reservar espaço para cuidar de mim'],
-    caminhos:['Entender o que quero neste momento','Pensar em um recomeço','Escolher uma prioridade entre possibilidades']
+    dinheiro:['Descobrir onde estão os bloqueios no meu fluxo de dinheiro','Saber a melhor rota para multiplicar minha renda e patrimônio','Tomar decisões financeiras com segurança e sem margem para erro'],
+    amor:['Entender o momento real da relação e o que precisa ser alinhado','Identificar se devo insistir ou se é hora de encerrar o ciclo','Romper padrões repetitivos para construir uma relação sólida'],
+    carreira:['Descobrir a estratégia certa para acelerar minha carreira ou negócio','Saber exatamente se é hora de mudar de rota ou avançar onde estou','Ganhar clareza para me posicionar com autoridade e cobrar mais caro'],
+    casa:['Resolver conflitos familiares pendentes e estabelecer meus limites','Tomar uma decisão definitiva sobre mudança, imóvel ou convivência','Conquistar autonomia e blindar meu espaço pessoal de interferências'],
+    corpo:['Superar o cansaço constante e restaurar meu ritmo e vitalidade','Construir disciplina e consistência real na minha rotina de saúde','Aprender a desacelerar a mente antes de entrar em exaustão'],
+    caminhos:['Ter clareza absoluta sobre qual decisão de vida tomar agora','Destravar a coragem necessária para executar o que venho adiando','Encontrar uma direção clara para o meu próximo ciclo de realizações']
   };
   /* As mesmas frases, ditas pelo Crassus de volta para ela. Mesma ordem. */
   const DESEJOS_ECO = {
-    dinheiro:['organizar melhor as suas prioridades','entender a sua relação com o dinheiro','pensar nos próximos passos de um projeto'],
-    amor:['entender o que você busca em uma relação','olhar para uma relação que já existe','reconhecer padrões nas suas escolhas'],
-    carreira:['pensar em uma mudança de trabalho','reconhecer o que você quer desenvolver','reorganizar o seu ritmo e as suas prioridades'],
-    casa:['lidar melhor com as mudanças em casa','entender o seu lugar nas relações da família','encontrar mais espaço para as suas necessidades'],
-    corpo:['perceber como está o seu ritmo','reorganizar a sua rotina de descanso','reservar espaço para cuidar de você'],
-    caminhos:['entender o que você quer neste momento','pensar em um recomeço','escolher uma prioridade entre as possibilidades']
+    dinheiro:['descobrir onde estão os bloqueios no seu fluxo de dinheiro','saber a melhor rota para multiplicar sua renda e patrimônio','tomar decisões financeiras com segurança e sem margem para erro'],
+    amor:['entender o momento real da relação e o que precisa ser alinhado','identificar se deve insistir ou se é hora de encerrar o ciclo','romper padrões repetitivos para construir uma relação sólida'],
+    carreira:['descobrir a estratégia certa para acelerar sua carreira ou negócio','saber exatamente se é hora de mudar de rota ou avançar onde está','ganhar clareza para se posicionar com autoridade e cobrar mais caro'],
+    casa:['resolver conflitos familiares pendentes e estabelecer seus limites','tomar uma decisão definitiva sobre mudança, imóvel ou convivência','conquistar autonomia e blindar seu espaço pessoal de interferências'],
+    corpo:['superar o cansaço constante e restaurar seu ritmo e vitalidade','construir disciplina e consistência real na sua rotina de saúde','aprender a desacelerar a mente antes de entrar em exaustão'],
+    caminhos:['ter clareza absoluta sobre qual decisão de vida tomar agora','destravar a coragem necessária para executar o que vem adiando','encontrar uma direção clara para o seu próximo ciclo de realizações']
   };
   let contextoArea=null;
   function buildContexto(){
@@ -3039,10 +2636,10 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     contextoArea=S.area; S.desejo=''; S.vidaAgora='';
     $('#vidaAgora').value=''; $('#contextoContador').textContent='0 / 600 caracteres';
     $('#desejoTitulo').innerHTML =
-      'Sobre <em>' + areaPosse() + '</em>, o que você mais gostaria de compreender?';
+      'Sobre <em>' + areaPosse() + '</em>, qual é o seu principal foco agora?';
     const box=$('#desejoOpts');box.replaceChildren();
     box.classList.remove('done','indo');box.hidden=false;
-    [...(DESEJOS[S.area]||DESEJOS.caminhos),'Quero explorar, ainda não sei dizer'].forEach((t,idx)=>{
+    [...(DESEJOS[S.area]||DESEJOS.caminhos),'Quero uma visão geral, ainda estou avaliando'].forEach((t,idx)=>{
       const b=document.createElement('button');b.className='opt';b.textContent=t;
       b.addEventListener('click',()=>{
         if(box.classList.contains('indo'))return;
@@ -3634,12 +3231,21 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
      comeca em 'indisponivel' e so sai de la quando existe um video de fato
      tocando na tela.                                                        */
   const VSL = {
-    video: '65cb9c18-e117-4734-a983-2fc6275c2061',
-    segundos: 16,        /* quando o botao pode aparecer (pelo menos 16 segundos) */
+    conta:  '223abe8e-2d2e-49cd-918d-557c6d31f4f3',
+    player: '6aae980148ba928c1d0d6efb',
+    fonte:  '6aae97f09446f4c41ce4eb52',
+    segundos: 18,        /* quando o botao pode aparecer (18 segundos) */
     esperaMontar: 2500,  /* sem NADA desenhado ate aqui, a bussola volta */
     esperaPlayer: 9000,  /* sem video ate aqui, seguimos sem ele */
+    travaMs: 6000,       /* relogio do video parado por tanto tempo = travou */
     tetoEspera: 120000,  /* rede de seguranca final, acima do tempo da carta */
-    garantiaBotao: 16000,
+    /* A GARANTIA. Passado este tempo COM A CARTA PRONTA, o botao aparece,
+       nao importa em que estado o video ficou. Existe porque a regra das duas
+       condicoes dependia de dois disparos avulsos se encontrarem: se a carta
+       ficasse pronta enquanto o video ainda tocava, ninguem chamava de novo e
+       a tela ficava sem botao e sem erro - a pior falha possivel, porque nao
+       da nem para a pessoa tentar outra vez. */
+    garantiaBotao: 1500,
   };
 
   let vslEstado = 'indisponivel';   /* indisponivel | carregando | tocando | fim */
@@ -3648,56 +3254,97 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   let vslAbertoEm = 0;
   let vslRelogio = null;
 
+  /* O script do player so e baixado quando a pessoa chega na tela dos dados.
+     Injetar no carregamento da pagina seria puxar um player de video para
+     100% das visitas, inclusive quem abandona na primeira tela - e a maior
+     perda do funil e justamente ali. Da tela 5 ate o play sobram dezenas de
+     segundos, tempo de sobra para o player estar pronto. */
+  /* Tela 5: so aquece a rede. O player.js e baixado para o cache mas NAO
+     executa, porque <link rel=preload as=script> nao roda nada. Assim a
+     compra do arquivo acontece enquanto a pessoa digita nome e data, e na
+     tela 6 sobra so o custo de executar. */
   function vslPreparar(){
     if(vslInjetado) return;
     vslInjetado = true;
-    ['https://turb-front.aryaraj.shop', 'https://turb-back.aryaraj.shop'].forEach(href => {
+    [['script', 'https://scripts.converteai.net/' + VSL.conta + '/players/' + VSL.player + '/v4/player.js'],
+     ['script', 'https://scripts.converteai.net/lib/js/smartplayer-wc/v4/smartplayer.js'],
+     ['fetch',  'https://cdn.converteai.net/' + VSL.conta + '/' + VSL.fonte + '/main.m3u8']
+    ].forEach(([como, href]) => {
       const l = document.createElement('link');
-      l.rel = 'preconnect'; l.href = href;
+      l.rel = 'preload'; l.href = href; l.as = como;
+      if(como === 'fetch') l.crossOrigin = 'anonymous';
       document.head.appendChild(l);
     });
     A.ev('vsl', {estado:'preload'});
   }
 
-  function vslPlayer(){
-    return null;
+  /* Tela 6: monta o elemento e SO ENTAO executa o player.
+
+     A ordem nao e detalhe, e a coisa toda. Medido nos dois sentidos:
+
+     - elemento no HTML e script na tela 5: o smartAutoPlay dispara no
+       connectedCallback, mesmo dentro de um container com [hidden], e a
+       pessoa chegava na tela 6 com onze segundos de Crassus ja falados.
+     - elemento criado na tela 6 e script na tela 5: o player.js procura
+       #vid-<id> quando executa, nao acha nada, e nenhum player nasce.
+
+     Entao os dois esperam pela tela 6, e o preload paga o preco da rede. */
+  function vslMontar(box){
+    if(box.firstElementChild) return false;
+    const el = document.createElement('vturb-smartplayer');
+    el.id = 'vid-' + VSL.player;
+    box.appendChild(el);
+    const s = document.createElement('script');
+    s.src = 'https://scripts.converteai.net/' + VSL.conta + '/players/' + VSL.player + '/v4/player.js';
+    s.async = true;
+    s.addEventListener('error', () => A.ev('vsl', {estado:'script_falhou'}, true));
+    document.head.appendChild(s);
+    return true;
   }
 
-  function vslPausar01(){
-    const ifr = document.getElementById('vsl01Iframe') || (document.getElementById('vturb-wrapper-' + VSL.video) && document.getElementById('vturb-wrapper-' + VSL.video).querySelector('iframe'));
-    if(ifr && ifr.contentWindow){
-      try{
-        ifr.contentWindow.postMessage({type:'VTURB_COMMAND', action:'pause'}, '*');
-      }catch(e){}
-    }
+  /* Onde esta o tempo do video.
+
+     A VTurb nao coloca um <video> no DOM: quem guarda currentTime, duration e
+     paused e o proprio custom element, alcancavel por
+     window.smartplayer.instances[0].instance. Isso foi medido no player real
+     desta conta - procurar <video> na pagina devolvia null mesmo com o video
+     tocando, e o video caia fora sem motivo.
+
+     O <video> continua sendo aceito como segunda opcao para o dia em que a
+     VTurb mudar de estrategia ou o player for trocado por outro. */
+  function vslPlayer(){
+    const sp = window.smartplayer;
+    const inst = sp && sp.instances && sp.instances[0];
+    const el = inst && inst.instance;
+    if(el && typeof el.currentTime === 'number') return el;
+    const box = document.getElementById('vslBox');
+    const v = box && box.querySelector('video');
+    return v || null;
   }
 
   function vslLiberar(motivo){
-    if(i !== T.calculo || voltandoDeProposito) return;
-    const decorrido = Date.now() - vslAbertoEm;
-    /* REGRA ESTRITA: espera pelo menos 16 segundos para liberar o botao */
-    if(decorrido < (VSL.segundos * 1000)) return;
     const btn = document.getElementById('vslGo');
     if(!btn || btn.style.display === 'block') return;
-    btn.hidden = false;
     btn.style.display = 'block';
-    try{ btn.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){}
     A.ev('vsl', {estado:'botao', motivo:motivo,
-                 ms_na_tela: decorrido}, true);
+                 ms_na_tela: Date.now() - vslAbertoEm}, true);
   }
 
   /* As duas condicoes. Chamada pelo relogio do video e pelo fim da geracao. */
   function vslTalvezLiberar(motivo){
-    if(!leituraPronta || i !== T.calculo || voltandoDeProposito) return;
+    if(!leituraPronta) return;
     if(vslEstado === 'indisponivel'){ vslGuardaParar(); fill(); go(T.leitura); return; }
-    const decorrido = Date.now() - vslAbertoEm;
-    if(decorrido >= (VSL.segundos * 1000)){ vslGuardaParar(); vslLiberar(motivo); return; }
+    if(vslEstado === 'fim'){ vslGuardaParar(); vslLiberar(motivo); return; }
+    /* A carta ficou pronta com o video ainda rodando. Antes isto simplesmente
+       nao fazia nada, e como as duas chamadas sao avulsas, ninguem tentava de
+       novo: a tela ficava parada para sempre. Agora fica um vigia de pe. */
     vslGuardaIniciar();
   }
 
   /* O VIGIA.
-     Com a carta pronta, o botao TEM que esperar os 16 segundos minimos
-     e depois ser liberado. */
+     Com a carta pronta, o botao TEM que aparecer. Ele espera o video terminar
+     por mais um tempo curto - o fim do video ainda e o melhor momento - e
+     depois solta assim mesmo. Um video sem fim nao pode custar a venda. */
   let vslGuarda = null;
   let vslGuardaDesde = 0;
 
@@ -3705,12 +3352,13 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if(vslGuarda) return;
     vslGuardaDesde = Date.now();
     vslGuarda = setInterval(() => {
-      if(!leituraPronta || i !== T.calculo || voltandoDeProposito){ vslGuardaParar(); return; }
+      if(!leituraPronta){ vslGuardaParar(); return; }
       if(vslEstado === 'indisponivel'){ vslGuardaParar(); fill(); go(T.leitura); return; }
-      const decorrido = Date.now() - vslAbertoEm;
-      if(decorrido >= (VSL.segundos * 1000)){
+      if(vslEstado === 'fim'){ vslGuardaParar(); vslLiberar('carta_pronta'); return; }
+      if(Date.now() - vslGuardaDesde > VSL.garantiaBotao){
         vslGuardaParar();
-        vslLiberar('tempo_16s');
+        A.ev('vsl', {estado:'botao_garantido', video:vslEstado}, true);
+        vslLiberar('garantia');
       }
     }, 250);
   }
@@ -3721,65 +3369,115 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
 
   function vslIniciar(){
     vslAbertoEm = Date.now();
-    const wrap = document.getElementById('vturb-wrapper-' + VSL.video);
-    const ifr = document.getElementById('vsl01Iframe') || (wrap && wrap.querySelector('iframe'));
+    const box = document.getElementById('vslBox');
     const tela = document.querySelector('section.scr[data-s="6"]');
-    if(!wrap){ vslEstado = 'indisponivel'; return; }
+    if(!box){ vslEstado = 'indisponivel'; return; }
     vslEstado = 'carregando';
-    wrap.style.display = 'block';
+    const novo = vslMontar(box);
+    box.hidden = false;
     if(tela) tela.classList.add('com-video');
 
-    if(ifr && !ifr.src){
-      ifr.src = ifr.getAttribute('data-src') || ('https://turb-front.aryaraj.shop/?embed=' + VSL.video + '&ratio=9:16&width=640px&transparent=1');
+    /* Remontagem: quem voltou para os dados e reenviou cai aqui com o player
+       ja existente e PAUSADO por cancelarLeitura(). O smartAutoPlay so roda
+       no nascimento do elemento, entao o play tem que partir daqui - sem
+       isso o relogio fica parado, o detector de travada entende engasgo e
+       entrega o botao aos seis segundos com o video no comeco. */
+    if(!novo){
+      const anterior = vslPlayer();
+      if(anterior && typeof anterior.play === 'function'){
+        try{ anterior.play(); }catch(e){}
+      }
     }
 
-    if(ifr && ifr.contentWindow){
-      try{ ifr.contentWindow.postMessage({type:'VTURB_PARENT_INTERACTION'}, '*'); }catch(e){}
-    }
-
+    let marcouPlay = false;
+    let montou = false;
+    let recuou = false;
+    let ultimoTempo = -1;
+    let ultimoAvanco = Date.now();
     clearInterval(vslRelogio);
     vslRelogio = setInterval(() => {
       const decorrido = Date.now() - vslAbertoEm;
-      if (decorrido >= (VSL.segundos * 1000)) {
-        vslEstado = 'fim';
-        if (leituraPronta) {
-          clearInterval(vslRelogio);
-          vslLiberar('tempo_16s');
-        }
+      const v = vslPlayer();
+
+      if(!montou && box.firstElementChild && box.firstElementChild.childElementCount){
+        montou = true;
+        if(recuou){ recuou = false; box.hidden = false;
+                    if(tela) tela.classList.add('com-video'); }
+        A.ev('vsl', {estado:'montou', ms:decorrido});
       }
-      if (decorrido > VSL.tetoEspera) {
+
+      /* Com o preload da tela 5, o thumbnail aparece em torno de 200ms. Se
+         depois de dois segundos e meio nao ha um pixel desenhado, o script
+         nao vai chegar - e encarar um retangulo vazio ate a decisao final,
+         nove segundos adiante, e pior do que ver a bussola girando. Ela
+         volta, e se o player aparecer atrasado ele retoma o lugar. */
+      if(!montou && !recuou && decorrido > VSL.esperaMontar){
+        recuou = true;
+        box.hidden = true;
+        if(tela) tela.classList.remove('com-video');
+        A.ev('vsl', {estado:'demorou', ms:decorrido});
+      }
+
+      /* Nao ha player nenhum: a tela volta a ser a de antes. */
+      if(!v){
+        if(decorrido > VSL.esperaPlayer && vslEstado === 'carregando'){
+          clearInterval(vslRelogio);
+          vslEstado = 'indisponivel';
+          box.hidden = true;
+          if(tela) tela.classList.remove('com-video');
+          A.ev('vsl', {estado:'sem_player', ms:decorrido}, true);
+          vslTalvezLiberar('sem_player');
+        }
+        return;
+      }
+
+      const tempo = Number(v.currentTime) || 0;
+      const rodando = (v.paused === false) || tempo > 0.2;
+
+      if(!marcouPlay && rodando){
+        marcouPlay = true;
+        vslEstado = 'tocando';
+        A.ev('vsl', {estado:'tocando', ms:decorrido, mudo:!!v.muted});
+      }
+
+      /* O player carregou mas nao esta tocando - autoplay bloqueado, ou a
+         pessoa nao deu play. Segurar alguem na frente de uma imagem parada
+         seria pior que nao ter video: o botao sai assim que a carta fica
+         pronta, e o video continua ali para quem quiser assistir. */
+      if(!marcouPlay && decorrido > VSL.esperaPlayer && vslEstado === 'carregando'){
+        vslEstado = 'fim';
+        A.ev('vsl', {estado:'sem_autoplay', ms:decorrido}, true);
+        vslTalvezLiberar('sem_autoplay');
+        return;
+      }
+
+      if(!marcouPlay) return;
+
+      if(tempo > ultimoTempo + 0.05){ ultimoTempo = tempo; ultimoAvanco = Date.now(); }
+
+      /* Duas formas de nao chegar aos dezoito segundos, e as duas tem saida.
+
+         A pessoa pode pausar de proposito. E o video pode simplesmente
+         travar: num dos testes o relogio andou 9 segundos em 21 por engasgo
+         da CDN. Esperar o teto de um minuto nos dois casos seria maltratar
+         quem ja fez o quiz inteiro - seis segundos sem o relogio andar ja
+         provam que nao vale mais esperar. */
+      const travou = (Date.now() - ultimoAvanco) > VSL.travaMs;
+      const fim = v.duration ? (tempo >= Number(v.duration) - 0.4) : false;
+      const chegou = v.ended === true || fim || tempo >= VSL.segundos || decorrido >= (VSL.segundos * 1000);
+      if(chegou || travou || decorrido > VSL.tetoEspera){
         clearInterval(vslRelogio);
         vslEstado = 'fim';
-        vslLiberar('teto');
+        A.ev('vsl', {estado: chegou ? 'assistiu' : (travou ? 'travou' : 'teto'),
+                     segundos: Math.round(tempo)}, true);
+        vslTalvezLiberar(chegou ? 'assistiu' : (travou ? 'travou' : 'teto'));
       }
     }, 250);
   }
 
-  window.addEventListener('message', function(e) {
-    if(!e || !e.data || typeof e.data !== 'object') return;
-    if(e.data.videoId && e.data.videoId !== VSL.video) return;
-    if(e.data.type === 'VTURB_PLAY_STATE'){
-      if(e.data.isPlaying || e.data.action === 'play'){
-        vslEstado = 'tocando';
-        A.ev('vsl', {estado:'tocando', ms: Date.now() - vslAbertoEm});
-      }
-    }
-    if(e.data.type === 'VTURB_PITCH_REACHED'){
-      vslEstado = 'fim';
-      vslTalvezLiberar('pitch');
-    }
-    if(e.data.type === 'VTURB_PIXEL_TRACK'){
-      var evt = e.data.eventName;
-      if(evt === 'ViewContent_100' || evt === 'PitchReached'){
-        vslEstado = 'fim';
-        vslTalvezLiberar('fim_video');
-      }
-    }
-  });
-
   const vslBtn = document.getElementById('vslGo');
   if(vslBtn) vslBtn.addEventListener('click', () => {
-    vslPausar01();
+    vslBtn.style.display = 'none';
     A.ev('vsl', {estado:'clique', ms_na_tela: Date.now() - vslAbertoEm}, true);
     fill(); go(T.leitura);
   });
@@ -3795,11 +3493,12 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     if(controleLeitura){ try{ controleLeitura.abort(); }catch(e){} }
     clearInterval(vslRelogio);
     vslGuardaParar();
-    vslPausar01();
+    const v = vslPlayer();
+    if(v && typeof v.pause === 'function'){ try{ v.pause(); }catch(e){} }
     const btn = document.getElementById('vslGo');
     if(btn) btn.style.display = 'none';
-    const wrap = document.getElementById('vturb-wrapper-' + VSL.video);
-    if(wrap) wrap.style.display = 'none';
+    const box = document.getElementById('vslBox');
+    if(box) box.hidden = true;
     const tela = document.querySelector('section.scr[data-s="6"]');
     if(tela) tela.classList.remove('com-video');
     vslEstado = 'indisponivel';
@@ -3827,23 +3526,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     };
   }
   async function spin(){
-    if(S.leitura){
-      voltandoDeProposito=false;
-      leituraPronta=true;
-      spinning=false;
-      const wrap=document.getElementById('vturb-wrapper-'+VSL.video);
-      const tela=document.querySelector('section.scr[data-s="6"]');
-      if(wrap) wrap.style.display='block';
-      if(tela) tela.classList.add('com-video');
-      $('#ptxt').textContent='Sua carta está pronta.';
-      $('#pnum').textContent=S.leitura.bussola?.porta_casa?'porta encontrada':'';
-      const btnVsl=document.getElementById('vslGo');
-      if(btnVsl){
-        btnVsl.hidden=false;
-        btnVsl.style.display='block';
-      }
-      return;
-    }
     if(spinning)return;
     spinning=true;
     leituraPronta=false;
@@ -3891,7 +3573,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
          o próprio vídeo é a espera, então ela sai do caminho */
       const minimo = (vslEstado==='indisponivel') ? (reduced?300:4400) : 0;
       await new Promise(resolve=>setTimeout(resolve,Math.max(0,minimo-(Date.now()-started))));
-      if(voltandoDeProposito || i !== T.calculo){ voltandoDeProposito=false; return; }
       clearInterval(iv);
       dots.forEach(d=>d.classList.remove('on'));
       const slot=result.bussola.slot;
@@ -3909,7 +3590,6 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
       if(vslEstado==='indisponivel'){
         /* sem vídeo, a tela se comporta como sempre se comportou */
         await new Promise(resolve=>setTimeout(resolve,reduced?300:1300));
-        if(voltandoDeProposito || i !== T.calculo){ voltandoDeProposito=false; return; }
         fill();go(T.leitura);
       }else{
         /* com vídeo, quem manda no avanço é o botão */
