@@ -1,4 +1,4 @@
-# 🌌 Bússola Astrológica: Quiz, Leitura Personalizada & Painel de Leads (v1.4.0)
+# 🌌 Bússola Astrológica: Quiz, Leitura Personalizada, LP Astrowake & Painel de Leads (v1.5.0)
 
 Plataforma astrológica completa desenvolvida para o astrólogo **Crassus Gobbi**, integrando quiz interativo com leitura personalizada via IA, cálculo de precisão astrológica, painel administrativo com atualização em tempo real via WebSockets e landing pages de alta conversão.
 
@@ -6,11 +6,13 @@ Plataforma astrológica completa desenvolvida para o astrólogo **Crassus Gobbi*
 
 ## 🧭 Visão Geral do Ecossistema
 
-O ecossistema da **Bússola Astrológica** é composto por duas aplicações integradas:
+O ecossistema da **Bússola Astrológica** é composto por:
 
 1. **Aplicação do Quiz & Painel de Leads (`quiz/`)**:
    - Desenvolvida em **Python 3.10+ / FastAPI / WebSockets**, servindo na raiz `/` o quiz em 16 etapas ativas, cálculo astrológico de casas e trânsitos (Swiss Ephemeris / Kerykeion), geração de carta personalizada por IA, players VSL com modo flutuante (mini-player), acompanhamento em tempo real e painel administrativo protegido (`/painel` e `/painel/login`).
-2. **Landing Pages & Vendas (`frontend/`)**:
+2. **Landing Page Astrowake (`lp-astrowake/`)**:
+   - Página estática de alta conversão para o encontro ao vivo "Astrowake: Hackeando a Realidade", com animações fluidas via GSAP e ScrollTrigger, modal de captura com proteção de fechamento acidental, seletor internacional de DDI (+55 Brasil padrão), página de obrigado e integração direta via Webhook.
+3. **Landing Pages & Vendas (`frontend/`)**:
    - Desenvolvida com **TanStack Start (SSR)**, **React 19**, **Tailwind CSS v4** e **PostgreSQL**.
    - **Página Principal da Bússola (`/bussola` e `/`)**: Apresentação das 12 casas (as 12 portas da vida), narrativa astrológica imersiva, animações em Framer Motion/GSAP e checkout integrado.
    - **Página de Oferta Relâmpago (`/oferta-relampago`)**: Página de alta conversão para remarketing com **cronômetro regressivo dinâmico** (`TimerOferta`), ancoragem de preço flexível (ex: R$47 à vista ou 12x de R$4,86), destaque para bônus exclusivos e botão flutuante de suporte via WhatsApp.
@@ -69,6 +71,15 @@ Landing Page - Bussula Astrologica/
 │   ├── tsconfig.json                   # Configuração TypeScript
 │   ├── vite.config.ts                  # Configuração do Vite e TanStack Start
 │   └── vitest.config.ts                # Configuração do executor de testes
+│
+├── lp-astrowake/                       # Landing Page do Encontro Astrowake
+│   ├── index.html                      # Página principal e pop-up modal
+│   ├── interacao.js                    # Animações de entrada e parallax (GSAP)
+│   ├── inscricao.js                    # Máscara DDI, validações e envio de webhook
+│   ├── config.js                       # Configuração de Webhook e Grupo VIP
+│   └── obrigado.html                   # Página de agradecimento e convite
+│
+├── prints-etapas-quiz/                 # Registros visuais das 21 etapas do funil
 │
 ├── package.json                        # Scripts utilitários de delegação na raiz
 └── README.md                           # Documentação do projeto
