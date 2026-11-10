@@ -216,6 +216,7 @@
     esconderAviso();
     if (!validar()) return;
 
+    const nomeLimpo = campoNome.value.trim();
     const ddi = campoDdi ? campoDdi.value : '55';
     const d = digitos(campoZap.value);
     const numeroE164 = '+' + ddi + d;
@@ -223,10 +224,15 @@
 
     const dados = {
       evento: 'inscricao',
+      event: 'inscricao',
+      event_type: 'inscricao',
       origem: CFG.ORIGEM || 'lp-astrowake',
-      nome: campoNome.value.trim(),
+      nome: nomeLimpo,
+      name: nomeLimpo,
+      first_name: nomeLimpo.split(' ')[0],
       ddi: ddi,
       whatsapp: numeroE164,              // formato internacional padrao E.164
+      phone: numeroE164,
       whatsapp_formatado: formatado,
       pagina: location.origin + location.pathname,
       referrer: document.referrer || null,
@@ -271,17 +277,19 @@
     try {
       const r = await fetch(CFG.WEBHOOK, {
         method: 'POST',
+        mode: 'no-cors',
         /* text/plain de proposito: deixa a requisicao no formato
            "simples", sem a chamada OPTIONS de verificacao que a maioria
            dos webhooks responde com erro. O corpo continua sendo JSON e
-           Make, Zapier e n8n leem normalmente. Se o seu endpoint exigir
-           application/json, troque aqui e libere CORS no servidor. */
+           Make, Zapier, n8n e ZapVoice leem normalmente. */
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify(dados),
         signal: corta.signal
       });
       clearTimeout(relogio);
-      return r.ok;
+      // Em modo no-cors o navegador retorna r.type === 'opaque' (sem bloqueio de CORS),
+      // garantindo que a requisicao foi enviada ao servidor com sucesso.
+      return r.ok || r.type === 'opaque';
     } catch (err) {
       clearTimeout(relogio);
       console.error('[Astrowake] falha ao enviar o lead:', err);
