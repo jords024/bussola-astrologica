@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Astrowake · Hackeando a Realidade</title>
 <meta name="description" content="Encontro ao vivo no dia 15, às 18h. Astrologia aplicada a carreira, dinheiro e relacionamentos.">
+<!-- Pixel da Meta. Antes das fontes de proposito: o PageView precisa
+     sair mesmo de quem desiste no primeiro segundo. O numero do pixel
+     fica em config.js, por isso ele carrega primeiro. -->
+<script src="config.js"></script>
+<script src="pixel.js"></script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=Work+Sans:wght@300;400;500&display=swap">
@@ -818,7 +824,6 @@ footer{position:relative;z-index:2;padding:34px 0 46px;border-top:1px solid var(
   </div>
 </div>
 
-<script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="interacao.js"></script>

@@ -1,7 +1,7 @@
 /* ============================================================
    ASTROWAKE · CONFIGURACAO
 
-   AS DUAS UNICAS COISAS QUE VOCE PRECISA PREENCHER.
+   AS TRES UNICAS COISAS QUE VOCE PRECISA PREENCHER.
    Elas valem para a pagina de inscricao e para a de obrigado,
    entao mexa so aqui. Nenhum outro arquivo precisa ser tocado.
    ============================================================ */
@@ -17,7 +17,16 @@ window.ASTROWAKE = {
         antes de ter o webhook pronto. */
   WEBHOOK: 'https://zapvoicecrassos.aryaraj.shop/api/webhooks/blazkfriday-astrowake-landingpage',
 
-  /* 2. O LINK DO GRUPO de WhatsApp, que e o destino da pagina de
+  /* 2. O PIXEL da Meta (Facebook/Instagram). So o numero.
+
+        Vale para as duas paginas: a de captura dispara PageView e a de
+        obrigado dispara PageView e Lead. Esta e a UNICA copia desse
+        numero no projeto: trocar aqui troca em tudo.
+
+        Vazio: nenhum evento e enviado, e o console avisa. */
+  PIXEL: '776532458708522',
+
+  /* 3. O LINK DO GRUPO de WhatsApp, que e o destino da pagina de
         obrigado. Aquele endereco chat.whatsapp.com/XXXX do convite. */
   GRUPO_WHATSAPP: 'https://chat.whatsapp.com/Cx8cg7EFczY69kc0dwKjdC?s=sh&p=a&iam=2',
 

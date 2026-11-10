@@ -9,6 +9,12 @@
 <title>Inscrição confirmada</title>
 <meta name="description" content="Sua vaga no Astrowake do dia 15 está garantida. Falta entrar no grupo.">
 
+<!-- Pixel da Meta. O data-evento="lead" e o que faz esta pagina, e so
+     ela, disparar o Lead - e so para quem chegou pelo formulario. Ver
+     pixel.js. -->
+<script src="config.js"></script>
+<script src="pixel.js" data-evento="lead"></script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500&family=Work+Sans:wght@300;400;500&display=swap">
@@ -181,7 +187,6 @@ footer{position:relative;z-index:2;padding:26px 0 32px;border-top:1px solid var(
 
 <footer>Astrowake &nbsp;·&nbsp; Crassus Gobbi</footer>
 
-<script src="config.js"></script>
 <script>
 (() => {
   'use strict';

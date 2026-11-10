@@ -209,6 +209,48 @@
   }
 
   /* ---------------------------------------------------------
+     O ID DO EVENTO
+
+     Um numero aleatorio por inscricao. Ele viaja em tres lugares: no
+     payload do webhook (event_id), no endereco da pagina de obrigado
+     (?lead=...) e no Lead que o pixel dispara la.
+
+     Serve para duas coisas. Autoriza o disparo do Lead, para que visita
+     direta a pagina de obrigado nao conte inscricao. E, se um dia o
+     webhook tambem mandar o Lead pelo servidor (Conversions API), a Meta
+     reconhece que navegador e servidor falam do MESMO evento, em vez de
+     contar dois leads para uma pessoa.
+
+     Nao e dado pessoal, e por isso pode andar na URL - ao contrario do
+     nome, que fica na sessao. */
+  function novoIdDeEvento() {
+    try {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch (e) {}
+    /* randomUUID exige contexto seguro (https ou localhost). Em http
+       comum cai aqui, e isto basta: o id so precisa ser unico. */
+    return 'lead-' + Date.now().toString(36) + '-' +
+           Math.random().toString(36).slice(2, 10) +
+           Math.random().toString(36).slice(2, 10);
+  }
+
+  /* Os cookies que a Meta planta no navegador: _fbp identifica este
+     navegador e _fbc guarda o clique no anuncio que trouxe a pessoa. Vao
+     no webhook porque sem eles um Lead enviado pelo servidor nao se liga
+     ao anuncio, e a campanha perde a atribuicao. Leitura sem regex de
+     proposito. */
+  function cookie(nome) {
+    const partes = String(document.cookie || '').split('; ');
+    for (let i = 0; i < partes.length; i++) {
+      const corte = partes[i].indexOf('=');
+      if (corte > 0 && partes[i].slice(0, corte) === nome) {
+        return decodeURIComponent(partes[i].slice(corte + 1));
+      }
+    }
+    return null;
+  }
+
+  /* ---------------------------------------------------------
      ENVIO */
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -216,6 +258,7 @@
     esconderAviso();
     if (!validar()) return;
 
+    const idEvento = novoIdDeEvento();
     const nomeLimpo = campoNome.value.trim();
     const ddi = campoDdi ? campoDdi.value : '55';
     const d = digitos(campoZap.value);
@@ -226,6 +269,7 @@
       evento: 'inscricao',
       event: 'inscricao',
       event_type: 'inscricao',
+      event_id: idEvento,
       origem: CFG.ORIGEM || 'lp-astrowake',
       nome: nomeLimpo,
       name: nomeLimpo,
@@ -237,6 +281,8 @@
       pagina: location.origin + location.pathname,
       referrer: document.referrer || null,
       utm: origemDaVisita(),
+      fbp: cookie('_fbp'),
+      fbc: cookie('_fbc'),
       enviado_em: new Date().toISOString()
     };
 
@@ -245,7 +291,7 @@
     const deuCerto = await mandarParaWebhook(dados);
 
     if (deuCerto) {
-      concluir(dados.nome);
+      concluir(dados.nome, idEvento);
       return;
     }
 
@@ -259,7 +305,7 @@
       mostrarAviso('Não consegui registrar agora. Toque no botão para tentar de novo.');
     } else {
       mostrarAviso('A conexão falhou duas vezes. Vou te levar para o grupo mesmo assim.');
-      setTimeout(() => concluir(dados.nome), 1800);
+      setTimeout(() => concluir(dados.nome, idEvento), 1800);
     }
   });
 
@@ -297,11 +343,18 @@
     }
   }
 
-  function concluir(nome) {
+  function concluir(nome, idEvento) {
     /* O nome viaja na sessao, nao na URL: dado pessoal em endereco
        acaba em historico, em log de servidor e em link compartilhado. */
     try { sessionStorage.setItem('astrowake_nome', nome); } catch (e) {}
-    location.href = CFG.DESTINO || 'obrigado.html';
+
+    /* O id do evento, ao contrario, vai na URL de proposito. Ele nao
+       identifica ninguem, e e o que autoriza a pagina de obrigado a
+       disparar o Lead do pixel. A propria pagina limpa a barra depois
+       de usar. */
+    const destino = CFG.DESTINO || 'obrigado.html';
+    const juncao = destino.indexOf('?') === -1 ? '?' : '&';
+    location.href = destino + juncao + 'lead=' + encodeURIComponent(idEvento);
   }
 
   function marcarEnviando(estado) {
