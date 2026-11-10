@@ -1,0 +1,41 @@
+version: "3.7"
+
+services:
+  # ============================================================================
+  # Landing Page Astrowake (Nginx Alpine - Alta Performance & Baixo Consumo)
+  # ============================================================================
+  lp_astrowake:
+    image: aryalvesfernandes/lp-astrowake:1.0.0
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+
+    networks:
+      - network_swarm_public
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+      labels:
+        # Habilita o Traefik
+        - traefik.enable=true
+        - traefik.docker.network=network_swarm_public
+
+        # Configura o Dominio / Roteamento HTTP(S)
+        - traefik.http.routers.lp_astrowake.rule=Host(`${DOMAIN_ASTROWAKE:-astrowake.crassusastrologo.com.br}`)
+
+        # Ponto de entrada HTTPS e Certificado SSL Let's Encrypt
+        - traefik.http.routers.lp_astrowake.entrypoints=websecure
+        - traefik.http.routers.lp_astrowake.tls.certresolver=letsencryptresolver
+
+        # Porta interna do Nginx
+        - traefik.http.services.lp_astrowake.loadbalancer.server.port=80
+
+networks:
+  network_swarm_public:
+    external: true
