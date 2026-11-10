@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astrowake · Hackeando a Realidade</title>
+<meta name="description" content="Encontro ao vivo no dia 15, às 18h. Astrologia aplicada a carreira, dinheiro e relacionamentos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=Work+Sans:wght@300;400;500&display=swap">
+
+<style>
+/* ============================================================
+   ASTROWAKE · HACKEANDO A REALIDADE
+   Vidro + futurismo sobre base escura quente.
+
+   Decisoes que sustentam a sensacao "premium":
+   - uma aurora lenta por tras de TUDO, porque vidro sem nada
+     atras para refratar vira plastico cinza
+   - borda de 1px em gradiente, mais clara no topo: e o unico
+     detalhe que o olho le como "luz batendo numa quina"
+   - grao por cima do vidro, que mata a lisura sintetica
+   - um acento so (ouro). O futurismo vem da forma (mono, grade
+     tecnica, numeral vazado), nunca de uma segunda cor
+   ============================================================ */
+
+:root{
+  --ink:#08090C;
+  --ink-2:#0C0E13;
+  --paper:#EFEAE2;
+  --paper-2:rgba(239,234,226,.68);
+  --paper-3:rgba(239,234,226,.42);
+  --gold:#E5A93C;
+  --gold-2:#C98A1E;
+  --line:rgba(239,234,226,.12);
+  --measure:62ch;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--ink);color:var(--paper);
+  font-family:'Work Sans',system-ui,-apple-system,sans-serif;
+  font-weight:300;font-size:17px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+@media (prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+}
+
+/* ---------- a aurora: o que o vidro refrata ---------- */
+/* PESO DE SCROLL, PARTE 1.
+   Era inset:-25% com filter:blur(90px) e tres bolhas em animacao infinita
+   por baixo. Desfocar 90px sobre uma area 2,25x maior que a tela ja e caro;
+   com algo se mexendo embaixo, o navegador tem de refazer esse desfoque
+   QUADRO A QUADRO, e nunca consegue guardar o resultado pronto.
+   Agora a camada e parada e o desfoque menor: o navegador desenha uma vez,
+   guarda, e no scroll so reposiciona. A aparencia e a mesma, o custo por
+   quadro cai a quase nada. A suavidade vem dos proprios gradientes, com
+   paradas mais longas para nao fazer faixa. */
+.aurora{position:fixed;inset:-12%;z-index:0;pointer-events:none;filter:blur(46px);opacity:.75}
+.aurora i{position:absolute;display:block;border-radius:50%}
+.aurora i:nth-child(1){width:60vw;height:60vw;left:-8vw;top:-10vw;
+  background:radial-gradient(circle,rgba(229,169,60,.26),rgba(229,169,60,.10) 42%,transparent 72%)}
+.aurora i:nth-child(2){width:66vw;height:66vw;right:-14vw;top:12vh;
+  background:radial-gradient(circle,rgba(72,86,168,.30),rgba(72,86,168,.11) 40%,transparent 70%)}
+.aurora i:nth-child(3){width:52vw;height:52vw;left:22vw;bottom:-18vw;
+  background:radial-gradient(circle,rgba(168,84,44,.20),rgba(168,84,44,.08) 44%,transparent 74%)}
+
+/* ---------- grade tecnica, bem apagada ---------- */
+.grade{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.26;
+  background-image:
+    linear-gradient(rgba(239,234,226,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(239,234,226,.045) 1px,transparent 1px);
+  background-size:84px 84px;
+  -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 10%,transparent 78%);
+          mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 10%,transparent 78%)}
+
+/* ---------- grao: tira a lisura de plastico ---------- */
+/* PESO DE SCROLL, PARTE 2.
+   Tinha mix-blend-mode:overlay. Um modo de mesclagem ocupando a tela
+   inteira obriga o navegador a reler TUDO que esta embaixo e misturar de
+   novo a cada quadro, e ainda tira do caminho rapido tudo que passa por
+   baixo. Num fundo quase preto o overlay quase nao muda nada, entao saiu:
+   ficou so a opacidade, que e de graca. */
+.grao{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+main{position:relative;z-index:2}
+.wrap{width:min(1180px,92vw);margin:0 auto}
+
+/* ---------- o vidro ---------- */
+.glass{position:relative;border-radius:20px;
+  background:linear-gradient(142deg,rgba(255,255,255,.058),rgba(255,255,255,.012) 58%);
+  /* PESO DE SCROLL, PARTE 3. Cada bloco de vidro reamostra e desfoca o que
+     esta atras dele a cada quadro em que se mexe. Eram duas operacoes
+     (desfoque + saturacao) a 26px. Uma operacao a 18px custa bem menos e,
+     sobre um fundo escuro, o olho nao separa as duas versoes. */
+  -webkit-backdrop-filter:blur(18px);
+          backdrop-filter:blur(18px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 0 rgba(0,0,0,.30),0 28px 70px rgba(0,0,0,.42)}
+/* a borda de 1px em gradiente. E esse detalhe que o olho le como quina de vidro. */
+.glass::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:linear-gradient(142deg,rgba(255,255,255,.34),rgba(255,255,255,.05) 42%,rgba(229,169,60,.16));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .glass{background:rgba(18,20,26,.88)}
+}
+
+/* ---------- tipografia ---------- */
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--gold);font-weight:500}
+h1,h2,h3{font-family:'Archivo',sans-serif;font-weight:800;letter-spacing:-.025em;
+  line-height:1.03;margin:0;text-wrap:balance}
+h1{font-size:clamp(38px,5.7vw,70px);text-transform:uppercase}
+h2{font-size:clamp(30px,4.6vw,52px);text-transform:uppercase}
+h3{font-size:clamp(19px,2.2vw,24px);letter-spacing:-.01em;text-transform:none}
+.serif{font-family:'EB Garamond',Georgia,serif;font-style:italic;font-weight:400;
+  letter-spacing:0;text-transform:none}
+p{margin:0 0 1.1em;max-width:var(--measure)}
+strong{font-weight:500;color:var(--paper)}
+
+/* ---------- botao ---------- */
+.cta{display:inline-flex;align-items:center;gap:14px;position:relative;
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:13.5px;letter-spacing:.1em;
+  text-transform:uppercase;text-decoration:none;color:#15110A;
+  background:linear-gradient(180deg,#F0BC55,var(--gold) 55%,var(--gold-2));
+  padding:19px 34px;border-radius:999px;border:0;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 14px 36px rgba(229,169,60,.26);
+  transition:box-shadow .3s ease}
+.cta:hover{box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 20px 48px rgba(229,169,60,.36)}
+/* No mouse quem move o botao e o magnetico do GSAP, entao transform fica
+   fora da transition. No toque o magnetico nao roda, e ai o :active e a
+   unica resposta ao dedo: por isso ele continua aqui. */
+.cta:active{transform:translateY(1px)}
+.cta:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
+.cta svg{width:16px;height:16px;flex:0 0 auto}
+
+/* ============================ HERO ============================
+   A foto SANGRA ate a borda direita e some num gradiente, em vez de
+   ficar num cartao com margem. Cartao com margem encolhe o sujeito e
+   cria uma aresta dura entre foto e texto: e o que fazia o hero
+   parecer montagem. Sangrando, a foto e o fundo viram a mesma coisa. */
+.hero{position:relative;min-height:min(94svh,860px);display:flex;align-items:center;
+  padding:clamp(86px,10vh,118px) 0 clamp(54px,7vh,84px);overflow:hidden}
+
+/* A EMENDA VERTICAL, E POR QUE ELA EXISTIA.
+   A foto some num gradiente PINTADO por cima dela, e esse gradiente
+   comecava em var(--ink) OPACO. Ou seja: os primeiros 12% da foto eram um
+   retangulo de tinta solida cobrindo a aurora. Um pixel para a esquerda a
+   aurora aparecia, um pixel para a direita estava tapada. Dava uma linha
+   reta na vertical exatamente em 48% da tela. O mesmo acontecia embaixo,
+   onde o gradiente terminava em var(--ink) opaco sobre a aurora.
+   A correcao nao e suavizar o gradiente: e parar de pintar. Agora quem
+   some e a PROPRIA FOTO, pela mascara. O que aparece por baixo e o fundo
+   de verdade da pagina, aurora inclusa, continuo dos dois lados. Nao
+   existe mais nada a emendar porque nao existe mais uma borda. */
+.hero-foto{position:absolute;top:0;right:0;bottom:0;width:52%;z-index:0;pointer-events:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.06) 13%,rgba(0,0,0,.42) 31%,rgba(0,0,0,.85) 57%,#000 80%);
+          mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.06) 13%,rgba(0,0,0,.42) 31%,rgba(0,0,0,.85) 57%,#000 80%)}
+
+/* Onde da, a foto some tambem para baixo, pela mesma razao. Duas mascaras
+   ao mesmo tempo precisam de mask-composite, que e recente: por isso ela
+   entra por cima, e nao na regra de base. Em navegador antigo fica so a
+   horizontal, que ja resolve a emenda que aparecia. */
+@supports (mask-composite:intersect){
+  .hero-foto{
+    mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.06) 13%,rgba(0,0,0,.42) 31%,rgba(0,0,0,.85) 57%,#000 80%),
+               linear-gradient(180deg,#000 0%,#000 56%,rgba(0,0,0,.55) 84%,transparent 100%);
+    mask-composite:intersect}
+}
+@supports ((-webkit-mask-composite:source-in) and (not (mask-composite:intersect))){
+  .hero-foto{
+    -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.06) 13%,rgba(0,0,0,.42) 31%,rgba(0,0,0,.85) 57%,#000 80%),
+                       linear-gradient(180deg,#000 0%,#000 56%,rgba(0,0,0,.55) 84%,transparent 100%);
+    -webkit-mask-composite:source-in}
+}
+
+.hero-foto img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block;
+  filter:contrast(1.03) saturate(1.02)}
+
+/* So o escurecido do topo, para o rotulo e o titulo nao disputarem com a
+   parte clara da foto. Termina em transparente: nenhuma parada opaca em
+   borda nenhuma, nunca mais. E como esta dentro de .hero-foto, a mascara
+   da foto se aplica a ele tambem. */
+.hero-foto::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,9,12,.58) 0%,transparent 27%)}
+.hero-col{position:relative;z-index:2;max-width:min(600px,52%)}
+@media(max-width:980px){
+  .hero{min-height:0;display:block;padding-top:0}
+  /* No celular a foto ocupa a largura toda, entao sumir para a esquerda
+     comeria o rosto. Aqui ela some nas duas pontas, numa mascara unica:
+     embaixo para entrar no texto, e um fio em cima, porque ali tambem
+     havia um corte reto contra o fundo. */
+  .hero-foto{position:relative;width:100vw;margin-left:calc(50% - 50vw);height:46svh;min-height:300px;
+    -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 6%,#000 46%,rgba(0,0,0,.5) 80%,transparent 100%);
+            mask-image:linear-gradient(180deg,transparent 0%,#000 6%,#000 46%,rgba(0,0,0,.5) 80%,transparent 100%);
+    -webkit-mask-composite:source-over;mask-composite:add}
+  .hero-foto::after{background:linear-gradient(180deg,rgba(8,9,12,.45) 0%,transparent 30%)}
+  .hero-col{max-width:none;margin-top:-34px}
+}
+
+.marca{display:flex;align-items:center;gap:11px;margin-bottom:26px}
+.marca-selo{width:30px;height:30px;flex:0 0 auto}
+.marca span{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.3em;
+  text-transform:uppercase;color:var(--paper-2)}
+
+/* AS DUAS LINHAS DOURADAS SUMIAM NO SAFARI DO IPHONE.
+   O degrade era pintado no <em> e recortado no formato das letras
+   (background-clip:text). So que quem ANIMA sao os <span> de dentro, e
+   eles ainda carregavam will-change:transform, que coloca cada um na
+   propria camada. No Safari, letra recortada de um fundo que esta num
+   ancestral, dentro de uma camada separada, nao recebe pintura nenhuma:
+   a linha some e sobra o buraco onde ela deveria estar.
+   Correcao: o degrade passa para o PROPRIO elemento que anima. Fundo e
+   letra ficam na mesma caixa, entao nao ha como um sair sem o outro.
+   E o will-change saiu: o GSAP promove sozinho enquanto anima. */
+.hero h1 em{display:block;font-style:normal}
+
+/* Ouro chapado como base. Se o recorte falhar em qualquer navegador, o
+   titulo aparece dourado e solido. Invisivel, nunca. */
+.hero h1 em .linha-i{color:var(--gold)}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .hero h1 em .linha-i{
+    background:linear-gradient(104deg,#F6D79A,var(--gold) 38%,#B87A17);
+    -webkit-background-clip:text;background-clip:text;
+    color:transparent;-webkit-text-fill-color:transparent}
+}
+.hero-sub{font-size:clamp(16.5px,1.8vw,18.5px);color:var(--paper-2);margin:22px 0 14px;max-width:52ch}
+.hero-corpo{font-size:15.5px;color:var(--paper-3);max-width:50ch;margin-bottom:26px}
+.hero-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:18px}
+.hero-nota{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--paper-3)}
+
+
+/* faixa de vidro do evento, agora na coluna de texto */
+.ficha{margin-top:26px;max-width:420px;padding:15px 18px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.ficha div{text-align:center;padding:0 6px}
+.ficha dt{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--paper-3);margin-bottom:7px}
+.ficha dd{margin:0;font-family:'Archivo',sans-serif;font-weight:700;font-size:clamp(15px,2vw,19px);
+  letter-spacing:-.01em;color:var(--paper)}
+.ficha dd.livre{color:var(--gold)}
+.ficha div+div{border-left:1px solid var(--line)}
+
+/* ============================ SECOES ============================ */
+section{position:relative;padding:clamp(76px,11vh,132px) 0}
+.sec-rotulo{display:flex;align-items:center;gap:16px;margin-bottom:28px}
+.sec-rotulo::after{content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(229,169,60,.42),transparent)}
+
+/* manifesto */
+/* O manifesto era uma pilha unica: rotulo, titulo e seis paragrafos todos
+   encostados na margem esquerda. Isso e o arranjo mais repetido que existe
+   e nao usa nada da pagina.
+   Agora e uma grade assimetrica: rotulo e titulo numa coluna estreita a
+   esquerda, o argumento numa coluna larga a direita. E a mesma arquitetura
+   do bloco do autor, entao a pagina continua falando uma lingua so.
+   O titulo gruda no topo enquanto o texto passa. Nao e truque: e o que
+   impede a coluna da esquerda de virar 900px de vazio. Sticky e resolvido
+   pelo compositor, entao nao custa quadro nenhum. */
+.manifesto{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);
+  gap:clamp(26px,4vw,72px);align-items:start}
+.manifesto-titulo{position:sticky;top:clamp(36px,11vh,104px)}
+.manifesto h2{margin-bottom:0}
+@media(max-width:900px){
+  .manifesto{display:block}
+
+  /* NO CELULAR A GRADE NAO CABE, E COM ELA IA EMBORA O QUE SEGURAVA A
+     SECAO: o titulo parado ao lado enquanto o texto passa. Sem isso sobra
+     texto solto, sem comeco nem fim a vista.
+     display:contents dissolve a caixa do titulo e entrega rotulo e h2
+     direto para .manifesto. Com isso o ROTULO pode grudar no topo e
+     acompanhar a leitura da secao inteira, que antes era impossivel: ele
+     estava preso dentro de uma caixa que acabava logo abaixo do titulo. */
+  .manifesto-titulo{display:contents}
+  .manifesto h2{margin-bottom:30px}
+
+  .manifesto .sec-rotulo{position:sticky;top:0;z-index:4;
+    margin:0 0 20px;padding:15px 0 13px}
+  /* O veu atras do rotulo precisa subir ALEM da caixa dele, senao o texto
+     que passa por cima aparece picado no fio de cima da tela. Por isso
+     ele vive num ::before esticado para fora, e nao no background. */
+  .manifesto .sec-rotulo::before{content:'';position:absolute;z-index:-1;
+    left:-14px;right:-14px;top:-46px;bottom:0;
+    background:linear-gradient(180deg,var(--ink) 0%,var(--ink) 64%,rgba(8,9,12,.84) 82%,transparent 100%)}
+
+  /* O fio do rotulo ja existia como enfeite. Agora ele CONTA ALGUMA COISA:
+     enche de ouro conforme voce avanca no argumento. Nao e um widget novo
+     colado na pagina, e um elemento que ja estava ali passando a carregar
+     informacao. O avanco vem do scroll, pela variavel --avanco. */
+  .manifesto .sec-rotulo::after{
+    background:linear-gradient(90deg,
+      rgba(229,169,60,.78) 0%,
+      rgba(229,169,60,.78) var(--avanco,0%),
+      rgba(239,234,226,.13) var(--avanco,0%),
+      rgba(239,234,226,.13) 100%)}
+}
+/* Aqui estava "max-width:none", que jogava fora o --measure de 62ch da
+   pagina. A linha chegava a 95 caracteres e a secao virava um paredao
+   cinza de 900px. A medida volta a valer. */
+.manifesto p{color:var(--paper-2)}
+
+/* A primeira frase e a porta de entrada. Sem um degrau aqui o leitor
+   encara a secao inteira no mesmo cinza e nao sabe por onde comecar. */
+.lede{font-size:clamp(18.5px,1.5vw,21.5px);line-height:1.52;color:var(--paper)}
+
+/* A unica frase em primeira pessoa da pagina inteira. Muda de voz, entao
+   muda de tipo: serifa romana (nao italica, que e o cliche de citacao) e
+   o nome em mono por cima. Fica claro que quem fala e uma pessoa. */
+.confissao{margin:40px 0 46px;padding:0}
+.confissao figcaption{font-family:'IBM Plex Mono',monospace;font-size:10px;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+.confissao blockquote{margin:0}
+.confissao p{font-family:'EB Garamond',Georgia,serif;font-size:21px;
+  line-height:1.48;color:var(--paper);margin:0}
+
+/* O ponto alto do texto. Era citacao em italico com barra dourada do lado,
+   que e o enfeite mais repetido que existe em pagina de venda. Virou o que
+   a frase de fato e: a pagina levantando a voz. */
+.destaque{font-family:'Archivo',sans-serif;font-weight:600;
+  font-size:clamp(24px,2.9vw,34px);line-height:1.16;letter-spacing:-.02em;
+  color:var(--paper)!important;margin:0 0 .55em}
+.destaque em{font-style:normal;color:var(--gold)}
+
+/* A frase diz que reduziram a Astrologia a horoscopo de revista. O risco
+   em cima dessas palavras faz a frase acontecer, em vez de so afirmar.
+   A cor do texto nao muda: quem marca e a linha, entao nada de contraste
+   se perde. */
+.manifesto s{text-decoration-line:line-through;text-decoration-color:var(--gold);
+  text-decoration-thickness:1px;text-underline-offset:0}
+
+.virada{color:var(--paper)!important;font-size:18.5px;line-height:1.55}
+
+/* os tres destravamentos */
+.tres{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:52px}
+@media(max-width:940px){.tres{grid-template-columns:1fr;gap:16px}}
+.card{padding:clamp(26px,3vw,36px);display:flex;flex-direction:column;gap:14px}
+/* O cartao NAO tem transition. A entrada e o hover mexem os dois no
+   transform, e CSS transition mais GSAP na mesma propriedade se atrapalham:
+   a transition suaviza cada quadro que o GSAP escreve e o movimento sai
+   borrachudo, ou trava no meio. O hover virou GSAP tambem (interacao.js),
+   entao so um sistema escreve transform aqui. */
+.card .num{font-family:'Archivo',sans-serif;font-weight:800;font-size:46px;line-height:1;
+  color:transparent;-webkit-text-stroke:1px rgba(229,169,60,.52);letter-spacing:-.04em}
+.card h3{margin-bottom:2px}
+.card p{font-size:15.5px;color:var(--paper-2);margin:0;max-width:none}
+
+/* a comunidade: console, nao grade de icones */
+.console{margin-top:46px;padding:clamp(26px,3.4vw,44px)}
+.console-topo{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
+  gap:12px;padding-bottom:22px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.console-topo h3{font-family:'Archivo',sans-serif;font-weight:700;font-size:17px;
+  letter-spacing:.02em;text-transform:none}
+.item{display:grid;grid-template-columns:auto 1fr;gap:20px;padding:24px 0;
+  border-bottom:1px solid rgba(239,234,226,.07)}
+.item:last-of-type{border-bottom:0;padding-bottom:6px}
+.item .ix{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;
+  color:var(--gold);padding-top:5px}
+.item h4{margin:0 0 7px;font-family:'Archivo',sans-serif;font-weight:600;font-size:17px;
+  letter-spacing:-.005em;color:var(--paper)}
+.item p{margin:0;font-size:15px;color:var(--paper-2);max-width:62ch}
+
+/* autor */
+.autor-grid{display:grid;grid-template-columns:300px 1fr;gap:clamp(28px,4.5vw,56px);align-items:center}
+@media(max-width:820px){.autor-grid{grid-template-columns:1fr;gap:32px}}
+/* Retrato 4:5 em vez de quadrado: a foto e vertical e as arvores
+   emolduram ele: cortar em quadrado jogaria fora justamente isso. */
+.autor-foto{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/5;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.09),0 22px 54px rgba(0,0,0,.42)}
+/* A foto e de dia, com verde forte, e a pagina inteira e preta com ouro:
+   e o unico verde saturado do site. Em vez de tratar a imagem a ponto de
+   descaracteriza-la, que seria o contrario do motivo dela estar aqui,
+   baixo um pouco a saturacao e deixo o resto com a vinheta. Ele continua
+   sendo ele, ao ar livre, so que sem brigar com a paleta. */
+.autor-foto img{width:100%;height:100%;object-fit:cover;display:block;
+  filter:saturate(.8) contrast(1.04) brightness(.97)}
+/* Vinheta com um fio de ouro nas pontas, para a moldura pertencer a
+   pagina em vez de ser um retangulo colado nela. */
+.autor-foto::after{content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 78% 76% at 50% 34%,transparent 44%,rgba(8,9,12,.58) 100%),
+    linear-gradient(168deg,rgba(229,169,60,.10),transparent 42%,rgba(8,9,12,.34))}
+.autor-nome{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(26px,3.4vw,38px);
+  letter-spacing:-.02em;margin:10px 0 4px}
+.autor-arroba{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.12em;
+  color:var(--gold);margin-bottom:22px}
+.autor-grid p{color:var(--paper-2)}
+.marcas{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.marcas span{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--paper-2);
+  border:1px solid var(--line);border-radius:999px;padding:8px 15px}
+
+/* fecho */
+.fecho{text-align:center;padding-bottom:clamp(90px,13vh,150px)}
+.fecho .glass{padding:clamp(40px,6vw,76px) clamp(24px,5vw,56px);text-align:center}
+.fecho h2{margin-bottom:20px}
+.fecho p{margin:0 auto 34px;color:var(--paper-2);max-width:46ch}
+.fecho .hero-nota{display:block;margin-top:20px}
+
+footer{position:relative;z-index:2;padding:34px 0 46px;border-top:1px solid var(--line);
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--paper-3);text-align:center}
+
+
+/* ===================== CAMADA INTERATIVA ===================== */
+.linha{display:block;overflow:hidden;padding-bottom:.06em;margin-bottom:-.06em}
+.linha-i{display:block;transform:translateY(105%)}
+.hero-fade{opacity:0;transform:translateY(16px)}
+.hero-foto{opacity:0;will-change:opacity}
+.hero-foto img{will-change:transform}
+
+.sem-movimento .linha-i{transform:none!important}
+.sem-movimento .hero-fade,.sem-movimento .hero-foto,
+.sem-movimento .tres .card,.sem-movimento .sobe,
+.sem-movimento .item{opacity:1!important;transform:none!important}
+
+/* ---------- entrada por scroll ---------- */
+@media (prefers-reduced-motion:no-preference){
+  /* PESO DE SCROLL, PARTE 4. Tinha will-change aqui. Numa pagina com
+     dezenas de .sobe isso manda o navegador reservar uma camada separada
+     para cada um, o tempo todo, mesmo paradas: gasta memoria de video e
+     deixa o scroll pastoso. O GSAP promove sozinho o que esta animando. */
+  .sobe{opacity:0;transform:translateY(18px)}
+}
+@media (prefers-reduced-motion:reduce){
+  /* A aurora nao anima mais para ninguem, entao nao ha o que desligar aqui. */
+  .sobe{opacity:1;transform:none}
+}
+
+/* ===================== POP-UP DE INSCRICAO ===================== */
+.modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;
+  opacity:0;visibility:hidden;transition:opacity .22s ease,visibility .22s ease}
+.modal[data-aberto="1"]{opacity:1;visibility:visible}
+.modal-veu{position:absolute;inset:0;background:rgba(4,5,7,.74);
+  -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+.modal-cartao{position:relative;width:min(430px,100%);padding:clamp(24px,4.4vw,36px);
+  border-radius:22px;max-height:calc(100dvh - 36px);overflow-y:auto;
+  transform:translateY(16px) scale(.98);
+  transition:transform .28s cubic-bezier(.2,.9,.25,1)}
+.modal[data-aberto="1"] .modal-cartao{transform:none}
+@media (prefers-reduced-motion:reduce){
+  .modal,.modal-cartao{transition:none}
+  .modal-cartao{transform:none}
+}
+.modal-x{position:absolute;top:14px;right:14px;width:34px;height:34px;display:grid;
+  place-items:center;border:0;border-radius:50%;cursor:pointer;color:var(--paper-3);
+  background:rgba(255,255,255,.06);transition:color .18s ease,background .18s ease}
+.modal-x:hover{color:var(--paper);background:rgba(255,255,255,.12)}
+.modal-x svg{width:15px;height:15px}
+.modal-titulo{font-family:'Archivo',sans-serif;font-weight:800;letter-spacing:-.025em;
+  font-size:clamp(25px,4.6vw,31px);line-height:1.05;text-transform:none;margin:12px 0 9px}
+.modal-texto{font-size:15px;color:var(--paper-2);margin-bottom:22px;max-width:none}
+.modal-rodape{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--paper-3);text-align:center;margin:16px 0 0}
+
+/* ---------- campos ---------- */
+.campo{display:block;margin-bottom:15px}
+.campo > span{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--paper-3);margin-bottom:8px}
+/* 16px nao e escolha de estilo: abaixo disso o iPhone da zoom sozinho
+   quando o campo recebe foco, e a pagina inteira sai do lugar. */
+.campo input{width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;
+  color:var(--paper);background:rgba(255,255,255,.045);border-radius:12px;
+  border:1px solid rgba(255,255,255,.15);padding:14px 15px;
+  transition:border-color .18s ease,background .18s ease}
+.campo input::placeholder{color:rgba(239,234,226,.28)}
+.campo input:focus{outline:none;border-color:rgba(229,169,60,.75);
+  background:rgba(255,255,255,.075)}
+.campo input:focus-visible{outline:2px solid rgba(229,169,60,.35);outline-offset:2px}
+.campo-erro{display:none;margin-top:7px;font-size:13px;line-height:1.35;color:#F0907B}
+.campo[data-erro] input{border-color:#C8553D;background:rgba(200,85,61,.07)}
+.campo[data-erro] .campo-erro{display:block}
+
+.form-aviso{font-size:13.5px;line-height:1.4;color:#F0907B;margin:0 0 14px;max-width:none}
+
+/* ---------- botao do formulario ---------- */
+/* Sem o ima do GSAP: botao que foge do dedo dentro de um formulario
+   atrapalha em vez de encantar. Por isso a classe .cta-bloco, que o
+   interacao.js usa para pular esse. */
+.cta-bloco{width:100%;justify-content:center}
+.cta-bloco:disabled{cursor:progress;opacity:.72}
+.btn-girando{display:none;width:15px;height:15px;border-radius:50%;
+  border:2px solid rgba(21,17,10,.3);border-top-color:#15110A;
+  animation:girando .7s linear infinite}
+.modal[data-enviando="1"] .btn-girando{display:block}
+.modal[data-enviando="1"] .cta-bloco svg{display:none}
+@keyframes girando{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="grade" aria-hidden="true"></div>
+<div class="grao" aria-hidden="true"></div>
+
+<main>
+
+<!-- ============================ HERO ============================ -->
+<header class="hero">
+  <div class="wrap">
+
+    <div class="marca" style="position:relative;z-index:2">
+      <svg class="marca-selo" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <circle cx="20" cy="20" r="18.5" stroke="rgba(229,169,60,.45)"/>
+        <circle cx="20" cy="20" r="11" stroke="rgba(229,169,60,.3)"/>
+        <path d="M20 2.5 L22.6 17.4 L37.5 20 L22.6 22.6 L20 37.5 L17.4 22.6 L2.5 20 L17.4 17.4 Z" fill="#E5A93C" opacity=".9"/>
+      </svg>
+      <span>Astrowake</span>
+    </div>
+
+    <div class="hero-foto">
+      <img src="hero.webp" alt="Crassus Gobbi, astrólogo, em seu estúdio" width="900" height="1200" fetchpriority="high">
+    </div>
+
+    <div class="hero-col">
+      <p class="eyebrow hero-fade" style="margin-bottom:22px">Dia 15 &nbsp;·&nbsp; Ao vivo às 18h &nbsp;·&nbsp; Gratuito</p>
+      <h1>
+          <span class="linha"><span class="linha-i">Astrowake:</span></span>
+          <em>
+            <span class="linha"><span class="linha-i">Hackeando</span></span>
+            <span class="linha"><span class="linha-i">a Realidade</span></span>
+          </em>
+        </h1>
+      <p class="hero-sub hero-fade">Um encontro ao vivo para quem quer assumir o comando das próprias decisões na carreira, no dinheiro e nos relacionamentos, através da Astrologia aplicada à vida real.</p>
+      <p class="hero-corpo hero-fade">No dia 15 você vai descobrir como ler os seus próprios ciclos e usar isso na rotina, para saber onde colocar energia, quando agir e como crescer ao lado de gente que caminha na mesma direção.</p>
+      <div class="hero-acoes hero-fade">
+          <a class="cta" href="#modal-inscricao">
+          Quero garantir minha vaga
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8h11m0 0-4.2-4.2M13 8l-4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+
+      <dl class="ficha glass hero-fade">
+        <div><dt>Data</dt><dd>Dia 15</dd></div>
+        <div><dt>Horário</dt><dd>18h</dd></div>
+        <div><dt>Ingresso</dt><dd class="livre">Gratuito</dd></div>
+      </dl>
+    </div>
+  </div>
+</header>
+
+<!-- ============================ MANIFESTO ============================ -->
+<section>
+  <div class="wrap">
+    <div class="manifesto sobe">
+      <div class="manifesto-titulo">
+        <div class="sec-rotulo"><span class="eyebrow">O chamado</span></div>
+        <h2>Chegou a hora de desligar o piloto automático</h2>
+      </div>
+
+      <div class="manifesto-corpo">
+      <p class="lede">Se você olhar ao redor, vai perceber que muita gente inteligente, capaz e trabalhadora está vivendo no limite do cansaço.</p>
+
+      <p>Passamos anos cumprindo uma cartilha social. Vestindo uma armadura para agradar todo mundo, dizendo sim quando queríamos dizer não, insistindo em trabalhos que drenam a saúde e tentando consertar relações que só trazem desgaste.</p>
+
+      <figure class="confissao">
+        <figcaption>Crassus Gobbi</figcaption>
+        <blockquote><p>Eu mesmo vivi isso, até o dia em que me olhei no espelho e percebi que estava morrendo por dentro tentando sustentar uma vida que não tinha nada a ver comigo.</p></blockquote>
+      </figure>
+
+      <p class="destaque">Quando você pilota a vida no escuro, na tentativa e erro, está jogando no <em>Modo Difícil</em>.</p>
+
+      <p>Anda com o freio de mão puxado o tempo inteiro, e mesmo com toda a vontade continua travada.</p>
+
+      <p>Durante décadas reduziram a Astrologia a <s>horóscopo de revista e meme de internet</s>, e esconderam das pessoas o que ela realmente é: a ferramenta mais precisa que existe para enxergar a sua natureza, entender quem está ao seu redor e acertar o tempo das suas decisões.</p>
+
+      <p class="virada">No dia 15 nós vamos nos reunir ao vivo para abrir esse conhecimento de forma prática. Sem misticismo raso e sem decoreba teórica. Um encontro para aplicar a astrologia de verdade na sua vida, de um jeito que nunca foi feito antes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ OS TRÊS ============================ -->
+<section>
+  <div class="wrap">
+    <div class="sobe">
+      <div class="sec-rotulo"><span class="eyebrow">No dia 15</span></div>
+      <h2>O que você vai<br>destravar</h2>
+    </div>
+
+    <div class="tres">
+      <article class="card glass sobe">
+        <span class="num">01</span>
+        <h3>Carreira, dinheiro<br>e decisões</h3>
+        <p>Como identificar onde está a sua verdadeira força de realização e de prosperidade, e parar de gastar anos e saúde insistindo em caminhos que não foram feitos para você.</p>
+      </article>
+
+      <article class="card glass sobe">
+        <span class="num">02</span>
+        <h3>Relacionamentos<br>e padrões afetivos</h3>
+        <p>Como entender a raiz das suas necessidades emocionais e do seu jeito de amar, quebrando o ciclo de atrair pessoas indisponíveis e relações mornas para viver parcerias maduras e leves.</p>
+      </article>
+
+      <article class="card glass sobe">
+        <span class="num">03</span>
+        <h3>A leitura da vida real,<br>sem decoreba</h3>
+        <p>Como enxergar a astrologia acontecendo ao vivo nas conversas, nos negócios e nos ciclos do seu ano. Sabendo quando pisar no acelerador e quando ter cautela antes do próximo passo.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ A COMUNIDADE ============================ -->
+<section>
+  <div class="wrap">
+    <div class="manifesto sobe">
+      <div class="manifesto-titulo">
+        <div class="sec-rotulo"><span class="eyebrow">Mais do que um encontro</span></div>
+        <h2>O ponto de partida da nossa comunidade</h2>
+      </div>
+
+      <div class="manifesto-corpo">
+        <p class="lede">Ter clareza muda tudo. Mas sustentar essa evolução sozinha, cercada de gente que continua no piloto automático, é o que faz muita gente travar no meio do caminho.</p>
+        <p>Por isso, ao final do encontro do dia 15, eu vou abrir oficialmente as inscrições para a <strong>Comunidade Astrowake</strong>: a nossa base viva de desenvolvimento, estudo prático e apoio mútuo pelos próximos 12 meses.</p>
+      </div>
+    </div>
+
+    <div class="console glass sobe">
+      <div class="console-topo">
+        <h3>A estrutura completa</h3>
+        <span class="eyebrow">Acesso por 12 meses</span>
+      </div>
+
+      <div class="item">
+        <span class="ix">01</span>
+        <div>
+          <h4>Formação Completa Astrowake</h4>
+          <p>Do zero à interpretação prática. O método completo para aprender astrologia e entender mapas.</p>
+        </div>
+      </div>
+
+      <div class="item">
+        <span class="ix">02</span>
+        <div>
+          <h4>Comunidade viva e dois encontros ao vivo por mês</h4>
+          <p>Análises de casos reais de membros, ao vivo, comigo e com convidados. Mais o grupo fechado para conexão, apoio e networking.</p>
+        </div>
+      </div>
+
+      <div class="item">
+        <span class="ix">03</span>
+        <div>
+          <h4>App Bússola Astrológica</h4>
+          <p>Um especialista em trânsitos na palma da mão, cruzando o seu mapa com os movimentos do dia a dia para guiar as suas escolhas com precisão.</p>
+        </div>
+      </div>
+
+      <div class="item">
+        <span class="ix">04</span>
+        <div>
+          <h4>Curso Astrowake Trânsitos</h4>
+          <p>O domínio dos grandes ciclos, Saturno, Urano e Plutão, para você antecipar viradas de carreira e fases importantes da vida.</p>
+        </div>
+      </div>
+
+      <div class="item">
+        <span class="ix">05</span>
+        <div>
+          <h4>Comunidade gamificada</h4>
+          <p>Quanto mais você interage, mais ganha. Dá para conquistar uma sessão comigo e outros prêmios contribuindo com as outras pessoas.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="sobe" style="margin:30px auto 0;text-align:center;max-width:52ch;color:var(--paper-2)">
+      A sua participação no encontro do dia 15 é <strong>100% gratuita</strong>, e quem estiver no grupo oficial terá acesso prioritário à condição especial de entrada.
+    </p>
+    <div class="sobe" style="text-align:center;margin-top:28px">
+      <a class="cta" href="#modal-inscricao">
+        Quero garantir minha vaga no evento
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8h11m0 0-4.2-4.2M13 8l-4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ AUTOR ============================ -->
+<section>
+  <div class="wrap">
+    <div class="sobe">
+      <div class="sec-rotulo"><span class="eyebrow">Quem vai te guiar</span></div>
+    </div>
+    <div class="autor-grid sobe">
+      <div class="autor-foto">
+        <img src="autor-crassus.webp" alt="Crassus Gobbi ao ar livre, entre duas árvores" width="880" height="1100" loading="lazy">
+      </div>
+      <div>
+        <h3 class="autor-nome">Crassus Gobbi</h3>
+        <p class="autor-arroba">@crassusastrologo</p>
+        <p>Mais de 5.000 mapas analisados na prática. Criei o Astrowake depois de abandonar a armadura corporativa para viver alinhado à própria essência.</p>
+        <p>Dedico minha vida a traduzir a profundidade da Astrologia para a língua da vida real, ajudando milhares de homens e mulheres a saírem da tentativa e erro para viverem com clareza, coragem e direção.</p>
+        <div class="marcas">
+          <span>+5.000 mapas lidos</span>
+          <span>+10 anos de profissão</span>
+          <span>50 anos de tradição em casa</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FECHO ============================ -->
+<section class="fecho" id="inscricao">
+  <div class="wrap">
+    <div class="glass sobe">
+      <p class="eyebrow" style="margin-bottom:20px">Dia 15 &nbsp;·&nbsp; 18h &nbsp;·&nbsp; Ao vivo</p>
+      <h2>Pare de jogar<br>no Modo Difícil</h2>
+      <p>Duas horas ao vivo para você sair com clareza sobre onde colocar a sua energia nos próximos meses. Sem custo, com vagas limitadas.</p>
+      <a class="cta" href="#modal-inscricao">
+        Participar gratuitamente no dia 15
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8h11m0 0-4.2-4.2M13 8l-4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <span class="hero-nota">Seus dados estão seguros</span>
+    </div>
+  </div>
+</section>
+
+<footer>Astrowake &nbsp;·&nbsp; Crassus Gobbi</footer>
+
+</main>
+
+<!-- ==================== POP-UP DE INSCRICAO ==================== -->
+<div class="modal" id="modal-inscricao" data-aberto="0" data-enviando="0"
+     role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+  <div class="modal-veu" data-fechar></div>
+
+  <div class="modal-cartao glass">
+    <button type="button" class="modal-x" data-fechar aria-label="Fechar">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5l9 9m0-9l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
+
+    <p class="eyebrow">Dia 15 &nbsp;·&nbsp; 18h &nbsp;·&nbsp; Ao vivo</p>
+    <h2 class="modal-titulo" id="modal-titulo">Garanta a sua vaga</h2>
+    <p class="modal-texto">Dois campos e pronto. O acesso vai pro seu WhatsApp.</p>
+
+    <form id="form-inscricao" novalidate>
+      <label class="campo" data-campo="nome">
+        <span>Seu nome</span>
+        <input type="text" name="nome" id="in-nome" autocomplete="given-name"
+               placeholder="Como você quer ser chamado" required>
+        <span class="campo-erro" aria-live="polite"></span>
+      </label>
+
+      <label class="campo" data-campo="whatsapp">
+        <span>Seu WhatsApp</span>
+        <input type="tel" name="whatsapp" id="in-whatsapp" inputmode="numeric"
+               autocomplete="tel-national" placeholder="(00) 00000-0000"
+               maxlength="16" required>
+        <span class="campo-erro" aria-live="polite"></span>
+      </label>
+
+      <p class="form-aviso" id="form-aviso" role="alert" hidden></p>
+
+      <button type="submit" class="cta cta-bloco" id="btn-enviar">
+        <span class="btn-texto">Quero garantir minha vaga</span>
+        <span class="btn-girando" aria-hidden="true"></span>
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8h11m0 0-4.2-4.2M13 8l-4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </form>
+
+    <p class="modal-rodape">Seus dados ficam só comigo</p>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="interacao.js"></script>
+<script src="inscricao.js"></script>
+</body>
+</html>

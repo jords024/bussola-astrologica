@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Pagina de conversao nao deve aparecer em busca: quem cai aqui pelo
+     Google pula o cadastro e entra no grupo sem virar lead. -->
+<meta name="robots" content="noindex,nofollow">
+<title>Inscrição confirmada</title>
+<meta name="description" content="Sua vaga no Astrowake do dia 15 está garantida. Falta entrar no grupo.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500&family=Work+Sans:wght@300;400;500&display=swap">
+
+<style>
+:root{
+  --ink:#08090C;
+  --paper:#EFEAE2;
+  --paper-2:rgba(239,234,226,.68);
+  --paper-3:rgba(239,234,226,.42);
+  --gold:#E5A93C;
+  --gold-2:#C98A1E;
+  --line:rgba(239,234,226,.12);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100dvh;background:var(--ink);color:var(--paper);
+  font-family:'Work Sans',system-ui,-apple-system,sans-serif;
+  font-size:17px;line-height:1.62;font-weight:300;
+  -webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+
+/* A mesma aurora da pagina principal: parada, entao o navegador
+   desenha uma vez e guarda. */
+.aurora{position:fixed;inset:-12%;z-index:0;pointer-events:none;filter:blur(46px);opacity:.72}
+.aurora i{position:absolute;display:block;border-radius:50%}
+.aurora i:nth-child(1){width:60vw;height:60vw;left:-10vw;top:-14vw;
+  background:radial-gradient(circle,rgba(229,169,60,.24),rgba(229,169,60,.09) 42%,transparent 72%)}
+.aurora i:nth-child(2){width:64vw;height:64vw;right:-16vw;bottom:-18vw;
+  background:radial-gradient(circle,rgba(72,86,168,.28),rgba(72,86,168,.10) 40%,transparent 70%)}
+.grao{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+main{position:relative;z-index:2;flex:1;display:flex;align-items:center;
+  padding:clamp(28px,6vh,64px) 0}
+.wrap{width:min(560px,90vw);margin:0 auto}
+
+.marca{display:flex;align-items:center;gap:11px;margin-bottom:clamp(26px,5vh,42px)}
+.marca svg{width:28px;height:28px;flex:0 0 auto}
+.marca span{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.3em;
+  text-transform:uppercase;color:var(--paper-2)}
+
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--gold);font-weight:500;margin:0 0 16px;
+  display:flex;align-items:center;gap:10px}
+.eyebrow svg{width:15px;height:15px;flex:0 0 auto}
+
+h1{font-family:'Archivo',sans-serif;font-weight:800;letter-spacing:-.025em;
+  line-height:1.04;margin:0 0 16px;font-size:clamp(31px,6.2vw,46px);text-wrap:balance}
+h1 em{font-style:normal;color:var(--gold)}
+.sub{color:var(--paper-2);margin:0 0 clamp(26px,4.5vh,38px);max-width:46ch}
+
+/* ---------- o passo que falta ---------- */
+/* A lista de dois passos saiu daqui e virou um rotulo dentro do cartao.
+   Ela ocupava um bloco inteiro e empurrava o botao para baixo da dobra,
+   e o botao e a unica coisa que essa pagina precisa entregar.
+   "Passo 2 de 2" diz a mesma coisa em uma linha. */
+.passo-rotulo{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--gold);margin:0 0 10px}
+
+.cartao{position:relative;border-radius:20px;padding:clamp(24px,4.4vw,32px);
+  background:linear-gradient(142deg,rgba(255,255,255,.058),rgba(255,255,255,.012) 58%);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 0 rgba(0,0,0,.30),
+             0 28px 70px rgba(0,0,0,.42)}
+.cartao::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;
+  pointer-events:none;background:linear-gradient(142deg,rgba(255,255,255,.34),
+    rgba(255,255,255,.05) 42%,rgba(229,169,60,.16));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+.cartao h2{font-family:'Archivo',sans-serif;font-weight:800;letter-spacing:-.02em;
+  font-size:clamp(20px,3.6vw,25px);line-height:1.12;margin:0 0 10px}
+.cartao p{font-size:15px;color:var(--paper-2);margin:0 0 20px}
+
+.cta{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;letter-spacing:.05em;
+  text-transform:uppercase;text-decoration:none;color:#15110A;
+  background:linear-gradient(180deg,#F0BC55,var(--gold) 55%,var(--gold-2));
+  padding:23px 26px;border-radius:999px;border:0;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 14px 36px rgba(229,169,60,.26);
+  transition:box-shadow .28s ease,transform .28s cubic-bezier(.2,.8,.2,1)}
+.cta:hover{transform:translateY(-2px);
+  box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 20px 48px rgba(229,169,60,.36)}
+.cta:active{transform:translateY(0)}
+.cta:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
+.cta span{white-space:nowrap}
+.cta svg{width:21px;height:21px;flex:0 0 auto}
+.cta-abaixo{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--paper-3);text-align:center;margin:13px 0 0}
+body[data-sem-grupo="1"] .cta-abaixo{display:none}
+@media (prefers-reduced-motion:reduce){.cta{transition:none}.cta:hover{transform:none}}
+
+/* Estado que so aparece enquanto o link do grupo nao foi colado no
+   config.js. Some sozinho assim que voce preencher. */
+.falta-link{display:none;margin:0;padding:14px 16px;border-radius:12px;
+  background:rgba(200,85,61,.12);border:1px solid rgba(200,85,61,.4);
+  font-size:13.5px;line-height:1.45;color:#F0907B}
+body[data-sem-grupo="1"] .falta-link{display:block}
+body[data-sem-grupo="1"] .cta{display:none}
+
+.ficha{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:26px;
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  background:var(--line)}
+.ficha div{background:rgba(10,11,15,.72);padding:15px 10px;text-align:center}
+.ficha dt{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--paper-3);margin-bottom:5px}
+.ficha dd{margin:0;font-family:'Archivo',sans-serif;font-weight:600;font-size:16px}
+.ficha dd.ouro{color:var(--gold)}
+
+.nota{font-size:13.5px;color:var(--paper-3);margin:24px 0 0;line-height:1.5}
+
+footer{position:relative;z-index:2;padding:26px 0 32px;border-top:1px solid var(--line);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--paper-3);text-align:center}
+</style>
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true"><i></i><i></i></div>
+<div class="grao" aria-hidden="true"></div>
+
+<main>
+  <div class="wrap">
+
+    <div class="marca">
+      <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <circle cx="20" cy="20" r="18.5" stroke="rgba(229,169,60,.45)"/>
+        <circle cx="20" cy="20" r="11" stroke="rgba(229,169,60,.3)"/>
+        <path d="M20 2.5 L22.6 17.4 L37.5 20 L22.6 22.6 L20 37.5 L17.4 22.6 L2.5 20 L17.4 17.4 Z" fill="#E5A93C" opacity=".9"/>
+      </svg>
+      <span>Astrowake</span>
+    </div>
+
+    <p class="eyebrow">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.6 8.4l3.4 3.4 7.4-7.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Inscrição confirmada
+    </p>
+
+    <h1>Pronto<span id="nome-pessoa"></span>.<br>Sua vaga <em>está garantida</em>.</h1>
+    <p class="sub">Dia 15, às 18h, ao vivo. Falta um passo, e é ele que garante que você não vai perder o começo.</p>
+
+    <div class="cartao">
+      <p class="passo-rotulo">Passo 2 de 2</p>
+      <h2>Ei, o link do encontro sai no grupo</h2>
+      <p>É por lá que eu mando o acesso, aviso quando a transmissão começa e respondo as dúvidas antes do dia 15. Quem não está no grupo corre o risco de só lembrar depois que acabou.</p>
+
+      <a class="cta" id="link-grupo" href="#" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24a8.2 8.2 0 0 1 5.83 2.42 8.2 8.2 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23Zm4.52-6.16c-.25-.13-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.13-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.51.11-.11.25-.29.37-.43.12-.15.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.13-.56-1.35-.77-1.84-.2-.49-.4-.42-.55-.43h-.47c-.16 0-.43.06-.65.31-.22.25-.85.83-.85 2.03s.87 2.35.99 2.51c.12.17 1.71 2.61 4.14 3.66.58.25 1.03.4 1.38.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.3Z"/></svg>
+        <span>Entrar no grupo</span>
+      </a>
+      <p class="cta-abaixo">Abre direto no WhatsApp</p>
+
+      <p class="falta-link">
+        <strong>Falta configurar:</strong> cole o link do grupo em
+        <code>config.js</code>, no campo <code>GRUPO_WHATSAPP</code>.
+        Este aviso some sozinho quando você preencher, e só você o vê enquanto
+        estiver vazio.
+      </p>
+    </div>
+
+    <dl class="ficha">
+      <div><dt>Data</dt><dd>Dia 15</dd></div>
+      <div><dt>Horário</dt><dd>18h</dd></div>
+      <div><dt>Ingresso</dt><dd class="ouro">Gratuito</dd></div>
+    </dl>
+
+    <p class="nota">Pode fechar esta página depois de entrar no grupo. O lembrete chega por lá.</p>
+
+  </div>
+</main>
+
+<footer>Astrowake &nbsp;·&nbsp; Crassus Gobbi</footer>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  'use strict';
+  const CFG = window.ASTROWAKE || {};
+
+  /* O nome vem da sessao, posto pelo formulario da pagina anterior.
+     Nunca da URL: dado pessoal em endereco vaza para historico, log de
+     servidor e qualquer link que a pessoa compartilhe. */
+  try {
+    const nome = (sessionStorage.getItem('astrowake_nome') || '').trim();
+    if (nome) {
+      /* So o primeiro nome, e sem exagerar no tamanho: nome gigante
+         quebraria o titulo em cinco linhas. */
+      const primeiro = nome.split(/\s+/)[0].slice(0, 18);
+      document.getElementById('nome-pessoa').textContent = ', ' + primeiro;
+      document.title = 'Pronto, ' + primeiro + '. Vaga garantida';
+    }
+  } catch (e) {}
+
+  /* Sem link de grupo configurado a pagina nao finge que esta tudo bem:
+     ela esconde o botao e diz o que falta. Melhor voce ver isso no teste
+     do que um inscrito clicar num botao que nao leva a lugar nenhum. */
+  const link = (CFG.GRUPO_WHATSAPP || '').trim();
+  if (link) {
+    document.getElementById('link-grupo').href = link;
+  } else {
+    document.body.dataset.semGrupo = '1';
+    console.warn('[Astrowake] GRUPO_WHATSAPP vazio em config.js.');
+  }
+})();
+</script>
+</body>
+</html>
