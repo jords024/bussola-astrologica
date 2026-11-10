@@ -15,7 +15,7 @@ RUN rm -f /usr/share/nginx/html/Dockerfile \
           /usr/share/nginx/html/nginx.conf \
           /usr/share/nginx/html/README.md
 
-EXPOSE 80
+EXPOSE 80 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -q -O - http://127.0.0.1/health || exit 1
