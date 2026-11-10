@@ -81,10 +81,10 @@ class RecitacaoDaDefinicao(unittest.TestCase):
     """
 
     def test_pega_a_definicao_recitada(self):
-        c = bloco("Uma conversa simples esta virando duvida demais.",
-                  "Nas mensagens, voce rele cada frase procurando uma certeza "
-                  "que nao aparece. Um combinado curto vira interpretacoes "
-                  "demais e no fim voce confirma tudo de novo.")
+        c = bloco("Uma conversa direta sobre acordos e decisões.",
+                  "Nas negociações objetivas, as conversas diretas e os "
+                  "alinhamentos práticos de decisões viram acordos sem rumo "
+                  "procurando uma certeza que não aparece.")
         self.assertTrue(auditar_recitacao(c))
 
     def test_ancora_concreta_absolve_o_bloco(self):

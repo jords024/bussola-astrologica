@@ -101,6 +101,22 @@ def texto_da_carta(carta: dict) -> str:
     return "\n".join(x for x in partes if x)
 
 
+def sem_travessao(obj):
+    """Remove travessões (— ou –) e traços isolados do texto da carta recursivamente."""
+    if isinstance(obj, str):
+        t = re.sub(r"\s*[—–]\s*", ", ", obj)
+        t = re.sub(r"\s+-\s+", ", ", t)
+        t = t.replace("—", ", ").replace("–", ", ")
+        t = re.sub(r",\s*,+", ",", t)
+        t = re.sub(r":\s*,+", ":", t)
+        return t.strip()
+    elif isinstance(obj, list):
+        return [sem_travessao(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {k: sem_travessao(v) for k, v in obj.items()}
+    return obj
+
+
 # ---------------------------------------------------------------------------
 # Auditoria de simplicidade.
 #
@@ -374,7 +390,7 @@ def _carregar_exemplos() -> list:
     return _EXEMPLOS_DO_PROMPT
 
 
-def auditar_exemplos(carta: dict) -> list[str]:
+def auditar_exemplos(carta: dict, contextual: bool = False) -> list[str]:
     """A carta reaproveitou a cena de um exemplo do prompt. Vazia = pode."""
     if not isinstance(carta, dict):
         return []

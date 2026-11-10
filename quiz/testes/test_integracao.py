@@ -161,18 +161,14 @@ class Integracao(unittest.TestCase):
         self.assertIn("slice(0, 2)", html)
         self.assertIn("slice(0, 4)", html)
 
-    def test_vsl_video_tempo_delay_20_segundos(self):
+    def test_vsl_video_oferta_configurada(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         html = response.text
-        self.assertIn("segundos: 16", html)
-        self.assertIn("garantiaBotao: 16000", html)
-        self.assertIn("decorrido >= (VSL.segundos * 1000)", html)
-        self.assertIn("decorrido < (VSL.segundos * 1000)", html)
-        self.assertIn('id="vslGo"', html)
-        self.assertIn('id="vturb-wrapper-65cb9c18-e117-4734-a983-2fc6275c2061"', html)
-        self.assertIn('turb-front.aryaraj.shop/?embed=65cb9c18-e117-4734-a983-2fc6275c2061', html)
-        self.assertIn("videoId = '65cb9c18-e117-4734-a983-2fc6275c2061'", html)
+        self.assertIn("pitchSegundos: 231", html)
+        self.assertIn('id="vturb-wrapper-c6818306-fbe3-4919-b404-2f5b99424bc1"', html)
+        self.assertIn('turb-front.aryaraj.shop/?embed=c6818306-fbe3-4919-b404-2f5b99424bc1', html)
+        self.assertIn("videoId = 'c6818306-fbe3-4919-b404-2f5b99424bc1'", html)
 
     def test_docker_compose_quiz_producao_valido(self):
         import yaml

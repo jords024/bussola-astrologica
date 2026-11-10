@@ -548,11 +548,11 @@ def bloco_porta(porta, solares: bool = False, casa_do_tema=None,
                    "entrega a alavanca prática com passos no chão.")
     elif casa_do_tema:
         relacao = (f"A PESSOA QUER DESTRAVAR {tema.upper()}, E A SUA PORTA ABERTA NESTA SEMANA É: {CASA_VIDA.get(porta.casa, '')}. "
-                   "Esta é a sua maior OPORTUNIDADE TÁTICA e a CHAVE MESTRA da leitura: "
+                   "Esta é a sua maior OPORTUNIDADE TÁTICA, a BOA NOTICIA e a CHAVE MESTRA da leitura: "
                    f"ao agir nesta porta aberta, ela destrava {tema} com muito menos esforço e muito mais poder. "
                    "No parágrafo, faça a ponte direta, executiva e acolhedora: "
                    f"mostre com autoridade como assumir essa postura específica destrava {tema} no dia a dia. "
-                   "PROIBIDO tom pessimista, proibido frases de peso duradouro ou sofrimento, proibido verbos de concessão. "
+                   "PROIBIDO tom pessimista, proibido frases de peso duradouro ou sofrimento, PROIBIDO verbo de concessao. "
                    "Mostre a alavanca com autoridade, clareza e poder de ação imediato.")
     else:
         relacao = ""

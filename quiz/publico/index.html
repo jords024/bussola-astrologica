@@ -90,6 +90,7 @@ src="https://www.facebook.com/tr?id=776532458708522&ev=PageView&noscript=1"
     min-height:calc(100dvh - 46px);justify-content:center;padding:34px 0 40px;}
   .scr.on{display:flex;animation:rise .55s cubic-bezier(.2,.9,.3,1) both;}
   .scr.flow{justify-content:flex-start;min-height:auto;}
+  .scr.flow.on{animation:none !important;transform:none !important;}
   @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 
@@ -1308,7 +1309,7 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
     var videoRatio = '9:16';
     var isFloatingConfig = true;
     var floatingPos = 'bottom-right';
-    var floatingWidth = 320;
+    var floatingWidth = 140;
     var isCloseable = true;
 
     var isFloatingDismissed = false;
@@ -1457,14 +1458,20 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         isCurrentlyFloating = shouldFloat;
 
         if (shouldFloat) {
+          if (scr10) {
+            scr10.style.transform = 'none';
+            scr10.style.animation = 'none';
+          }
           var isVertical = videoRatio === '9:16';
-          var actualWidth = isVertical ? Math.min(floatingWidth, 250) : floatingWidth;
+          var isMobile = window.innerWidth <= 600;
+          var actualWidth = isVertical ? (isMobile ? Math.min(130, Math.round(window.innerWidth * 0.35)) : 140) : floatingWidth;
           var floatHeight = isVertical ? Math.round((actualWidth * 16) / 9) : Math.round((actualWidth * 9) / 16);
-          var marginEdge = 32;
-          var marginEdgeRight = 56;
+          var marginEdge = isMobile ? 84 : 32;
+          var marginEdgeBottom = marginEdge;
+          var marginEdgeRight = isMobile ? 16 : 32;
           ifr.style.position = 'fixed';
           ifr.style.top = 'auto';
-          ifr.style.bottom = marginEdge + 'px';
+          ifr.style.bottom = marginEdgeBottom + 'px';
           if (floatingPos === 'bottom-left') {
             ifr.style.left = marginEdge + 'px';
             ifr.style.right = 'auto';
@@ -1986,6 +1993,52 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
   let vslTempoReproducao = 0;       /* segundos acumulados de video reproduzido */
   let vslPlayTicker = null;
 
+  let vslConfigOferta = null;
+  function vslNotificarPlay(videoId, videoTipo){
+    const nome = (typeof S !== 'undefined' && S.nome) ? S.nome : '';
+    const whatsapp = (typeof S !== 'undefined' && S.whatsapp) ? S.whatsapp : '';
+    const leituraId = (typeof S !== 'undefined' && S.leituraId) ? S.leituraId : '';
+    if (!nome && !whatsapp && !leituraId) return;
+
+    const payload = {
+      video_id: videoId || '',
+      video_tipo: videoTipo || 'oferta',
+      nome: nome,
+      whatsapp: whatsapp,
+      leitura_id: leituraId
+    };
+
+    try {
+      fetch('/api/vsl-play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(function() {});
+    } catch(e) {}
+  }
+  window.vslNotificarPlay = vslNotificarPlay;
+
+  function vslCarregarConfig(){
+    if(vslConfigOferta) return Promise.resolve(vslConfigOferta);
+    const sid = (typeof S !== 'undefined' && S.sid) ? S.sid : (typeof A !== 'undefined' && A.sid ? A.sid : '');
+    const aid = (typeof S !== 'undefined' && S.aid) ? S.aid : (typeof A !== 'undefined' && A.aid ? A.aid : '');
+    return fetch('/api/config-oferta?sid=' + encodeURIComponent(sid) + '&aid=' + encodeURIComponent(aid))
+      .then(r => r.json())
+      .then(data => {
+        vslConfigOferta = data;
+        if(data && data.pitch_imediato){
+          if (typeof vslOfertaRevelar === 'function') vslOfertaRevelar('pitch_imediato');
+        }
+        return data;
+      })
+      .catch(() => {
+        vslConfigOferta = {modo: 'delay', variante: 'B', pitch_imediato: false};
+        return vslConfigOferta;
+      });
+  }
+  try{ vslCarregarConfig(); }catch(e){}
+
   function vslOfertaIniciarTicker(){
     if(vslPlayTicker || vslOfertaRevelada) return;
     vslPlayTicker = setInterval(() => {
@@ -2302,6 +2355,44 @@ p.cuidado{font-size:.95em;opacity:.8;padding-left:13px;
         if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); abrir(); }
       });
     }
+  }
+
+  /* Atalho Dev exclusivo para localhost / 127.0.0.1: pular direto para o último slide */
+  if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    const devPularParaOferta = () => {
+      if (!S.nome) S.nome = 'Visitante';
+      if (!S.desejo) S.desejo = 'compreender seu momento';
+      if (!S.area) S.area = 'carreira';
+      go(T.oferta);
+      if (typeof vslOfertaRevelar === 'function') vslOfertaRevelar('dev_atalho');
+    };
+
+    // 1. Botão no slide inicial (data-s="0") logo abaixo de #portalGo
+    const portalGo = document.getElementById('portalGo');
+    if (portalGo) {
+      const devBtn = document.createElement('button');
+      devBtn.type = 'button';
+      devBtn.id = 'devJumpInicioBtn';
+      devBtn.className = 'dev-jump-btn';
+      devBtn.textContent = '⚡ Pular para o último slide (Dev)';
+      devBtn.style.cssText = 'margin:12px auto 0;display:block;background:rgba(217,119,6,0.18);border:1px dashed #d97706;color:#fbbf24;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:all .2s ease;';
+      devBtn.onmouseover = () => { devBtn.style.background = 'rgba(217,119,6,0.35)'; };
+      devBtn.onmouseout = () => { devBtn.style.background = 'rgba(217,119,6,0.18)'; };
+      devBtn.onclick = devPularParaOferta;
+      portalGo.insertAdjacentElement('afterend', devBtn);
+    }
+
+    // 2. Atalho flutuante no topo direito para poder pular de qualquer etapa
+    const devFloatBtn = document.createElement('button');
+    devFloatBtn.type = 'button';
+    devFloatBtn.id = 'devFloatJumpBtn';
+    devFloatBtn.textContent = '⚡ Pular para Oferta (Dev)';
+    devFloatBtn.title = 'Atalho de desenvolvimento: pular direto para a tela de oferta';
+    devFloatBtn.style.cssText = 'position:fixed;top:14px;right:16px;z-index:999999;background:rgba(20,20,20,0.85);backdrop-filter:blur(8px);border:1px solid #d97706;color:#fbbf24;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.5);transition:all .2s ease;font-family:sans-serif;';
+    devFloatBtn.onmouseover = () => { devFloatBtn.style.transform = 'scale(1.05)'; devFloatBtn.style.borderColor = '#f59e0b'; };
+    devFloatBtn.onmouseout = () => { devFloatBtn.style.transform = 'scale(1)'; devFloatBtn.style.borderColor = '#d97706'; };
+    devFloatBtn.onclick = devPularParaOferta;
+    document.body.appendChild(devFloatBtn);
   }
 
   /* voltar: da leitura pula o cálculo e cai direto nos dados */
