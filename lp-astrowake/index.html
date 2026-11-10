@@ -474,6 +474,21 @@ footer{position:relative;z-index:2;padding:34px 0 46px;border-top:1px solid var(
 .campo[data-erro] input{border-color:#C8553D;background:rgba(200,85,61,.07)}
 .campo[data-erro] .campo-erro{display:block}
 
+/* ---------- telefone com ddi ---------- */
+.campo-telefone{display:flex;gap:8px;align-items:stretch}
+.ddi-wrapper{position:relative;flex:0 0 110px}
+.ddi-select{width:100%;height:100%;min-height:50px;appearance:none;-webkit-appearance:none;
+  background:rgba(255,255,255,.045);color:var(--paper);border:1px solid rgba(255,255,255,.15);
+  border-radius:12px;padding:14px 26px 14px 12px;font-family:inherit;font-size:15px;
+  cursor:pointer;transition:border-color .18s ease,background .18s ease}
+.ddi-select option{background:#12141a;color:#efeae2}
+.ddi-select:focus{outline:none;border-color:rgba(229,169,60,.75);background:rgba(255,255,255,.075)}
+.ddi-select:focus-visible{outline:2px solid rgba(229,169,60,.35);outline-offset:2px}
+.ddi-seta{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  pointer-events:none;color:var(--paper-3);display:flex;align-items:center}
+.campo-telefone input{flex:1;min-width:0}
+.campo[data-erro] .ddi-select{border-color:#C8553D;background:rgba(200,85,61,.07)}
+
 .form-aviso{font-size:13.5px;line-height:1.4;color:#F0907B;margin:0 0 14px;max-width:none}
 
 /* ---------- botao do formulario ---------- */
@@ -725,7 +740,7 @@ footer{position:relative;z-index:2;padding:34px 0 46px;border-top:1px solid var(
 <!-- ==================== POP-UP DE INSCRICAO ==================== -->
 <div class="modal" id="modal-inscricao" data-aberto="0" data-enviando="0"
      role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
-  <div class="modal-veu" data-fechar></div>
+  <div class="modal-veu"></div>
 
   <div class="modal-cartao glass">
     <button type="button" class="modal-x" data-fechar aria-label="Fechar">
@@ -744,13 +759,51 @@ footer{position:relative;z-index:2;padding:34px 0 46px;border-top:1px solid var(
         <span class="campo-erro" aria-live="polite"></span>
       </label>
 
-      <label class="campo" data-campo="whatsapp">
-        <span>Seu WhatsApp</span>
-        <input type="tel" name="whatsapp" id="in-whatsapp" inputmode="numeric"
-               autocomplete="tel-national" placeholder="(00) 00000-0000"
-               maxlength="16" required>
+      <div class="campo" data-campo="whatsapp">
+        <label for="in-whatsapp"><span>Seu WhatsApp</span></label>
+        <div class="campo-telefone">
+          <div class="ddi-wrapper">
+            <select id="in-ddi" class="ddi-select" aria-label="Código do país (DDI)">
+              <option value="55" selected>🇧🇷 +55</option>
+              <option value="351">🇵🇹 +351</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="34">🇪🇸 +34</option>
+              <option value="44">🇬🇧 +44</option>
+              <option value="33">🇫🇷 +33</option>
+              <option value="49">🇩🇪 +49</option>
+              <option value="39">🇮🇹 +39</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="598">🇺🇾 +598</option>
+              <option value="595">🇵🇾 +595</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="57">🇨🇴 +57</option>
+              <option value="52">🇲🇽 +52</option>
+              <option value="81">🇯🇵 +81</option>
+              <option value="41">🇨🇭 +41</option>
+              <option value="353">🇮🇪 +353</option>
+              <option value="61">🇦🇺 +61</option>
+              <option value="244">🇦🇴 +244</option>
+              <option value="258">🇲🇿 +258</option>
+              <option value="32">🇧🇪 +32</option>
+              <option value="31">🇳🇱 +31</option>
+              <option value="46">🇸🇪 +46</option>
+              <option value="47">🇳🇴 +47</option>
+              <option value="43">🇦🇹 +43</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="591">🇧🇴 +591</option>
+              <option value="593">🇪🇨 +593</option>
+              <option value="58">🇻🇪 +58</option>
+            </select>
+            <span class="ddi-seta" aria-hidden="true">
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </div>
+          <input type="tel" name="whatsapp" id="in-whatsapp" inputmode="numeric"
+                 autocomplete="tel-national" placeholder="(00) 00000-0000"
+                 maxlength="16" required>
+        </div>
         <span class="campo-erro" aria-live="polite"></span>
-      </label>
+      </div>
 
       <p class="form-aviso" id="form-aviso" role="alert" hidden></p>
 

@@ -17,6 +17,7 @@
   if (!modal || !form) return;
 
   const campoNome = document.getElementById('in-nome');
+  const campoDdi  = document.getElementById('in-ddi');
   const campoZap  = document.getElementById('in-whatsapp');
   const botao     = document.getElementById('btn-enviar');
   const aviso     = document.getElementById('form-aviso');
@@ -93,8 +94,7 @@
   /* ---------------------------------------------------------
      O CAMPO DE WHATSAPP
 
-     Mascara brasileira enquanto digita. Guardo so digitos por baixo
-     e formato por cima: colar um numero de qualquer jeito funciona. */
+     Mascara brasileira ou internacional conforme o DDI. */
   function mascara(valor) {
     const d = valor.replace(/\D/g, '').slice(0, 11);
     if (!d.length) return '';
@@ -104,9 +104,35 @@
     return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
   }
 
+  function mascaraInternacional(valor) {
+    const d = valor.replace(/\D/g, '').slice(0, 15);
+    if (!d.length) return '';
+    if (d.length <= 4) return d;
+    if (d.length <= 8) return d.slice(0, 4) + ' ' + d.slice(4);
+    if (d.length <= 12) return d.slice(0, 4) + ' ' + d.slice(4, 8) + ' ' + d.slice(8);
+    return d.slice(0, 4) + ' ' + d.slice(4, 8) + ' ' + d.slice(8, 12) + ' ' + d.slice(12);
+  }
+
+  if (campoDdi) {
+    campoDdi.addEventListener('change', () => {
+      const isBr = campoDdi.value === '55';
+      if (isBr) {
+        campoZap.placeholder = '(00) 00000-0000';
+        campoZap.maxLength = 16;
+        campoZap.value = mascara(campoZap.value);
+      } else {
+        campoZap.placeholder = 'Número do WhatsApp';
+        campoZap.maxLength = 19;
+        campoZap.value = mascaraInternacional(campoZap.value);
+      }
+      limparErro('whatsapp');
+    });
+  }
+
   campoZap.addEventListener('input', () => {
+    const isBr = !campoDdi || campoDdi.value === '55';
     const naPonta = campoZap.selectionStart === campoZap.value.length;
-    campoZap.value = mascara(campoZap.value);
+    campoZap.value = isBr ? mascara(campoZap.value) : mascaraInternacional(campoZap.value);
     if (naPonta) campoZap.setSelectionRange(campoZap.value.length, campoZap.value.length);
     limparErro('whatsapp');
   });
@@ -126,16 +152,25 @@
       ok = false;
     }
 
+    const ddi = campoDdi ? campoDdi.value : '55';
     const d = digitos(campoZap.value);
-    if (d.length < 10) {
-      marcarErro('whatsapp', 'Faltam números. Use DDD mais o número, como (11) 98888-7777.');
-      ok = false;
-    } else if (Number(d.slice(0, 2)) < 11) {
-      marcarErro('whatsapp', 'Esse DDD não existe. Confira os dois primeiros números.');
-      ok = false;
-    } else if (d.length === 11 && d[2] !== '9') {
-      marcarErro('whatsapp', 'Celular com 11 números começa com 9 depois do DDD.');
-      ok = false;
+
+    if (ddi === '55') {
+      if (d.length < 10) {
+        marcarErro('whatsapp', 'Faltam números. Use DDD mais o número, como (11) 98888-7777.');
+        ok = false;
+      } else if (Number(d.slice(0, 2)) < 11) {
+        marcarErro('whatsapp', 'Esse DDD não existe. Confira os dois primeiros números.');
+        ok = false;
+      } else if (d.length === 11 && d[2] !== '9') {
+        marcarErro('whatsapp', 'Celular com 11 números começa com 9 depois do DDD.');
+        ok = false;
+      }
+    } else {
+      if (d.length < 6) {
+        marcarErro('whatsapp', 'Número incompleto. Digite o número com o código de área.');
+        ok = false;
+      }
     }
 
     /* O foco vai para o primeiro campo com problema, senao a pessoa
@@ -181,13 +216,18 @@
     esconderAviso();
     if (!validar()) return;
 
+    const ddi = campoDdi ? campoDdi.value : '55';
     const d = digitos(campoZap.value);
+    const numeroE164 = '+' + ddi + d;
+    const formatado = ddi === '55' ? ('+55 ' + campoZap.value) : ('+' + ddi + ' ' + campoZap.value);
+
     const dados = {
       evento: 'inscricao',
       origem: CFG.ORIGEM || 'lp-astrowake',
       nome: campoNome.value.trim(),
-      whatsapp: '+55' + d,              // pronto para disparo automatico
-      whatsapp_formatado: campoZap.value,
+      ddi: ddi,
+      whatsapp: numeroE164,              // formato internacional padrao E.164
+      whatsapp_formatado: formatado,
       pagina: location.origin + location.pathname,
       referrer: document.referrer || null,
       utm: origemDaVisita(),
