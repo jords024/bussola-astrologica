@@ -15,7 +15,7 @@ window.ASTROWAKE = {
         leva a pessoa para a pagina de obrigado, so que sem enviar
         nada e avisando no console. Da para testar o fluxo inteiro
         antes de ter o webhook pronto. */
-  WEBHOOK: '',
+  WEBHOOK: 'https://zapvoicecrassos.aryaraj.shop/api/webhooks/blazkfriday-astrowake-landingpage',
 
   /* 2. O LINK DO GRUPO de WhatsApp, que e o destino da pagina de
         obrigado. Aquele endereco chat.whatsapp.com/XXXX do convite. */

@@ -74,9 +74,10 @@ def test_inscricao_js_suporta_ddi_e_mascara_internacional():
 
 
 def test_config_js_estrutura_webhook():
-    """Garante que config.js possui a estrutura esperada para WEBHOOK e GRUPO_WHATSAPP."""
+    """Garante que config.js possui a estrutura esperada e URL de webhook configurada."""
     conteudo = CONFIG_JS.read_text(encoding="utf-8")
 
     assert "window.ASTROWAKE" in conteudo
     assert "WEBHOOK:" in conteudo
     assert "GRUPO_WHATSAPP:" in conteudo
+    assert "blazkfriday-astrowake-landingpage" in conteudo, "URL do webhook de captura deve estar configurada"
