@@ -10,6 +10,7 @@ DIR_ASTROWAKE = Path(__file__).resolve().parent.parent.parent / "lp-astrowake"
 INDEX_HTML = DIR_ASTROWAKE / "index.html"
 INSCRICAO_JS = DIR_ASTROWAKE / "inscricao.js"
 CONFIG_JS = DIR_ASTROWAKE / "config.js"
+PIXEL_JS = DIR_ASTROWAKE / "pixel.js"
 
 
 def test_arquivos_astrowake_existem():
@@ -17,6 +18,7 @@ def test_arquivos_astrowake_existem():
     assert INDEX_HTML.exists(), "index.html não encontrado em lp-astrowake"
     assert INSCRICAO_JS.exists(), "inscricao.js não encontrado em lp-astrowake"
     assert CONFIG_JS.exists(), "config.js não encontrado em lp-astrowake"
+    assert PIXEL_JS.exists(), "pixel.js não encontrado em lp-astrowake"
 
 
 def test_popup_nao_fecha_ao_clicar_fora():
@@ -81,3 +83,17 @@ def test_config_js_estrutura_webhook():
     assert "WEBHOOK:" in conteudo
     assert "GRUPO_WHATSAPP:" in conteudo
     assert "blazkfriday-astrowake-landingpage" in conteudo, "URL do webhook de captura deve estar configurada"
+
+
+def test_pixel_meta_configurado():
+    """Garante que o Pixel da Meta está declarado no config.js e referenciado no index.html e obrigado.html."""
+    conteudo_cfg = CONFIG_JS.read_text(encoding="utf-8")
+    assert "PIXEL:" in conteudo_cfg, "Chave PIXEL deve existir em config.js"
+    assert "776532458708522" in conteudo_cfg, "ID do Pixel da Meta deve estar configurado"
+
+    conteudo_index = INDEX_HTML.read_text(encoding="utf-8")
+    assert "pixel.js" in conteudo_index, "pixel.js deve ser importado em index.html"
+
+    conteudo_obrigado = (DIR_ASTROWAKE / "obrigado.html").read_text(encoding="utf-8")
+    assert "pixel.js" in conteudo_obrigado, "pixel.js deve ser importado em obrigado.html"
+    assert 'data-evento="lead"' in conteudo_obrigado, "obrigado.html deve configurar data-evento='lead'"
