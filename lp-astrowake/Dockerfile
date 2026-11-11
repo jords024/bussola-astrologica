@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
 LABEL maintainer="Aryaraj Fernandes <aryarajmarketing@gmail.com>"
-LABEL version="1.0.0"
+LABEL version="1.3.2"
 LABEL description="Landing Page Astrowake - Hackeando a Realidade"
 
 # Copia configuracao otimizada do Nginx
